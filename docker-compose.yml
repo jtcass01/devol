@@ -8,7 +8,7 @@ services:
         - USER_UID=${USER_UID:?err}
         - USER_GID=${USER_GID:?err}
     volumes:
-      - ${devol_WS:?err}:/workspace/devol
+      - ${DEVOL_WS:?err}:/workspace/devol
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /dev/dri:/dev/dri
       - /tmp/runtime-${USER}:/tmp/runtime-${USER}
