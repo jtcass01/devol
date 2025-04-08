@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
     Command,
@@ -82,15 +82,15 @@ def generate_launch_description():
     )
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         "use_sim_time",
-        default_value="false",
+        default_value="true",
         choices=["true", "false"],
         description="Use Gazebo simulation clock",
     )
 
     declare_world_directory_cmd = DeclareLaunchArgument(
         "world",
-        default_value="empty",
-        choices=["empty", "moon"]
+        default_value="devol",
+        choices=["devol", "moon"]
     )
 
     robot_description_content: ParameterValue = ParameterValue(Command([
@@ -106,23 +106,6 @@ def generate_launch_description():
         output='screen',
         parameters=[{'use_sim_time': use_sim_time,
                      'robot_description': robot_description_content}])
-
-    # Publish the joint state values for the non-fixed joints in the URDF file.
-    start_joint_state_publisher_cmd: Node = Node(
-        package='joint_state_publisher',
-        executable='joint_state_publisher',
-        name='joint_state_publisher',
-        parameters=[{'use_sim_time': use_sim_time}],
-        condition=UnlessCondition(jsp_gui),
-    )
-
-    start_joint_state_publisher_gui_cmd: Node = Node(
-        package='joint_state_publisher_gui',
-        executable='joint_state_publisher_gui',
-        name='joint_state_publisher_gui',
-        parameters=[{'use_sim_time': use_sim_time}],
-        condition=IfCondition(jsp_gui),
-    )
 
     # Launch RViz
     start_rviz_cmd: Node = Node(
@@ -143,6 +126,16 @@ def generate_launch_description():
                 [devol_gz_model_directory, world_directory, "model.sdf"]
             )
         }.items(),
+    )
+
+    declare_gz_sim_resource_path_env_var = SetEnvironmentVariable(
+        "GZ_SIM_RESOURCE_PATH",
+        value=PathJoinSubstitution(
+            [devol_gz_model_directory, world_directory, 
+             ":", FindPackageShare("ur_description"), 
+             ":", FindPackageShare("robotiq_description"), 
+             ":", FindPackageShare("devol_description"), 
+             ":$GZ_SIM_RESOURCE_PATH"])
     )
 
     start_gz_bridge_cmd: Node = Node(
@@ -170,9 +163,8 @@ def generate_launch_description():
 
     # Add actions
     ld.add_action(start_robot_state_publisher_cmd)
-    ld.add_action(start_joint_state_publisher_cmd)
-    ld.add_action(start_joint_state_publisher_gui_cmd)
     ld.add_action(start_rviz_cmd)
+    ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
     ld.add_action(start_gz_bridge_cmd)
 
