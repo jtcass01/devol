@@ -4,8 +4,8 @@
 # is then ${COMPOSE_PROJECT_NAME}-${service_name}-1
 cat << EOF > .env
 DEVOL_WS=`pwd`
-USER_UID=`id -u`
-USER_GID=`id -g`
+USER_UID=1001
+USER_GID=1001
 COMPOSE_PROJECT_NAME=${USER}
 CONTAINER_NAME=${USER}-devol-dev
 EOF
