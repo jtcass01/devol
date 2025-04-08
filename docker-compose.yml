@@ -1,0 +1,38 @@
+services:
+  devol-dev:
+    image: ${USER}_devol_dev/sim
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - USER_UID=${USER_UID:?err}
+        - USER_GID=${USER_GID:?err}
+    volumes:
+      - ${devol_WS:?err}:/workspace/devol
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev/dri:/dev/dri
+      - /tmp/runtime-${USER}:/tmp/runtime-${USER}
+      - /home/${USER}/USD:/home/${USER}/USD
+    working_dir: /workspace/devol
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - QT_X11_NO_MITSHM=1
+      - XDG_RUNTIME_DIR=/tmp/runtime-${USER}
+      - LIBGL_ALWAYS_INDIRECT=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - DISPLAY=${DISPLAY:-:1}
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    devices:
+      - /dev/dri:/dev/dri
