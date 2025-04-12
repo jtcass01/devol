@@ -68,9 +68,39 @@
       </link>
     </model>
 
+    <!-- Add a stand for the manipulator -->
+    <model name="stand">
+      <static>true</static>
+      <link name="devol_stand">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+                <radius>0.09</radius>
+                <length>0.3</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+                <radius>0.09</radius>
+                <length>0.3</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.0 0.176 0.447 1</ambient>
+            <diffuse>0.0 0.176 0.447 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+      <pose>0 0 0.15 0 0 0</pose>
+    </model>
+
+    <!-- Add the devol manipulator -->
     <model name="devol">
       <self_collide>true</self_collide>
-      <pose>0 0 0.35 0 0 0</pose>
+      <pose>0 0 0.3 0 0 0</pose>
       <include merge="true">
         <uri>/home/jakeadelic/programming/devol/src/devol_description/models/devol/model.sdf</uri>
       </include>
@@ -88,7 +118,7 @@
         <static_publisher>true</static_publisher>
         <static_update_frequency>1</static_update_frequency>
       </plugin>
-
     </model>
+
   </world>
 </sdf>

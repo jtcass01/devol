@@ -10,6 +10,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+from tempfile import gettempdir
+from os.path import join
 
 ARGUMENTS = [
     DeclareLaunchArgument('name', default_value='devol',
@@ -48,6 +50,8 @@ def generate_launch_description():
     gz_launch_path: PathJoinSubstitution = PathJoinSubstitution(
         [gz_path, "launch", gz_launch_filename]
     )
+
+    tmp_sdf_path: str = join(gettempdir(), "devol.sdf")
 
     # Launch configuration variables
     jsp_gui = LaunchConfiguration("jsp_gui")
@@ -89,8 +93,8 @@ def generate_launch_description():
 
     declare_world_directory_cmd = DeclareLaunchArgument(
         "world",
-        default_value="devol",
-        choices=["devol", "moon"]
+        default_value="factory",
+        choices=["devol", "factory"]
     )
 
     robot_description_content: ParameterValue = ParameterValue(Command([
