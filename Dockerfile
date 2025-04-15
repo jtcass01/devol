@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get update -y \
     && apt-get upgrade -y \
     && apt-get install -y ros-dev-tools ros-${ROS_DISTRO}-desktop ros-${ROS_DISTRO}-vision-msgs ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-ur ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-robotiq-description ros-${ROS_DISTRO}-robotiq-controllers \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
