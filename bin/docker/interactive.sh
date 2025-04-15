@@ -1,8 +1,2 @@
-# Generate the .env file if it doesn't exist, then source it
-if [ ! -f .env ]; then
-    . ./bin/docker/generate_env.sh
-fi
-. .env
-
-xhost +
-docker exec -it $CONTAINER_NAME bash # Login to an interactive window
+xhost +local:docker
+docker run --rm -it --user $(id -u):$(id -g) --name devol-dev   --privileged  --net=host   --ipc=host   -e DISPLAY=${DISPLAY:-:1}   -e QT_X11_NO_MITSHM=1   -e XDG_RUNTIME_DIR=/tmp/runtime-${USER}  -e DEBIAN_FRONTEND=noninteractive   -v ${DEVOL_WS:?err}:/workspace/devol   -v /tmp/.X11-unix:/tmp/.X11-unix   -v /dev/dri:/dev/dri   -v /tmp/runtime-${USER}:/tmp/runtime-${USER}   -v /home/${USER}/USD:/home/${USER}/USD   -w /workspace/devol   ${USER}_devol_dev/sim
