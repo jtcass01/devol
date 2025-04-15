@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
     && apt-get update -y \
     && apt-get upgrade -y \
-    && apt-get install -y ros-dev-tools ros-${ROS_DISTRO}-desktop ros-${ROS_DISTRO}-vision-msgs ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-ur ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers \
+    && apt-get install -y ros-dev-tools ros-${ROS_DISTRO}-desktop ros-${ROS_DISTRO}-vision-msgs ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-ur ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers ros-${ROS_DISTRO}-robotiq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
