@@ -20,10 +20,6 @@ from ament_index_python.packages import get_package_share_directory
 ARGUMENTS = [
     DeclareLaunchArgument('name', default_value='devol',
                           description='Prefix for all joint names'),
-    DeclareLaunchArgument('tf_prefix', default_value='',
-                          description='Prefix of the joint names, useful for '
-                          'multi-robot setup. If changed than also joint names in the controllers\' configuration '
-                          'have to be updated.'),
 ]
 
 
@@ -37,10 +33,11 @@ def load_yaml(package_name, file_path):
             return safe_load(file)
     except OSError:  # parent of IOError, OSError *and* WindowsError where available
         return None
-    
+
 def generate_launch_description():
     # Define file names
     urdf_package = "devol_description"
+    moveit_package = "devol_moveit_config"
     urdf_filename = "devol.urdf.xacro"
     rviz_config_filename = "moveit_devol.rviz"
 
@@ -49,8 +46,9 @@ def generate_launch_description():
     default_urdf_path = PathJoinSubstitution(
         [pkg_share_description, "urdf", urdf_filename]
     )
+    pkg_share_moveit = FindPackageShare(moveit_package)
     default_rviz_path = PathJoinSubstitution(
-        [pkg_share_description, "rviz", rviz_config_filename]
+        [pkg_share_moveit, "rviz", rviz_config_filename]
     )
 
     # Launch configuration variables
@@ -112,17 +110,17 @@ def generate_launch_description():
 
 
     moveit_config = (
-        MoveItConfigsBuilder(robot_name="devol", package_name="devol_moveit_config")
-        .robot_description_semantic(file_path=join(get_package_share_directory("devol_moveit_config"),
+        MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
+        .robot_description_semantic(file_path=join(get_package_share_directory(moveit_package),
                                               "config",
                                               "devol.srdf"))
-        .robot_description(file_path=join(get_package_share_directory("devol_description"),
+        .robot_description(file_path=join(get_package_share_directory(urdf_package),
                                      "urdf",
-                                     "devol.urdf.xacro"))
-        .joint_limits(file_path=join(get_package_share_directory("devol_moveit_config"),
+                                     urdf_filename))
+        .joint_limits(file_path=join(get_package_share_directory(moveit_package),
                                      "config",
                                      "joint_limits.yaml"))
-        .trajectory_execution(file_path=join(get_package_share_directory("devol_moveit_config"),
+        .trajectory_execution(file_path=join(get_package_share_directory(moveit_package),
                                         "config",
                                         "moveit_controllers.yaml"))
         .to_moveit_configs()
@@ -159,7 +157,7 @@ def generate_launch_description():
         parameters=[
             moveit_config.robot_description,
             join(
-                get_package_share_directory("devol_moveit_config"),
+                get_package_share_directory(moveit_package),
                 "config",
                 "ros2_controllers.yaml"
             )
