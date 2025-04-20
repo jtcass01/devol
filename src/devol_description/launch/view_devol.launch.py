@@ -14,14 +14,6 @@ from launch_ros.substitutions import FindPackageShare
 ARGUMENTS = [
     DeclareLaunchArgument('name', default_value='devol',
                           description='Prefix for all joint names'),
-    DeclareLaunchArgument('use_mock_hardware', default_value='true',
-                          description='Use mock hardware'),
-    DeclareLaunchArgument('mock_sensor_commands', default_value='true',
-                          description='Use mock sensor commands'),
-    DeclareLaunchArgument('tf_prefix', default_value='',
-                          description='Prefix of the joint names, useful for '
-                          'multi-robot setup. If changed than also joint names in the controllers\' configuration '
-                          'have to be updated.'),
 ]
 
 
@@ -43,9 +35,10 @@ def generate_launch_description():
     # Launch configuration variables
     jsp_gui = LaunchConfiguration("jsp_gui")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
-    urdf_model = LaunchConfiguration("urdf_model")
     use_rviz = LaunchConfiguration("use_rviz")
+    urdf_model = LaunchConfiguration("urdf_model")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    name = LaunchConfiguration("name")
 
     # Declare launch arguments
     declare_jsp_gui_cmd = DeclareLaunchArgument(
@@ -79,7 +72,7 @@ def generate_launch_description():
 
     robot_description_content: ParameterValue = ParameterValue(Command([
         'xacro', ' ', urdf_model, ' ',
-        'name:=', LaunchConfiguration('name'), ' ',
+        'name:=', name, ' ',
     ]), value_type=str)
 
     # Subscribe to the joint states of the robot, and publish them to the robot state publisher

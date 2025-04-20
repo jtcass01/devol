@@ -102,7 +102,7 @@
       <self_collide>true</self_collide>
       <pose>0 0 0.3 0 0 0</pose>
       <include merge="true">
-        <uri>/workspace/devol/src/devol_description/models/devol/model.sdf</uri>
+        <uri>/home/jakeadelic/programming/devol/src/devol_description/models/devol/model.sdf</uri>
       </include>
 
       <plugin

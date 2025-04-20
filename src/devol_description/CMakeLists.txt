@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 project(devol_description)
 
 find_package(ament_cmake REQUIRED)
+find_package(ur_description REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -37,6 +38,12 @@ install(
   DIRECTORY
     launch/
   DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(
+  DIRECTORY
+    srdf/
+  DESTINATION share/${PROJECT_NAME}/srdf
 )
 
 ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/${PROJECT_NAME}.dsv.in")

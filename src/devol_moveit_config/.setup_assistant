@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: devol_description
+    relative_path: urdf/devol.urdf.xacro
+  srdf:
+    relative_path: config/devol.srdf
+  package_settings:
+    author_name: Jacob Taylor Cassady
+    author_email: jcassad1@jh.edu
+    generated_timestamp: 1745086383
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
