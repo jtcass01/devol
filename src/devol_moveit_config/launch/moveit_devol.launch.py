@@ -1,4 +1,3 @@
-from yaml import safe_load
 from os.path import join
 
 from launch import LaunchDescription
@@ -19,20 +18,8 @@ from ament_index_python.packages import get_package_share_directory
 
 ARGUMENTS = [
     DeclareLaunchArgument('name', default_value='devol',
-                          description='Prefix for all joint names'),
+                          description=''),
 ]
-
-
-
-def load_yaml(package_name, file_path):
-    package_path = get_package_share_directory(package_name)
-    absolute_file_path = join(package_path, file_path)
-
-    try:
-        with open(absolute_file_path) as file:
-            return safe_load(file)
-    except OSError:  # parent of IOError, OSError *and* WindowsError where available
-        return None
 
 def generate_launch_description():
     # Define file names
@@ -90,11 +77,6 @@ def generate_launch_description():
             [pkg_share_description, "config", "warehouse_ros.sqlite"]
         ),
         description="Path to the SQLite database for the warehouse",
-    )
-    declare_launch_servo_cmd = DeclareLaunchArgument(
-        "launch_servo",
-        default_value="false",
-        description="Launch the MoveIt Servo node",
     )
     declare_publish_robot_description_semantic_cmd = DeclareLaunchArgument(
         "publish_robot_description_semantic",
@@ -191,7 +173,6 @@ def generate_launch_description():
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_warehouse_sqlite_path_cmd)
     ld.add_action(declare_publish_robot_description_semantic_cmd)
-    ld.add_action(declare_launch_servo_cmd)
 
     # Add actions
     ld.add_action(start_move_group_cmd)

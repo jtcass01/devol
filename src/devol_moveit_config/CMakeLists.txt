@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(devol_moveit_config)
 
 find_package(ament_cmake REQUIRED)
+find_package(devol_description REQUIRED)
 
 install(
   DIRECTORY
