@@ -259,7 +259,7 @@
       <self_collide>true</self_collide>
       <pose>0 0 0.3 0 0 0</pose>
       <include merge="true">
-        <uri>/home/jakeadelic/programming/devol/src/devol_description/models/devol/model.sdf</uri>
+        <uri>/home/ubuntu/devol/src/devol_description/models/devol/model.sdf</uri>
       </include>
 
       <plugin
@@ -290,8 +290,35 @@
       <include merge="true">
         <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Reflective table</uri>
       </include>
-      <pose>-1.0 -2.5 0 0 0 1.570796327</pose>
+      <pose>-1.0 -2.0 0 0 0 1.570796327</pose>
       <static>true</static>
+    </model>
+
+    <!-- Add a block for the manipulator to grab and place on the Husky-->
+    <model name="block">
+      <static>false</static>
+      <link name="block_obj">
+        <collision name="collision">
+          <geometry>
+            <box>
+                <size>0.075 0.075 0.075</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+                <size>0.075 0.075 0.075</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.898 0.447 0 1</ambient>
+            <diffuse>0.898 0.447 0 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+      <pose>-0 -1.0 1.1 0 0 0</pose>
     </model>
 
   </world>
