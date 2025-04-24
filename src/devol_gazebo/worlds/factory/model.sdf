@@ -28,17 +28,19 @@
     </plugin>
     
     <gravity>0 0 -9.8</gravity>
-    <physics default="0" name="default_physics" type="ode">
+    <!-- <gravity>0 0 -9.8</gravity>
+    <physics type="dart" name="dart_physics" type="ode">
       <max_step_size>0.01</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>100</real_time_update_rate>
-    </physics>
+    </physics> -->
 
     <model name="aws_robomaker_warehouse_ShelfF_01_001">
       <include>
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfF_01</uri>
       </include>
       <pose>-5.795143 -0.956635 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_WallB_01_001">
@@ -51,6 +53,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfE_01</uri>
       </include>
       <pose>4.73156 0.57943 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ShelfE_01_002">
@@ -58,6 +61,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfE_01</uri>
       </include>
       <pose>4.73156 -4.827049 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ShelfE_01_003">
@@ -65,6 +69,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfE_01</uri>
       </include>
       <pose>4.73156 -8.6651 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ShelfD_01_001">
@@ -72,6 +77,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfD_01</uri>
       </include>
       <pose>4.73156 -1.242668 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ShelfD_01_002">
@@ -79,6 +85,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfD_01</uri>
       </include>
       <pose>4.73156 -3.038551 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ShelfD_01_003">
@@ -86,6 +93,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfD_01</uri>
       </include>
       <pose>4.73156 -6.750542 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_GroundB_01_001">
@@ -93,6 +101,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_GroundB_01</uri>
       </include>
       <pose>0.0 0.0 -0.090092 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_Lamp_01_005">
@@ -100,6 +109,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_Lamp_01</uri>
       </include>
       <pose>0 0 -4 0 0 0</pose>
+      <static>true</static>
     </model>
 
 
@@ -108,6 +118,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_Bucket_01</uri>
       </include>
       <pose>0.433449 9.631706 0 0 0 -1.563161</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_Bucket_01_021">
@@ -115,12 +126,14 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_Bucket_01</uri>
       </include>
       <pose>-1.8321 -6.3752 0 0 0 -1.563161</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_Bucket_01_022">
       <include>
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_Bucket_01</uri>
       </include>
+      <static>true</static>
       <pose>0.433449 8.59 0 0 0 -1.563161</pose>
     </model>
 
@@ -129,6 +142,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringA_01</uri>
       </include>
       <pose>5.708138 8.616844 -0.017477 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name='aws_robomaker_warehouse_ClutteringA_01_017'>
@@ -136,6 +150,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringA_01</uri>
       </include>
       <pose>3.408638 8.616844 -0.017477 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name='aws_robomaker_warehouse_ClutteringA_01_018'>
@@ -143,6 +158,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringA_01</uri>
       </include>
       <pose>-1.491287 5.222435 -0.017477 0 0 -1.583185</pose>
+      <static>true</static>
     </model>
 
 
@@ -151,6 +167,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringC_01</uri>
       </include>
       <pose>3.324959 3.822449 -0.012064 0 0 1.563871</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ClutteringC_01_028">
@@ -158,6 +175,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringC_01</uri>
       </include>
       <pose>5.54171 3.816475 -0.015663 0 0 -1.583191</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ClutteringC_01_029">
@@ -172,6 +190,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringC_01</uri>
       </include>
       <pose>3.236 6.137154 0 0 0 3.150000</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ClutteringC_01_031">
@@ -179,6 +198,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringC_01</uri>
       </include>
       <pose>-1.573677 2.301994 -0.015663 0 0 -3.133191</pose>
+      <static>true</static>
     </model>
 
     <model name="aws_robomaker_warehouse_ClutteringC_01_032">
@@ -186,6 +206,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringC_01</uri>
       </include>
       <pose>-1.2196 9.407 -0.015663 0 0 1.563871</pose>
+      <static>true</static>
     </model>
 
     <model name='aws_robomaker_warehouse_ClutteringD_01_005'>
@@ -193,6 +214,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ClutteringD_01</uri>
       </include>
       <pose>-1.634682 -7.811813 -0.319559 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name='aws_robomaker_warehouse_TrashCanC_01_002'>
@@ -200,6 +222,7 @@
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_TrashCanC_01</uri>
       </include>
       <pose>-1.592441 7.715420 0 0 0 0</pose>
+      <static>true</static>
     </model>
 
     <model name='aws_robomaker_warehouse_PalletJackB_01_001'>
@@ -254,36 +277,13 @@
       <pose>0 0 0.15 0 0 0</pose>
     </model>
 
-    <!-- Add the devol manipulator -->
-    <model name="devol">
-      <self_collide>true</self_collide>
-      <pose>0 0 0.3 0 0 0</pose>
-      <include merge="true">
-        <uri>/home/jakeadelic/programming/devol/src/devol_description/models/devol/model.sdf</uri>
-      </include>
-
-      <plugin
-        filename="gz-sim-joint-state-publisher-system"
-        name="gz::sim::systems::JointStatePublisher">
-      </plugin>
-
-      <plugin
-        filename="gz-sim-pose-publisher-system"
-        name="gz::sim::systems::PosePublisher">
-        <publish_link_pose>true</publish_link_pose>
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-        <static_publisher>true</static_publisher>
-        <static_update_frequency>1</static_update_frequency>
-      </plugin>
-    </model>
-
     <!-- Add Husky Robot for placing items on top of. -->
     <model name="husky">
       <include merge="true">
         <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MARBLE_HUSKY_SENSOR_CONFIG_5</uri>
       </include>
       <pose>1.71 0.2 0.18 0 0 1.570796327</pose>
-      <static>false</static>
+      <static>true</static>
     </model>
 
    <model name="Reflective table">
@@ -293,6 +293,5 @@
       <pose>-1.0 -2.5 0 0 0 1.570796327</pose>
       <static>true</static>
     </model>
-
   </world>
 </sdf>

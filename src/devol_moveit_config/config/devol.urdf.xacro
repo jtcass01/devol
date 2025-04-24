@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="devol">
-    <xacro:arg name="initial_positions_file" default="/home/jakeadelic/programming/devol/src/devol_moveit_config/config/initial_positions.yaml" />
+    <xacro:arg name="initial_positions_file" default="$(find devol_moveit_config)/config/initial_positions.yaml" />
 
     <!-- Import devol urdf file -->
     <xacro:include filename="$(find devol_description)/urdf/devol.urdf.xacro" />

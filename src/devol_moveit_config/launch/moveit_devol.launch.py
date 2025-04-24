@@ -26,7 +26,7 @@ def generate_launch_description():
     urdf_package = "devol_description"
     moveit_package = "devol_moveit_config"
     urdf_filename = "devol.urdf.xacro"
-    rviz_config_filename = "moveit_devol.rviz"
+    rviz_config_filename = "moveit.rviz"
 
     # Define paths
     pkg_share_description = FindPackageShare(urdf_package)
@@ -35,7 +35,7 @@ def generate_launch_description():
     )
     pkg_share_moveit = FindPackageShare(moveit_package)
     default_rviz_path = PathJoinSubstitution(
-        [pkg_share_moveit, "rviz", rviz_config_filename]
+        [pkg_share_moveit, "config", rviz_config_filename]
     )
 
     # Launch configuration variables
@@ -105,6 +105,7 @@ def generate_launch_description():
         .trajectory_execution(file_path=join(get_package_share_directory(moveit_package),
                                         "config",
                                         "moveit_controllers.yaml"))
+        .planning_scene_monitor(publish_robot_description=True, publish_robot_description_semantic=True)
         .to_moveit_configs()
     )
 
@@ -146,6 +147,33 @@ def generate_launch_description():
         ]
     )
 
+    # Spawn joint_state_broadcaster
+    spawn_joint_state_broadcaster_cmd: Node = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="spawn_joint_state_broadcaster",
+        output="screen",
+        arguments=["joint_state_broadcaster", "-c", "/controller_manager"],
+    )
+
+    # Spawn UR controller
+    spawn_ur_controller_cmd: Node = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="spawn_ur_controller",
+        output="screen",
+        arguments=["ur_manipulator_controller", "-c", "/controller_manager"],
+    )
+
+    # Spawn UR controller
+    spawn_hand_controller_cmd: Node = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="spawn_hand_controller",
+        output="screen",
+        arguments=["hand_controller", "-c", "/controller_manager"],
+    )
+
     # Launch RViz
     start_rviz_cmd: Node = Node(
         condition=IfCondition(use_rviz),
@@ -177,6 +205,9 @@ def generate_launch_description():
     # Add actions
     ld.add_action(start_move_group_cmd)
     ld.add_action(start_controller_manager_cmd)
+    ld.add_action(spawn_joint_state_broadcaster_cmd)
+    ld.add_action(spawn_ur_controller_cmd)
+    ld.add_action(spawn_hand_controller_cmd)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(start_rviz_cmd)
 

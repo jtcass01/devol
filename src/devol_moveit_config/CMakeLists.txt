@@ -6,12 +6,6 @@ find_package(devol_description REQUIRED)
 
 install(
   DIRECTORY
-    rviz/
-  DESTINATION share/${PROJECT_NAME}/rviz
-)
-
-install(
-  DIRECTORY
     config/
   DESTINATION share/${PROJECT_NAME}/config
 )

@@ -1,20 +1,24 @@
 from os.path import join
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, RegisterEventHandler
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command,
     LaunchConfiguration,
     PathJoinSubstitution,
+    FindExecutable,
+    TextSubstitution
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from moveit_configs_utils import MoveItConfigsBuilder
 
 from ament_index_python.packages import get_package_share_directory
+
+from numpy import pi
 
 
 
@@ -33,7 +37,7 @@ def generate_launch_description():
 
     gz_launch_filename: str = "gz_sim.launch.py"
     urdf_filename = "devol.urdf.xacro"
-    rviz_config_filename = "moveit_devol.rviz"
+    rviz_config_filename = "moveit.rviz"
 
     # Define paths
     pkg_share_description = FindPackageShare(urdf_package)
@@ -42,7 +46,7 @@ def generate_launch_description():
     )
     pkg_share_moveit = FindPackageShare(moveit_package)
     default_rviz_path = PathJoinSubstitution(
-        [pkg_share_moveit, "rviz", rviz_config_filename]
+        [pkg_share_moveit, "config", rviz_config_filename]
     )
     project_gz_path: FindPackageShare = FindPackageShare(project_gz_package_name)
     project_world_directory: PathJoinSubstitution = PathJoinSubstitution(
@@ -57,8 +61,6 @@ def generate_launch_description():
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     use_rviz = LaunchConfiguration("use_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
-    urdf_model = LaunchConfiguration("urdf_model")
-    name = LaunchConfiguration("name")
     publish_robot_description_semantic = LaunchConfiguration(
         "publish_robot_description_semantic"
     )
@@ -76,14 +78,9 @@ def generate_launch_description():
         choices=["true", "false"],
         description="Launch RViz with the robot description",
     )
-    declare_urdf_model_cmd = DeclareLaunchArgument(
-        "urdf_model",
-        default_value=default_urdf_path,
-        description="Path to the URDF model file",
-    )
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         "use_sim_time",
-        default_value="false",
+        default_value="true",
         choices=["true", "false"],
         description="Use Gazebo simulation clock",
     )
@@ -96,22 +93,26 @@ def generate_launch_description():
     declare_world_directory_cmd = DeclareLaunchArgument(
         "world",
         default_value="factory",
-        choices=["devol", "factory"]
+        choices=["empty", "factory"]
     )
 
-    robot_description_content: ParameterValue = ParameterValue(Command([
-        'xacro', ' ', urdf_model, ' ',
-        'name:=', name, ' ',
-    ]), value_type=str)
+    robot_description_content: Command = Command(
+        [
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            ' ',
+            default_urdf_path
+        ]
+    )
 
+    robot_description = {'robot_description': robot_description_content}
 
     moveit_config = (
         MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
         .robot_description_semantic(file_path=join(get_package_share_directory(moveit_package),
                                               "config",
                                               "devol.srdf"))
-        .robot_description(file_path=join(get_package_share_directory(urdf_package),
-                                     "urdf",
+        .robot_description(file_path=join(get_package_share_directory(moveit_package),
+                                     "config",
                                      urdf_filename))
         .joint_limits(file_path=join(get_package_share_directory(moveit_package),
                                      "config",
@@ -126,10 +127,17 @@ def generate_launch_description():
     start_robot_state_publisher_cmd: Node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        name='robot_state_publisher',
         output='screen',
-        parameters=[{'use_sim_time': use_sim_time,
-                     'robot_description': robot_description_content}])
+        parameters=[robot_description])
+
+
+    # Spawn robot command
+    gz_spawn_entity_cmd: Node = Node(
+        package="ros_gz_sim",
+        executable="create",
+        output="screen",
+        arguments=["-topic", 'robot_description', '-name', 'devol', '-x', '0', '-y', '0', '-z', '0.3', '-allow_renaming', 'true']
+    )
 
     start_move_group_cmd: Node = Node(
         package="moveit_ros_move_group",
@@ -145,21 +153,6 @@ def generate_launch_description():
         ]
     )
 
-    start_controller_manager_cmd: Node = Node(
-        package="controller_manager",
-        executable="ros2_control_node",
-        name="controller_manager",
-        output="both",
-        parameters=[
-            moveit_config.robot_description,
-            join(
-                get_package_share_directory(moveit_package),
-                "config",
-                "ros2_controllers.yaml"
-            )
-        ]
-    )
-
     # Launch RViz
     start_rviz_cmd: Node = Node(
         condition=IfCondition(use_rviz),
@@ -169,20 +162,22 @@ def generate_launch_description():
         output='log',
         arguments=['-d', rviz_config_file],
         parameters=[
-            moveit_config.robot_description_semantic,
-            moveit_config.robot_description,
             moveit_config.planning_pipelines,
             moveit_config.robot_description_kinematics,
             moveit_config.joint_limits,
             {'use_sim_time': use_sim_time}],
     )
 
-    start_gz_cmd: IncludeLaunchDescription = IncludeLaunchDescription(
+    start_gz_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(gz_launch_path),
         launch_arguments={
-            'gz_args': PathJoinSubstitution(
-                [project_world_directory, world_directory, "model.sdf"]
-            )
+            'gz_args': [
+                TextSubstitution(text='-r -v 4 '),
+                PathJoinSubstitution([
+                    project_world_directory, world_directory, 'model.sdf'
+                ]),
+                TextSubstitution(text=' --physics-engine gz-physics-bullet-featherstone-plugin')
+            ]
         }.items(),
     )
 
@@ -199,12 +194,7 @@ def generate_launch_description():
     start_gz_bridge_cmd: Node = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        parameters=[{
-            'config_file': PathJoinSubstitution(
-                [project_gz_path, 'config', 'bridge.yaml']
-            ),
-            'qos_overrides./tf_static.publisher.durability': 'transient_local',
-        }],
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
         output='screen'
     )
 
@@ -214,14 +204,13 @@ def generate_launch_description():
     # Declare the launch options
     ld.add_action(declare_rviz_config_cmd)
     ld.add_action(declare_use_rviz_cmd)
-    ld.add_action(declare_urdf_model_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_world_directory_cmd)
     ld.add_action(declare_publish_robot_description_semantic_cmd)
 
     # Add actions
+    ld.add_action(gz_spawn_entity_cmd)
     ld.add_action(start_move_group_cmd)
-    ld.add_action(start_controller_manager_cmd)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(start_rviz_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
