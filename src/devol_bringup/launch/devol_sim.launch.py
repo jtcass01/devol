@@ -74,7 +74,7 @@ def generate_launch_description():
     )
     declare_use_rviz_cmd = DeclareLaunchArgument(
         "use_rviz",
-        default_value="false",
+        default_value="true",
         choices=["true", "false"],
         description="Launch RViz with the robot description",
     )
