@@ -28,12 +28,6 @@
     </plugin>
     
     <gravity>0 0 -9.8</gravity>
-    <!-- <gravity>0 0 -9.8</gravity>
-    <physics type="dart" name="dart_physics" type="ode">
-      <max_step_size>0.01</max_step_size>
-      <real_time_factor>1</real_time_factor>
-      <real_time_update_rate>100</real_time_update_rate>
-    </physics> -->
 
     <model name="aws_robomaker_warehouse_ShelfF_01_001">
       <include>
@@ -290,8 +284,34 @@
       <include merge="true">
         <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Reflective table</uri>
       </include>
-      <pose>-1.0 -2.5 0 0 0 1.570796327</pose>
+      <pose>-1.0 -2.0 0 0 0 1.570796327</pose>
       <static>true</static>
+    </model>
+    <!-- Add a block for the manipulator to grab and place on the Husky-->
+    <model name="block">
+      <static>false</static>
+      <link name="block_obj">
+        <collision name="collision">
+          <geometry>
+            <box>
+                <size>0.075 0.075 0.075</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+                <size>0.075 0.075 0.075</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.898 0.447 0 1</ambient>
+            <diffuse>0.898 0.447 0 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+      <pose>-0 -1.0 1.1 0 0 0</pose>
     </model>
   </world>
 </sdf>
