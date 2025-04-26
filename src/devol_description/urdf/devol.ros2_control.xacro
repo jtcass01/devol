@@ -1,16 +1,25 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="devol_ros2_control" params="name">
+    <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro"/>
+    <xacro:include filename="$(find robotiq_description)/urdf/robotiq_gripper.ros2_control.xacro"/>
+
+    <xacro:macro name="devol_ros2_control" params="name prefix use_gazebo:=^|false">
 
         <ros2_control name="${name}" type="system">
             <hardware>
-                <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+                <xacro:if value="${use_gazebo}">
+                    <!-- Use Gazebo plugin for simulation -->
+                    <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+                </xacro:if>
+                <xacro:unless value="${use_gazebo}">
+                    <!-- Use Mock Hardware for real hardware -->
+                    <plugin>gz_ros2_control/MockHardware</plugin>
+                </xacro:unless>
             </hardware>
             <joint name="shoulder_pan_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
-                  <param name="initial_value">0.0</param>
+                  <param name="initial_value">3.14159</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>

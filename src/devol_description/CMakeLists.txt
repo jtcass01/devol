@@ -12,12 +12,6 @@ endif()
 
 install(
   DIRECTORY
-    models/
-  DESTINATION share/${PROJECT_NAME}/models
-)
-
-install(
-  DIRECTORY
     urdf/
   DESTINATION share/${PROJECT_NAME}/urdf
 )
@@ -38,12 +32,6 @@ install(
   DIRECTORY
     launch/
   DESTINATION share/${PROJECT_NAME}/launch
-)
-
-install(
-  DIRECTORY
-    srdf/
-  DESTINATION share/${PROJECT_NAME}/srdf
 )
 
 ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/${PROJECT_NAME}.dsv.in")

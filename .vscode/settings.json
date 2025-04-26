@@ -1,0 +1,13 @@
+{
+    "cmake.sourceDirectory": "/home/jakeadelic/programming/devol/src/devol_bringup",
+    "files.associations": {
+        "deque": "cpp",
+        "string": "cpp",
+        "vector": "cpp",
+        "*.tcc": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "complex": "cpp",
+        "chrono": "cpp"
+    }
+}
