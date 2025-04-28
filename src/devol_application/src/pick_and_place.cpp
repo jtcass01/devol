@@ -36,14 +36,14 @@ int main(int argc, char *argv[])
     // Load and configure hand move group
     auto hand_group_interface = MoveGroupInterface(node, "hand");
     
-    // PLACE TARGET POSE
+    // PLACE TARGET POSE: Husky: (1.71, 0.2, 0.35)
     auto const place_pose = [&node] {
         geometry_msgs::msg::PoseStamped target_pose_msg;
         target_pose_msg.header.frame_id = "base_link";
         target_pose_msg.header.stamp = node->now();
-        target_pose_msg.pose.position.x = 1.71;
-        target_pose_msg.pose.position.y = 0.2;
-        target_pose_msg.pose.position.z = 0.35;
+        target_pose_msg.pose.position.x = 0.0;
+        target_pose_msg.pose.position.y = -1.0;
+        target_pose_msg.pose.position.z = 0.9;
         target_pose_msg.pose.orientation.x = 1.0;
         target_pose_msg.pose.orientation.y = 0.0;
         target_pose_msg.pose.orientation.z = 0.0;
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
         // Print the planning frame for debugging purposes
         RCLCPP_INFO(logger, "Planning frame: %s", frame_id.c_str());
 
-        // Add Floor
+        // Add Table
         moveit_msgs::msg::CollisionObject table;
         table.header.frame_id = frame_id;
         table.header.stamp = node->now();
@@ -156,8 +156,8 @@ int main(int argc, char *argv[])
         primitive.dimensions.resize(3);
 
         // Set the dimensions of the box (in meters)
-        primitive.dimensions[primitive.BOX_X] = 4.0; // Width
-        primitive.dimensions[primitive.BOX_Y] = 2.5; // Depth
+        primitive.dimensions[primitive.BOX_X] = 2.5; // Width
+        primitive.dimensions[primitive.BOX_Y] = 2.0; // Depth
         primitive.dimensions[primitive.BOX_Z] = 1.0; // Height
 
         // Set the position of the box center
@@ -271,12 +271,58 @@ int main(int argc, char *argv[])
         return husky;
     }();
 
+    //Add the target block to be picked up
+    auto const target_block = [frame_id = ur_manipulator_group_interface.getPlanningFrame(), &node, &logger] {
+        // Print the planning frame for debugging purposes
+        RCLCPP_INFO(logger, "Planning frame: %s", frame_id.c_str());
+
+        // Add target block
+        moveit_msgs::msg::CollisionObject target_block;
+        target_block.header.frame_id = frame_id;
+        target_block.header.stamp = node->now();
+        target_block.id = "target_block";
+
+        // Define the shape of the object
+        shape_msgs::msg::SolidPrimitive primitive;
+        primitive.type = primitive.BOX;
+        primitive.dimensions.resize(3);
+
+        // Set the dimensions of the box (in meters)
+        primitive.dimensions[primitive.BOX_X] = 0.075; // Width
+        primitive.dimensions[primitive.BOX_Y] = 0.075; // Depth
+        primitive.dimensions[primitive.BOX_Z] = 0.075; // Height
+
+        // Set the position of the box center
+        geometry_msgs::msg::Pose pose;
+
+        pose.position.x = -1.0;
+        pose.position.y = -2.5;
+        pose.position.z = 0.7375;
+
+        pose.orientation.x = 0.0;
+        pose.orientation.y = 0.0;
+        pose.orientation.z = 0.0;
+        pose.orientation.w = 1.0;
+
+        target_block.primitives.push_back(primitive);
+        target_block.primitive_poses.push_back(pose);
+        target_block.operation = target_block.ADD;
+
+        RCLCPP_INFO(logger, "Boxes collision object created with ID: %s", target_block.id.c_str());
+        RCLCPP_INFO(logger, "dimensions: %.2f x %.2f x %.2f", primitive.dimensions[primitive.BOX_X], primitive.dimensions[primitive.BOX_Y], primitive.dimensions[primitive.BOX_Z]);
+        RCLCPP_INFO(logger, "position: (%.2f, %.2f, %.2f)", pose.position.x, pose.position.y, pose.position.z);
+        
+        return target_block;
+    }();
+
+
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
     planning_scene_interface.applyCollisionObject(floor);
     planning_scene_interface.applyCollisionObject(stand);
     planning_scene_interface.applyCollisionObject(table);
     planning_scene_interface.applyCollisionObject(boxes);
     planning_scene_interface.applyCollisionObject(husky);
+    planning_scene_interface.applyCollisionObject(target_block);
 
     auto const [success, plan] = [&ur_manipulator_group_interface] {
         moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -294,8 +340,8 @@ int main(int argc, char *argv[])
         RCLCPP_ERROR(logger, "Planning failed");
     }
     
-    // Close the gripper
-    hand_group_interface.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.8}});
+    // Open the gripper. 0.0-open, 0.8-close
+    hand_group_interface.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.0}});
     hand_group_interface.move();
 
     rclcpp::shutdown();
