@@ -41,11 +41,11 @@ int main(int argc, char *argv[])
         geometry_msgs::msg::PoseStamped target_pose_msg;
         target_pose_msg.header.frame_id = "base_link";
         target_pose_msg.header.stamp = node->now();
-        target_pose_msg.pose.position.x = 0.0;
-        target_pose_msg.pose.position.y = -1.0;
-        target_pose_msg.pose.position.z = 0.9;
-        target_pose_msg.pose.orientation.x = 1.0;
-        target_pose_msg.pose.orientation.y = 0.0;
+        target_pose_msg.pose.position.x = 0.2;
+        target_pose_msg.pose.position.y = -1.05;
+        target_pose_msg.pose.position.z = 1.05;
+        target_pose_msg.pose.orientation.x = 0.0;
+        target_pose_msg.pose.orientation.y = 1.0;
         target_pose_msg.pose.orientation.z = 0.0;
         target_pose_msg.pose.orientation.w = 0.0;
         return target_pose_msg;
@@ -158,14 +158,14 @@ int main(int argc, char *argv[])
         // Set the dimensions of the box (in meters)
         primitive.dimensions[primitive.BOX_X] = 2.5; // Width
         primitive.dimensions[primitive.BOX_Y] = 2.0; // Depth
-        primitive.dimensions[primitive.BOX_Z] = 1.0; // Height
+        primitive.dimensions[primitive.BOX_Z] = 1.05; // Height
 
         // Set the position of the box center
         geometry_msgs::msg::Pose pose;
 
         pose.position.x = -1.0;
-        pose.position.y = -2.5;
-        pose.position.z = 0.2; 
+        pose.position.y = -2.0;
+        pose.position.z = 0.225; // was 0.225
 
         pose.orientation.x = 0.0;
         pose.orientation.y = 0.0;
@@ -295,9 +295,9 @@ int main(int argc, char *argv[])
         // Set the position of the box center
         geometry_msgs::msg::Pose pose;
 
-        pose.position.x = -1.0;
-        pose.position.y = -2.5;
-        pose.position.z = 0.7375;
+        pose.position.x = 0.2;
+        pose.position.y = -1.05;
+        pose.position.z = 0.7875; // was 0.7875
 
         pose.orientation.x = 0.0;
         pose.orientation.y = 0.0;
