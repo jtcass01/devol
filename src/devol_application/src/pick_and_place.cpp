@@ -35,22 +35,6 @@ int main(int argc, char *argv[])
 
     // Load and configure hand move group
     auto hand_group_interface = MoveGroupInterface(node, "hand");
-    
-    // PLACE TARGET POSE: Husky: (1.71, 0.2, 0.35)
-    auto const place_pose = [&node] {
-        geometry_msgs::msg::PoseStamped target_pose_msg;
-        target_pose_msg.header.frame_id = "base_link";
-        target_pose_msg.header.stamp = node->now();
-        target_pose_msg.pose.position.x = 0.2;
-        target_pose_msg.pose.position.y = -1.05;
-        target_pose_msg.pose.position.z = 1.05;
-        target_pose_msg.pose.orientation.x = 0.0;
-        target_pose_msg.pose.orientation.y = 1.0;
-        target_pose_msg.pose.orientation.z = 0.0;
-        target_pose_msg.pose.orientation.w = 0.0;
-        return target_pose_msg;
-    }();
-    ur_manipulator_group_interface.setPoseTarget(place_pose);
 
     // Add Floor
     auto const floor = [frame_id = ur_manipulator_group_interface.getPlanningFrame(), &node, &logger] {
@@ -288,8 +272,8 @@ int main(int argc, char *argv[])
         primitive.dimensions.resize(3);
 
         // Set the dimensions of the box (in meters)
-        primitive.dimensions[primitive.BOX_X] = 0.075; // Width
-        primitive.dimensions[primitive.BOX_Y] = 0.075; // Depth
+        primitive.dimensions[primitive.BOX_X] = 0.055; // Width
+        primitive.dimensions[primitive.BOX_Y] = 0.055; // Depth
         primitive.dimensions[primitive.BOX_Z] = 0.075; // Height
 
         // Set the position of the box center
@@ -324,6 +308,23 @@ int main(int argc, char *argv[])
     planning_scene_interface.applyCollisionObject(husky);
     planning_scene_interface.applyCollisionObject(target_block);
 
+    // PLACE TARGET POSE: Husky: (1.71, 0.2, 0.35)
+    // Pose 1: Position in Grabbable Position for the Block
+    auto const place_pose = [&node] {
+        geometry_msgs::msg::PoseStamped target_pose_msg;
+        target_pose_msg.header.frame_id = "base_link";
+        target_pose_msg.header.stamp = node->now();
+        target_pose_msg.pose.position.x = 0.2;
+        target_pose_msg.pose.position.y = -1.05;
+        target_pose_msg.pose.position.z = 1.1; // was 0.975
+        target_pose_msg.pose.orientation.x = 0.0;
+        target_pose_msg.pose.orientation.y = 1.0;
+        target_pose_msg.pose.orientation.z = 0.0;
+        target_pose_msg.pose.orientation.w = 0.0;
+        return target_pose_msg;
+    }();
+    ur_manipulator_group_interface.setPoseTarget(place_pose);
+
     auto const [success, plan] = [&ur_manipulator_group_interface] {
         moveit::planning_interface::MoveGroupInterface::Plan plan;
         auto const ok = ur_manipulator_group_interface.plan(plan);
@@ -334,15 +335,97 @@ int main(int argc, char *argv[])
     {
         ur_manipulator_group_interface.execute(plan);
         RCLCPP_INFO(logger, "Planning succeeded");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // // Attach the object to the robot's end effector
+        // moveit_msgs::msg::AttachedCollisionObject attached_object;
+        // attached_object.link_name = "ur_to_robotiq_link"; //"hand"? "tool0?"
+        // attached_object.object.id = "target_block";
+        // attached_object.object.operation = attached_object.object.ADD;
+
+        // // Make sure to include the same shape and pose as in the original object
+        // shape_msgs::msg::SolidPrimitive primitive;
+        // primitive.type = primitive.BOX;
+        // primitive.dimensions.resize(3);
+        // primitive.dimensions[primitive.BOX_X] = 0.055;
+        // primitive.dimensions[primitive.BOX_Y] = 0.055;
+        // primitive.dimensions[primitive.BOX_Z] = 0.075;
+
+        // geometry_msgs::msg::Pose pose;
+        // pose.position.x = 0.0;  // relative to the link_name
+        // pose.position.y = 0.0;
+        // pose.position.z = -0.20; // for 0.975 -> -0.1875
+        // pose.orientation.w = 1.0;
+
+        // attached_object.object.primitives.push_back(primitive);
+        // attached_object.object.primitive_poses.push_back(pose);
+
+        // // Optionally allow collisions between the object and certain links
+        // attached_object.touch_links = std::vector<std::string>{
+        //     "gripper_mount_link",
+        //     "robotiq_85_base_link",
+        //     "robotiq_85_left_inner_knuckle_link",
+        //     "robotiq_85_left_knuckle_link",
+        //     "robotiq_85_left_finger_link",
+        //     "robotiq_85_left_finger_tip_link",
+        //     "robotiq_85_right_inner_knuckle_link",
+        //     "robotiq_85_right_knuckle_link",
+        //     "robotiq_85_right_finger_link",
+        //     "robotiq_85_right_finger_tip_link",
+        //     "ft_frame",
+        //     "devol_stand"
+        // };
+
+        // planning_scene_interface.applyAttachedCollisionObject(attached_object);
+
+        // Open the gripper. 0.0-open, 0.8-close
+        hand_group_interface.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.8}});
+        hand_group_interface.move();
+
+        RCLCPP_INFO(logger, "Attached the object to the end effector.");
     }
     else
     {
-        RCLCPP_ERROR(logger, "Planning failed");
+        RCLCPP_ERROR(logger, "place_pose failed");
     }
-    
-    // Open the gripper. 0.0-open, 0.8-close
-    hand_group_interface.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.0}});
-    hand_group_interface.move();
+
+    // Pose 2: Manuever to Husky
+    // PLACE TARGET POSE: Husky: (1.71, 0.2, 0.35)
+    auto const husky_pose = [&node] {
+        geometry_msgs::msg::PoseStamped target_pose_msg;
+        target_pose_msg.header.frame_id = "base_link";
+        target_pose_msg.header.stamp = node->now();
+        target_pose_msg.pose.position.x = 1.71;
+        target_pose_msg.pose.position.y = 0.2;
+        target_pose_msg.pose.position.z = 0.35;
+        target_pose_msg.pose.orientation.x = 0.0;
+        target_pose_msg.pose.orientation.y = 1.0;
+        target_pose_msg.pose.orientation.z = 0.0;
+        target_pose_msg.pose.orientation.w = 0.0;
+        return target_pose_msg;
+    }();
+    ur_manipulator_group_interface.setPoseTarget(husky_pose);
+
+    auto const [success2, plan2] = [&ur_manipulator_group_interface] {
+        moveit::planning_interface::MoveGroupInterface::Plan plan;
+        auto const ok = ur_manipulator_group_interface.plan(plan);
+        return std::make_pair(ok, plan);
+    }();
+
+    if (success2)
+    {
+        ur_manipulator_group_interface.execute(plan2);
+        RCLCPP_INFO(logger, "Planning succeeded");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // Open the gripper. 0.0-open, 0.8-close
+        hand_group_interface.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.0}});
+        hand_group_interface.move();
+    }
+    else
+    {
+        RCLCPP_ERROR(logger, "husky_pose failed");
+    }
 
     rclcpp::shutdown();
 

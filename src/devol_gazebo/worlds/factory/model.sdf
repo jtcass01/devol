@@ -407,7 +407,7 @@
         <visual name="block_visual">
           <geometry>
             <box>
-              <size>0.075 0.075 0.075</size>
+              <size>0.055 0.055 0.075</size>
             </box>
           </geometry>
           <material>
@@ -419,7 +419,7 @@
         <collision name="block_collision">
           <geometry>
             <box>
-              <size>0.075 0.075 0.075</size>
+              <size>0.055 0.055 0.075</size>
             </box>
           </geometry>
         </collision>
