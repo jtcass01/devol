@@ -10,7 +10,7 @@
   <depend>rclcpp</depend>
   <depend>moveit_msgs</depend>
   <depend>moveit_ros_planning_interface</depend>
-  <depend>moveit_visual_tools</depend>
+  <depend>ros_gz</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

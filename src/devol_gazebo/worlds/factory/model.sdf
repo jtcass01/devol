@@ -26,7 +26,7 @@
       filename="FullSystem"
       name="devol_gazebo::FullSystem">
     </plugin>
-    
+
     <gravity>0 0 -9.8</gravity>
 
     <model name="aws_robomaker_warehouse_ShelfF_01_001">
@@ -41,7 +41,9 @@
       <include>
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_WallB_01</uri>
       </include>
+      <static>true</static>
     </model>
+
     <model name="aws_robomaker_warehouse_ShelfE_01_001">
       <include>
         <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/aws_robomaker_warehouse_ShelfE_01</uri>
@@ -400,10 +402,10 @@
     </model>
 
     <!-- Add a block for the manipulator to grab and place on the Husky-->
-    <model name="block">
+    <model name="target_block">
       <static>false</static>
       <pose>0.2 -1.05 1.0875 0 0 0</pose>
-      <link name="block">
+      <link name="target_block">
         <visual name="block_visual">
           <geometry>
             <box>
@@ -422,6 +424,14 @@
               <size>0.055 0.055 0.075</size>
             </box>
           </geometry>
+
+          <surface>
+            <friction>
+              <bullet>
+                <friction>1.0</friction>
+              </bullet>
+            </friction>
+          </surface>
         </collision>
 
         <inertial>
