@@ -10,10 +10,18 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
-find_package(moveit_visual_tools REQUIRED)
+find_package(gz-msgs10 QUIET REQUIRED)
+find_package(gz-transport13 QUIET REQUIRED OPTIONAL_COMPONENTS log)
+set(GZ_TRANSPORT_VER ${gz-transport13_VERSION_MAJOR})
+
+# Add library for devol_robot
+add_library(devol_robot src/devol_robot.cpp)
+target_link_libraries(devol_robot ${GZ-MSGS_LIBRARIES} gz-transport${GZ_TRANSPORT_VER}::core)
+ament_target_dependencies(devol_robot "rclcpp" "moveit_msgs" "moveit_ros_planning_interface")
 
 add_executable(pick_and_place src/pick_and_place.cpp)
-ament_target_dependencies(pick_and_place "rclcpp" "moveit_msgs" "moveit_ros_planning_interface" "moveit_visual_tools")
+target_link_libraries(pick_and_place devol_robot)
+ament_target_dependencies(pick_and_place "rclcpp" "moveit_msgs" "moveit_ros_planning_interface")
 
 install(TARGETS pick_and_place
   DESTINATION lib/${PROJECT_NAME}
