@@ -2,3 +2,15 @@ build
 install
 log
 .env
+
+# Latex
+*.aux
+*.fls
+*.log
+*.fdb_latexmk
+*.gz
+*.toc
+*.bbl
+*.blg
+*.out
+*.aux
