@@ -4,6 +4,9 @@
 
 See docs/FinalProject_525_630_CASSADY_CHANDRA.pdf for a detailed report on the project.
 
+[![Video Demonstration of Pick and Place](https://img.youtube.com/vi/oQB3xyw07hM/0.jpg)](https://www.youtube.com/watch?v=oQB3xyw07hM)
+
+
 ---
 
 ## 📦 Packages Overview
