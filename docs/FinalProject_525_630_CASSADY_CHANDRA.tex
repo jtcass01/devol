@@ -30,18 +30,32 @@
 \end{abstract}
 
 \section{Introduction}\label{sec:Introduction}
-The goal of our final project was to develop a factory robot. 
-This robot would exist in a factory-like setting, and would be capable of grasping small objects and moving them around. 
-In our specific factory, the robot, for which we chose a UR20, would pick a cube off of a table and place it onto an autonomous four-wheeled robot, specifically an Open Robotics Husky A300. 
-This project would extend well in a real world setting, as robots like the UR20 and the Husky are increasingly becoming integral parts of day-to-day factory workflows. 
-One can imagine a UR20 picking up any number of items and placing them on a four-wheeled robot, and then that robot moving autonomously to transport its goods to either the next stage of production or to be shipped. 
-It was the real-world applicability of this project that inspired us to pursue it.
+This paper explores the development of a factory robot. 
+The robot, a UR20 from Universal Robotics, was tasked with picking up an object off of a table and then placing it onto a four wheeled robot, specifically the Husky A300 from Open Robotics. 
+ROS2, and more specifically the Moveit library \cite{DBLP:journals/corr/ColemanSCC14}, was used to implement the equations of motions for the arm. 
+The process by which these equations of motion were derived are explored later in this report. 
+Gazebo was the tool of choice for simulating the environment, which included the UR20, the Husky A300, and the factory within which these robots lived. 
+More information about the chosen hardware is described in Section \ref{sec:Robot Design}, while information about the simulation configuration is detailed in Section \ref{sec:Simulation Design}.
+Section \ref{sec:Control Software} overviews the software implemented to control the robot in simulation.
 
-\cite{DBLP:journals/corr/ColemanSCC14}
+This project was appealing given how applicable it is to the real world. 
+Robots like the UR20 and the Husky are increasingly becoming integral parts of day-to-day factory workflows. 
+One can imagine a UR20 picking up any number of items and placing them on a four-wheeled robot, and then that robot moving autonomously to transport its goods to either the next stage of production or to be shipped.
 
 \section{Robot Design}\label{sec:Robot Design}
 
+Section \ref{sec:Robot Design:Hardware} describes the hardware chosen for the pick and place task.
+Section \ref{sec:Robot Design:Equations of Motion} details the equations of motion for the UR20.
+
 \subsection{Hardware}\label{sec:Robot Design:Hardware}
+
+The UR20 is a robotic arm from Universal Robotics, designed to be incorporated into a traditional factory. 
+It is capable of lifting up to 25 kg of weight, and is capable of performing a variety of tasks including palletizing, welding, and (most relevant for this project), material handling. 
+It was this last quality in particular that led to it being used for this project. 
+To enable this robot to pick up a block, it was given a Robotiq 85 Gripper, manufactured by Robotiq Inc. 
+This robotic hand is extremely versatile, due in part to its use of a Distal Phalanx and Proximal Phalanx. 
+These two components are flexible, and as such, can grip onto differently shaped objects, such as cylinders and cubes, with equal dexterity and strength. 
+Given the hand's versatility, it felt the most realistic to use for this project. 
 
 \begin{figure}[H]
     \centering
@@ -491,14 +505,44 @@ The final equations of motion are given by equation \ref{eq:tau}.
     \tau = D(q) \ddot{q} + C(q, \dot{q}) \dot{q} + g(q)
 \end{equation}
 
-\section{Simulation Design}\label{sec:Approach}
+\section{Simulation Design}\label{sec:Simulation Design}
 
-industrial warehouse \cite{GazeboFuel-ssarkar-industrial-warehouse}
+Gazebo was chosen as the simulator within which to develop and test the software for the UR20. 
+To be compatible with Gazebo, ROS2 Jazzy was chosen as the software suite of choice. 
+The decision to use Jazzy, as opposed to older distributions, or even ROS1, came from a desire to be up to date with the software, and thus avoid any potential pitfalls that come from using older distributions, such as software compatibility issues across multiple tools. 
 
-Husky \cite{GazeboFuel-OpenRobotics-MARBLE_HUSKY_SENSOR_CONFIG_5}
+The environment for the factory was sourced from Gazebo Fuel, an open-source library containing user-contributed files for a variety of assets. 
+It was there that other assets for the factory \cite{GazeboFuel-ssarkar-industrial-warehouse} were obtained as well, including the model for the Husky A300 \cite{GazeboFuel-OpenRobotics-MARBLE_HUSKY_SENSOR_CONFIG_5}, and some extra boxes, which were added to make the environment more realistic. 
+For other assets, such as the object the robot would pick up and the table upon which the object would rest, it was decided that it would be better to design those objects from scratch. 
+This way, it would be possible to design a target object that would fit within the Robotiq 85 gripper, which had a maximum grasp width of 85mm. 
+It was decided that the object the robot should be attempting to pick up would be a cube, measuring 55mm by 55mm by 75mm. 
+Another advantage of designing the table and object from scratch was having more control over the visual and collision properties. 
+The latter of these was a very important factor in planning the path the UR20 would eventually take. 
+
+Defining the UR20 was done through a combination of open-source files provided by the UR20 vendor and some additional xacro files. 
+The vendor-provided files contained information such as the visual look of the robot arm, its collision boxes, and definitions for the relationships between each of the parts of the arm. 
+The xacro files contained configurations for putting the model into Gazebo, the initial joint values for the arm upon initial load, and some additional kinematic information. 
+In addition to Gazebo, RViz was used to aid in the path planning process. 
+One of the advantages of using RViz and Gazebo over just Gazebo was that in RViz, MoveIt would visualize the path the robot was going to take before the robot even took it. 
+That way, it was possible to see whether the robot was going to hit other objects in its vicinity, and double check that the values set for certain positions the robot needed to get to were in fact, the correct ones. 
+
+\section{Control Software}\label{sec:Control Software}
+
+A ROS2 node was implemented to command and monitor the UR20 robot through MoveIt.
+The following sequence of poses was decided on to have the UR20 accomplish its task.
+
+\begin{enumerate}
+    \item Robot moves from its starting position to hover the target object
+    \item Robot descends onto the target object
+    \item Robot closes gripper on target object
+    \item Robot moves back to its starting position, but now with the target object in hand
+    \item Robot moves to the Husky A300
+    \item Robot deposits block onto Husky A300
+    \item Robot returns to its starting position. 
+\end{enumerate}
 
 \section{Conclusion}\label{sec:Results}
-A video of the simulation running a successful pick and place operation can be found at \url{https:// final video link}.
+A video of the simulation running a successful pick and place operation can be found at \url{https://youtu.be/oQB3xyw07hM}.
 The video shows the UR20 robot approaching the cube, grasping it using the Robotiq 85 gripper, and then placing it ontop of the Husky A300 robot before opening the gripper and returning to a ready state.
 As stated, MoveIt was leveraged for implementation of equations of motion.
 Future work includes adding a camera to the system and detecting the position of the cube with computer vision as well as adding force feedback control.
