@@ -1,6 +1,6 @@
 # devol
 
-**devol** is a Gazebo simulation project built on **ROS 2 Jazzy** and **Gazebo Harmonic**, focused on simulating a robotic pick-and-place task using a UR manipulator and a Robotiq gripper. The project integrates robot description, motion planning with MoveIt, Gazebo simulation, and task execution via ROS 2 nodes.
+**devol** is an example **ROS 2 Jazzy** and **Gazebo Harmonic** demonstration, focused on simulating a robotic pick-and-place task using a Universal Robot (UR) manipulator and a Robotiq gripper. The project integrates robot description, motion planning with MoveIt, Gazebo simulation, and task execution via ROS 2 nodes.
 
 See docs/FinalProject_525_630_CASSADY_CHANDRA.pdf for a detailed report on the project.
 
