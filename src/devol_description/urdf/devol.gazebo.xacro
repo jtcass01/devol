@@ -14,8 +14,8 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
       </plugin>
 
       <plugin
-        filename="libignition-gazebo-detachable-joint-system.so"
-        name="ignition::gazebo::systems::DetachableJoint">
+        filename="libgz-sim-detachable-joint-system.so"
+        name="gz::sim::systems::DetachableJoint">
         <parent_link>wrist_3_link</parent_link>
         <child_link>target_block</child_link>
         <child_model>target_block</child_model>

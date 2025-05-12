@@ -18,8 +18,6 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 from ament_index_python.packages import get_package_share_directory
 
-from numpy import pi
-
 
 
 ARGUMENTS = [
