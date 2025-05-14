@@ -200,27 +200,14 @@ def generate_launch_description():
     ld.add_action(start_controller_manager_cmd)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(start_move_group_cmd)
-    # ld.add_action(start_robot_state_broadcaster_cmd)
     ld.add_action(spawn_ur_controller_cmd)
     ld.add_action(spawn_hand_controller_cmd)
-    # ld.add_action(RegisterEventHandler(
-    #     event_handler=OnProcessExit(
-    #         target_action=start_controller_manager_cmd,
-    #         on_exit=[start_robot_state_broadcaster_cmd]
-    #     )
-    # ))
     ld.add_action(RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=spawn_ur_controller_cmd,
             on_exit=[start_robot_state_broadcaster_cmd]
         )
     ))
-    # ld.add_action(RegisterEventHandler(
-    #     event_handler=OnProcessExit(
-    #         target_action=spawn_hand_controller_cmd,
-    #         on_exit=[spawn_ur_controller_cmd]
-    #     )
-    # ))
     ld.add_action(RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=start_robot_state_broadcaster_cmd,
