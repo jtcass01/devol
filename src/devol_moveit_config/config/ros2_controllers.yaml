@@ -4,7 +4,7 @@ controller_manager:
     update_rate: 100  # Hz
 
     hand_controller:
-      type: effort_controllers/GripperActionController
+      type: parallel_gripper_action_controller/GripperActionController
 
 
     ur_manipulator_controller:

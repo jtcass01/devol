@@ -1,8 +1,9 @@
 from os.path import join
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import (
     Command,
     LaunchConfiguration,
@@ -88,8 +89,19 @@ def generate_launch_description():
     robot_description_content: ParameterValue = ParameterValue(Command([
         'xacro', ' ', urdf_model, ' ',
         'name:=', name, ' ',
+        'use_gazebo:=false', ' ',
+        'use_mock_hardware:=true'
     ]), value_type=str)
 
+    robot_description = {'robot_description': robot_description_content}
+
+    robot_controllers = PathJoinSubstitution(
+        [
+            FindPackageShare(moveit_package),
+            "config",
+            "ros2_controllers.yaml"
+        ]
+    )
 
     moveit_config = (
         MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
@@ -105,7 +117,6 @@ def generate_launch_description():
         .trajectory_execution(file_path=join(get_package_share_directory(moveit_package),
                                         "config",
                                         "moveit_controllers.yaml"))
-        .planning_scene_monitor(publish_robot_description=True, publish_robot_description_semantic=True)
         .to_moveit_configs()
     )
 
@@ -113,10 +124,8 @@ def generate_launch_description():
     start_robot_state_publisher_cmd: Node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        name='robot_state_publisher',
         output='screen',
-        parameters=[{'use_sim_time': use_sim_time,
-                     'robot_description': robot_description_content}])
+        parameters=[robot_description])
 
     start_move_group_cmd: Node = Node(
         package="moveit_ros_move_group",
@@ -135,43 +144,28 @@ def generate_launch_description():
     start_controller_manager_cmd: Node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        name="controller_manager",
-        output="both",
-        parameters=[
-            moveit_config.robot_description,
-            join(
-                get_package_share_directory(moveit_package),
-                "config",
-                "ros2_controllers.yaml"
-            )
-        ]
+        parameters=[robot_controllers],
+        output="both"
     )
 
-    # Spawn joint_state_broadcaster
-    spawn_joint_state_broadcaster_cmd: Node = Node(
+    start_robot_state_broadcaster_cmd: Node = Node(
         package="controller_manager",
         executable="spawner",
-        name="spawn_joint_state_broadcaster",
-        output="screen",
-        arguments=["joint_state_broadcaster", "-c", "/controller_manager"],
+        arguments=["joint_state_broadcaster"]
     )
 
     # Spawn UR controller
     spawn_ur_controller_cmd: Node = Node(
         package="controller_manager",
         executable="spawner",
-        name="spawn_ur_controller",
-        output="screen",
-        arguments=["ur_manipulator_controller", "-c", "/controller_manager"],
+        arguments=["ur_manipulator_controller", "--param-file", robot_controllers],
     )
 
     # Spawn UR controller
     spawn_hand_controller_cmd: Node = Node(
         package="controller_manager",
         executable="spawner",
-        name="spawn_hand_controller",
-        output="screen",
-        arguments=["hand_controller", "-c", "/controller_manager"],
+        arguments=["hand_controller", "--param-file", robot_controllers],
     )
 
     # Launch RViz
@@ -203,12 +197,35 @@ def generate_launch_description():
     ld.add_action(declare_publish_robot_description_semantic_cmd)
 
     # Add actions
-    ld.add_action(start_move_group_cmd)
     ld.add_action(start_controller_manager_cmd)
-    ld.add_action(spawn_joint_state_broadcaster_cmd)
+    ld.add_action(start_robot_state_publisher_cmd)
+    ld.add_action(start_move_group_cmd)
+    # ld.add_action(start_robot_state_broadcaster_cmd)
     ld.add_action(spawn_ur_controller_cmd)
     ld.add_action(spawn_hand_controller_cmd)
-    ld.add_action(start_robot_state_publisher_cmd)
-    ld.add_action(start_rviz_cmd)
+    # ld.add_action(RegisterEventHandler(
+    #     event_handler=OnProcessExit(
+    #         target_action=start_controller_manager_cmd,
+    #         on_exit=[start_robot_state_broadcaster_cmd]
+    #     )
+    # ))
+    ld.add_action(RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=spawn_ur_controller_cmd,
+            on_exit=[start_robot_state_broadcaster_cmd]
+        )
+    ))
+    # ld.add_action(RegisterEventHandler(
+    #     event_handler=OnProcessExit(
+    #         target_action=spawn_hand_controller_cmd,
+    #         on_exit=[spawn_ur_controller_cmd]
+    #     )
+    # ))
+    ld.add_action(RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=start_robot_state_broadcaster_cmd,
+            on_exit=[start_rviz_cmd]
+        )
+    ))
 
     return ld
