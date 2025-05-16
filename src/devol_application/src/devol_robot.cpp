@@ -12,10 +12,12 @@ Robot::Robot(moveit::planning_interface::MoveGroupInterface &ur_manipulator_grou
              node_(node)
 {
     ur_manipulator_group_interface_.setPlanningPipelineId("ompl");
-    ur_manipulator_group_interface_.setPlannerId("RRTConnectkConfigDefault");
+    ur_manipulator_group_interface_.setPlannerId("LBKPIECEkConfigDefault");
     ur_manipulator_group_interface_.setMaxVelocityScalingFactor(0.5);
     ur_manipulator_group_interface_.setMaxAccelerationScalingFactor(0.5);
-    ur_manipulator_group_interface_.setPlanningTime(60.0);
+    ur_manipulator_group_interface_.setGoalPositionTolerance(0.01);
+    ur_manipulator_group_interface_.setGoalOrientationTolerance(0.05);
+    ur_manipulator_group_interface_.setPlanningTime(30.0);
 
     while (pub_detach_.HasConnections() == false)
     {
@@ -29,7 +31,6 @@ Robot::Robot(moveit::planning_interface::MoveGroupInterface &ur_manipulator_grou
     }
 
     this->detach_object_from_end_effector();
-
     this->go_home();
     this->set_gripper_position(GRIPPER_POSITION::OPEN);
 
@@ -89,7 +90,7 @@ void Robot::set_gripper_position(GRIPPER_POSITION position)
             break;
         case GRIPPER_POSITION::GRAB:
             RCLCPP_INFO(logger_, "Setting gripper to GRAB");
-            hand_group_interface_.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.1}});
+            hand_group_interface_.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.105}});
             break;
         default:
             RCLCPP_ERROR(logger_, "Invalid gripper position");

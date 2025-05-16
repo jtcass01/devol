@@ -285,7 +285,7 @@
     <!-- table -->
     <model name="table_single_link">
       <static>true</static>
-      <pose>-1.0 -2.0 0 0 0 1.570796327</pose>
+      <pose>-1.2 -2.35 0 0 0 1.570796327</pose>
 
       <link name="table">
         <visual name="tabletop">
@@ -404,7 +404,7 @@
     <!-- Add a block for the manipulator to grab and place on the Husky-->
     <model name="target_block">
       <static>false</static>
-      <pose>0.2 -1.05 1.0875 0 0 0</pose>
+      <pose>0 -1.4 1.0875 0 0 0</pose>
       <link name="target_block">
         <visual name="block_visual">
           <geometry>

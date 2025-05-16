@@ -80,8 +80,8 @@ void initialize_collision_objects(moveit::planning_interface::MoveGroupInterface
         primitive.dimensions = {2.5, 2.0, 1.05};
     
         geometry_msgs::msg::Pose pose;
-        pose.position.x = -1.0;
-        pose.position.y = -2.0;
+        pose.position.x = -1.2;
+        pose.position.y = -2.35;
         pose.position.z = 0.225;
         pose.orientation.w = 1.0;
     
@@ -131,8 +131,8 @@ void initialize_collision_objects(moveit::planning_interface::MoveGroupInterface
 
         // Set the position of the box center
         geometry_msgs::msg::Pose pose;
-        pose.position.x = 0.2;
-        pose.position.y = -1.05;
+        pose.position.x = 0;
+        pose.position.y = -1.4;
         pose.position.z = 0.788;
         pose.orientation.w = 1.0;
 
@@ -158,11 +158,18 @@ geometry_msgs::msg::Pose make_pose(double x, double y, double z, double qx, doub
 
 int main(int argc, char *argv[])
 {
+    int sleep_between_steps = 2500; // milliseconds
+
     // Start up ROS 2
     rclcpp::init(argc, argv);
 
     auto const node = std::make_shared<rclcpp::Node>("pick_and_place_node", rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
     auto const logger = rclcpp::get_logger("pick_and_place_node");
+
+    geometry_msgs::msg::Pose above_pickup_target_pose = make_pose(0, -1.4, 1.05, 0.0, 1.0, 0.0, 0.0);
+    geometry_msgs::msg::Pose pickup_target_pose = make_pose(0, -1.4, 0.95, 0.0, 1.0, 0.0, 0.0);
+    geometry_msgs::msg::Pose above_place_target_pose = make_pose(1.71, 0.2, 0.40, 1.0, 0.0, 0.0, 0.0);
+    geometry_msgs::msg::Pose place_target_pose = make_pose(1.71, 0.2, 0.35, 1.0, 0.0, 0.0, 0.0);
 
     rclcpp::executors::SingleThreadedExecutor executor;
     executor.add_node(node);
@@ -182,21 +189,19 @@ int main(int argc, char *argv[])
 
     // Create a robot object, includes going to ready position
     Robot robot(ur_manipulator_group_interface, hand_group_interface, planning_scene_interface, logger, node);
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
 
     // Go to above pick up position
     RCLCPP_INFO(logger, "Going to above pickup position");
-    geometry_msgs::msg::Pose above_pickup_target_pose = make_pose(0.2, -1.05, 1.05, 0.0, 1.0, 0.0, 0.0);
     bool success = robot.set_manipulator_goal(above_pickup_target_pose);
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
 
     // Go to pick up position
     if (success)
     {
         RCLCPP_INFO(logger, "Going to pickup position");
-        geometry_msgs::msg::Pose pickup_target_pose = make_pose(0.2, -1.05, 0.95, 0.0, 1.0, 0.0, 0.0);
         success = robot.set_manipulator_goal(pickup_target_pose);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
     }
 
     if (success)
@@ -204,11 +209,12 @@ int main(int argc, char *argv[])
         // Attach the object to the robot's end effector
         robot.attach_object("target_block");
         RCLCPP_INFO(logger, "Attached the object to the end effector.");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Close the gripper
         RCLCPP_INFO(logger, "Setting gripper to grab position");
         robot.set_gripper_position(GRIPPER_POSITION::GRAB);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
 
         robot.attach_object_to_end_effector();
     }
@@ -218,43 +224,57 @@ int main(int argc, char *argv[])
         // Go to above pick up position
         RCLCPP_INFO(logger, "Going to above pickup position");
         robot.set_manipulator_goal(above_pickup_target_pose);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
+    }
+
+    // Go Home
+    if (success)
+    {
+        RCLCPP_INFO(logger, "Going to home position");
+        robot.go_home();
+        RCLCPP_INFO(logger, "Returned to home position.");
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
     }
     
     if (success)
     {
         // Go to above place position
         RCLCPP_INFO(logger, "Going to above place position");
-        geometry_msgs::msg::Pose above_place_target_pose = make_pose(1.71, 0.2, 0.40, 0.0, 1.0, 0.0, 0.0);
         success = robot.set_manipulator_goal(above_place_target_pose);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
     }
 
     if (success)
     {
         // Go to place position
-        RCLCPP_INFO(logger, "Going to above place position");
-        geometry_msgs::msg::Pose place_target_pose = make_pose(1.71, 0.2, 0.35, 0.0, 1.0, 0.0, 0.0);
+        RCLCPP_INFO(logger, "Going to place position");
         robot.set_manipulator_goal(place_target_pose);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
     }
 
     if (success)
     {
-        // Go to place position
         robot.set_gripper_position(GRIPPER_POSITION::OPEN);
         RCLCPP_INFO(logger, "Gripper opened.");
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
 
         // Detach the object from the robot's end effector
         robot.detach_object("target_block");
         robot.detach_object_from_end_effector();
         RCLCPP_INFO(logger, "Detached the object from the end effector.");
 
+        // Go to above place position
+        RCLCPP_INFO(logger, "Going to above place position");
+        success = robot.set_manipulator_goal(above_place_target_pose);
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
+    }
+
+    if (success)
+    {
         RCLCPP_INFO(logger, "Going to home position");
         robot.go_home();
         RCLCPP_INFO(logger, "Returned to home position.");
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
     }
     
     rclcpp::shutdown();
