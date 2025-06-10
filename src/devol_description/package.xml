@@ -9,6 +9,9 @@
   <author>Jacob Cassady</author>
 
   <depend>ur_description</depend>
+  <depend>robotiq_description</depend>
+  <depend>realsense2_description</depend>
+  <depend>gz-sensors8</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

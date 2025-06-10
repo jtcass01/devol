@@ -4,6 +4,7 @@
     <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
     <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro"/>
     <xacro:include filename="$(find robotiq_description)/urdf/ur_to_robotiq_adapter.urdf.xacro"/>
+    <xacro:include filename= "$(find realsense2_description)/urdf/_d405.urdf.xacro"/>
 
     <xacro:macro name="devol" params="
         parent
@@ -53,6 +54,10 @@
             prefix="${tf_prefix}"
             connected_to="${tf_prefix}tool0"
         />
+
+        <xacro:sensor_d405 parent="${tf_prefix}gripper_mount_link" use_nominal_extrinsics="true">
+            <origin xyz="0 0.08 0" rpy="0 -1.570795 1.570795"/>
+        </xacro:sensor_d405>
 
         <xacro:robotiq_gripper
             name="RobotiqGripperHardwareInterface"

@@ -192,7 +192,12 @@ def generate_launch_description():
     start_gz_bridge_cmd: Node = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+                   "/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+                   "/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+                   "/depth/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+                   "/depth/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"],
         output='screen'
     )
 

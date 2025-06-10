@@ -105,18 +105,6 @@ def generate_launch_description():
 
     moveit_config = (
         MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
-        .robot_description_semantic(file_path=join(get_package_share_directory(moveit_package),
-                                              "config",
-                                              "devol.srdf"))
-        .robot_description(file_path=join(get_package_share_directory(urdf_package),
-                                     "urdf",
-                                     urdf_filename))
-        .joint_limits(file_path=join(get_package_share_directory(moveit_package),
-                                     "config",
-                                     "joint_limits.yaml"))
-        .trajectory_execution(file_path=join(get_package_share_directory(moveit_package),
-                                        "config",
-                                        "moveit_controllers.yaml"))
         .to_moveit_configs()
     )
 
