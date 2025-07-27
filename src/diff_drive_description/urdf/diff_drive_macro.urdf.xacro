@@ -1,0 +1,196 @@
+<?xml version="1.0"?>
+
+<!-- Reference: https://github.com/lucasmazzetto/gazebo_differential_drive_robot -->
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+    <!-- import macros -->
+    <xacro:include filename="$(find diff_drive_description)/urdf/materials.xacro"/>
+
+    <xacro:macro name="diff_drive" params="
+        tf_prefix
+        parent:=empty
+        body_length:=0.5
+        body_width:=0.3
+        body_height:=0.1
+        body_density:=7850.0
+        wheel_radius:=0.1
+        wheel_width:=0.05
+        wheel_density:=900
+        caster_radius:=0.1
+        caster_density:=0.1
+        max_linear_acceleration:=10
+    ">
+        <xacro:property name="PI" value="3.14159265"/>
+        <xacro:property name="body_mass" value="${body_density * body_length * body_height * body_width}"/>
+        <xacro:property name="body_inertia_x" value="${1.0/12.0 * body_mass * (body_height*body_height + body_width*body_width)}"/>
+        <xacro:property name="body_inertia_y" value="${1.0/12.0 * body_mass * (body_length*body_length + body_height*body_height)}"/>
+        <xacro:property name="body_inertia_z" value="${1.0/12.0 * body_mass * (body_length*body_length + body_width*body_width)}"/>
+        <xacro:property name="wheel_offset" value="${body_length/2 - wheel_radius}"/>
+        <xacro:property name="wheel_mass" value="${wheel_density * PI * wheel_radius * wheel_radius * wheel_width}"/>
+        <xacro:property name="wheel_inertia_x" value="${1.0/12.0 * wheel_mass * (3*wheel_radius*wheel_radius + wheel_width*wheel_width)}"/>
+        <xacro:property name="wheel_inertia_y" value="${1.0/12.0 * wheel_mass * (3*wheel_radius*wheel_radius + wheel_width*wheel_width)}"/>
+        <xacro:property name="wheel_inertia_z" value="${1.0/2.0 * wheel_mass * wheel_radius * wheel_radius}"/>
+        <xacro:property name="caster_offset" value="${body_length/2 - caster_radius}"/>
+        <xacro:property name="caster_mass" value="${caster_density * 4.0/3.0 * PI * caster_radius * caster_radius * caster_radius}"/>
+        <xacro:property name="caster_inertia_x" value="${2.0/5.0 * caster_mass * caster_radius * caster_radius}"/>
+        <xacro:property name="caster_inertia_y" value="${2.0/5.0 * caster_mass * caster_radius * caster_radius}"/>
+        <xacro:property name="caster_inertia_z" value="${2.0/5.0 * caster_mass * caster_radius * caster_radius}"/>
+
+        <!-- Body Link -->
+        <link name="${parent}"/>
+
+        <link name="${tf_prefix}body_link">
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <geometry>
+                    <box size="${body_length} ${body_width} ${body_height}"/>
+                </geometry>
+                <material name="dark-blue-metal" />
+            </visual>
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <geometry>
+                    <box size="${body_length} ${body_width} ${body_height}"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="10"/>
+                <inertia ixx="${body_inertia_x}" ixy="0.0" ixz="0.0" iyy="${body_inertia_y}" iyz="0" izz="${body_inertia_z}"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </inertial>
+        </link>
+        <joint name="${tf_prefix}base_to_body" type="fixed">
+            <parent link="${parent}"/>
+            <child link="${tf_prefix}body_link"/>
+            <origin xyz="0 0 ${caster_offset}" rpy="0 0 0"/>
+        </joint>        
+
+        <!-- Left Wheel -->
+        <link name="${tf_prefix}left_wheel_link">
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="1.570795 0.0 0.0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                </geometry>
+                <material name="dark-purple-metal" />
+            </visual>
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="1.570795 0.0 0.0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                </geometry>
+                <surface>
+                <friction>
+                <ode>
+                    <mu>1</mu>
+                    <mu2>1</mu2>
+                    <slip1>0.035</slip1>
+                    <slip2>0</slip2>
+                    <fdir1>0 0 1</fdir1>
+                </ode>
+                <bullet>
+                    <friction>1</friction>
+                    <friction2>1</friction2>
+                    <rolling_friction>0.1</rolling_friction>
+                </bullet>
+                </friction>
+            </surface>
+            </collision>
+            <inertial>
+                <mass value="2"/>
+                <inertia ixx="${wheel_inertia_x}" ixy="0.0" ixz="0.0" iyy="${wheel_inertia_y}" iyz="0" izz="${wheel_inertia_z}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="1.570795 0.0 0.0"/>
+            </inertial>
+        </link>
+
+        <!-- Right Wheel -->
+        <link name="${tf_prefix}right_wheel_link">
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="1.570795 0.0 0.0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                </geometry>
+                <material name="dark-purple-metal" />
+            </visual>
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="1.570795 0.0 0.0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                </geometry>
+                <surface>
+                    <friction>
+                    <ode>
+                        <mu>1</mu>
+                        <mu2>1</mu2>
+                        <slip1>0.035</slip1>
+                        <slip2>0</slip2>
+                        <fdir1>0 0 1</fdir1>
+                    </ode>
+                    <bullet>
+                        <friction>1</friction>
+                        <friction2>1</friction2>
+                        <rolling_friction>0.1</rolling_friction>
+                    </bullet>
+                    </friction>
+                </surface>
+            </collision>
+            <inertial>
+                <mass value="2"/>
+                <inertia ixx="${wheel_inertia_x}" ixy="0.0" ixz="0.0" iyy="${wheel_inertia_y}" iyz="0" izz="${wheel_inertia_z}"/>
+                <origin xyz="0.0 0.0 0.0" rpy="1.570795 0.0 0.0"/>
+            </inertial>
+        </link>
+
+        <!-- Caster Wheel -->
+        <link name="${tf_prefix}caster_link">
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <geometry>
+                    <sphere radius="${caster_radius}"/>
+                </geometry>
+                <material name="metallic-green" />
+            </visual>
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <geometry>
+                    <sphere radius="${caster_radius}"/>
+                </geometry>
+            </collision>
+            <inertial>
+                <mass value="0.5"/>
+                <inertia ixx="${caster_inertia_x}" ixy="0.0" ixz="0.0" iyy="${caster_inertia_y}" iyz="0" izz="${caster_inertia_z}"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </inertial>
+        </link>
+
+        <!-- Joints -->
+
+        <!-- Left Wheel Joint -->
+        <joint name="${tf_prefix}left_wheel_joint" type="continuous">
+            <origin xyz="-${wheel_offset} ${wheel_separation/2} -${wheel_radius/2}" rpy="0 0 0"/>
+            <parent link="${tf_prefix}body_link"/>
+            <child link="${tf_prefix}left_wheel_link"/>
+            <axis xyz="0 1 0"/>
+            <limit effort="100" velocity="10.0"/>
+            <dynamics damping="0.1" friction="0.1"/>
+        </joint>
+
+        <!-- Right Wheel Joint -->
+        <joint name="${tf_prefix}right_wheel_joint" type="continuous">
+            <origin xyz="-${wheel_offset} ${-wheel_separation/2} -${wheel_radius/2}" rpy="0 0 0"/>
+            <parent link="${tf_prefix}body_link"/>
+            <child link="${tf_prefix}right_wheel_link"/>
+            <axis xyz="0 1 0"/>
+            <limit effort="100" velocity="10.0"/>
+            <dynamics damping="0.1" friction="0.1"/>
+        </joint>
+
+        <!-- Caster Wheel Joint (fixed) -->
+        <joint name="${tf_prefix}caster_joint" type="fixed">
+            <origin xyz="${caster_offset} 0 -${caster_radius/2}" rpy="0 0 0"/>
+            <parent link="${tf_prefix}body_link"/>
+            <child link="${tf_prefix}caster_link"/>
+        </joint>
+
+    </xacro:macro>
+
+</robot>

@@ -27,8 +27,8 @@
         output_recipe_filename
         initial_positions
         *origin
-        use_gazebo:=false
-        force_abs_paths:=true
+        use_gazebo
+        force_abs_paths
     ">
 
         <!-- arm -->
@@ -63,8 +63,7 @@
             name="RobotiqGripperHardwareInterface"
             parent="${tf_prefix}gripper_mount_link"
             prefix="${tf_prefix}"
-            use_fake_hardware="true"
-            fake_sensor_commands="false"
+            include_ros2_control="${not use_gazebo}"
         >
             <origin xyz="0 0 0" rpy="0 0 0"/>
         </xacro:robotiq_gripper>
@@ -85,13 +84,6 @@
                 mock_sensor_commands="${mock_sensor_commands}"
                 initial_positions="${initial_positions}"
             />
-
-            <!-- <xacro:robotiq_gripper_ros2_control
-                name="RobotiqGripperHardwareInterface"
-                prefix="${tf_prefix}"
-            /> -->
         </xacro:unless>
-
     </xacro:macro>
-
 </robot>

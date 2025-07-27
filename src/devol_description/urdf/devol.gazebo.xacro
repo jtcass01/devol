@@ -5,7 +5,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 -->
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <xacro:macro name="devol_gazebo">
+  <xacro:macro name="devol_gazebo" params="tf_prefix">
 
     <!-- ros_control plugin -->
     <gazebo>
@@ -13,29 +13,27 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         <parameters>$(find devol_description)/config/ros2_controllers.yaml</parameters>
       </plugin>
 
-      <plugin
+      <!-- <plugin
         filename="libgz-sim-detachable-joint-system.so"
         name="gz::sim::systems::DetachableJoint">
-        <parent_link>wrist_3_link</parent_link>
+        <parent_link>${tf_prefix}wrist_3_link</parent_link>
         <child_link>target_block</child_link>
         <child_model>target_block</child_model>
         <child_model_link>target_block</child_model_link>
         <attach_topic>/devol_attach/attach</attach_topic>
         <detach_topic>/devol_attach/detach</detach_topic>
-      </plugin>
-
-
+      </plugin> -->
     </gazebo>
 
     <!-- Camera -->
     <gazebo reference="camera_color_frame">
 
-      <sensor type="camera" name="realsense_d405_camera">
+      <sensor type="camera" name="${tf_prefix}realsense_d405_camera">
         <pose relative_to="camera_color_frame">0 0 0 3.14159 0 0</pose>
-        <topic>camera/image_raw</topic>
+        <topic>/model/${tf_prefix}devol/color_raw</topic>
 
         <camera>
-          <camera_info_topic>camera/camera_info</camera_info_topic>
+          <camera_info_topic>/model/${tf_prefix}devol/color_info</camera_info_topic>
           <horizontal_fov>1.518</horizontal_fov>
           <image>
             <width>1280</width>
@@ -58,12 +56,12 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
     <!-- Depth Camera  -->
     <gazebo reference="camera_depth_frame">
 
-      <sensor type="depth_camera" name="realsense_d405_depth_camera">
-        <topic>depth/image_raw</topic>
+      <sensor type="depth_camera" name="${tf_prefix}realsense_d405_depth_camera">
+        <topic>/model/${tf_prefix}devol/depth_raw</topic>
         <pose relative_to="camera_color_frame">0 0 0 3.14159 0 0</pose>
 
         <camera>
-          <camera_info_topic>depth/camera_info</camera_info_topic>
+          <camera_info_topic>/model/${tf_prefix}devol/depth_info</camera_info_topic>
           <horizontal_fov>1.518</horizontal_fov>
           <image>
             <width>1280</width>

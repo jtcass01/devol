@@ -60,6 +60,8 @@
 
   <xacro:if value="$(arg use_gazebo)">
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
-    <xacro:devol_gazebo/>
+    <xacro:devol_gazebo
+      tf_prefix="$(arg tf_prefix)" 
+      />
   </xacro:if>
 </robot>

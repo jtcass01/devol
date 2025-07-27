@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+
+<!-- Reference: https://github.com/lucasmazzetto/gazebo_differential_drive_robot -->
+<robot name="devol_drive" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Import devol macro -->
+    <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive_macro.urdf.xacro"/>
+    <!-- ros2_control description -->
+    <xacro:include filename="$(find devol_description)/urdf/devol.ros2_control.xacro"/>
+
+    <!-- Robot Parameters -->
+    <xacro:arg name="parent" default="empty"/>  <!-- Set this to world for rviz and others -->
+    <xacro:arg name="name" default="devol_drive"/>
+    <xacro:arg name="tf_prefix" default="" />
+    <xacro:arg name="ur_type" default="ur3"/>
+    <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
+    <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
+    <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
+    <xacro:arg name="visual_params" default="$(find ur_description)/config/$(arg ur_type)/visual_parameters.yaml"/>
+    <xacro:arg name="transmission_hw_interface" default=""/>
+    <xacro:arg name="safety_limits" default="false"/>
+    <xacro:arg name="safety_pos_margin" default="0.15"/>
+    <xacro:arg name="safety_k_position" default="20"/>
+    <xacro:arg name="use_mock_hardware" default="false" />
+    <xacro:arg name="mock_sensor_commands" default="false" />
+    <xacro:arg name="robot_ip" default="yyy.yyy.yyy.yyy" />
+    <xacro:arg name="script_filename" default="None" />
+    <xacro:arg name="input_recipe_filename" default="None" />
+    <xacro:arg name="output_recipe_filename" default="None" />
+    <xacro:arg name="body_length" default="0.5"/>
+    <xacro:arg name="body_width" default="0.3"/>
+    <xacro:arg name="body_height" default="0.1"/>
+    <xacro:arg name="body_density" default="7850.0"/>
+    <xacro:arg name="wheel_radius" default="0.1"/>
+    <xacro:arg name="wheel_width" default="0.05"/>
+    <xacro:arg name="wheel_density" default="900"/>
+    <xacro:arg name="caster_radius" default="0.1"/>
+    <xacro:arg name="caster_density" default="0.1"/>
+    <xacro:arg name="max_linear_acceleration" default="10"/>
+    <xacro:arg name="use_gazebo" default="true"/>
+    <xacro:arg name="force_abs_paths" default="true"/>
+
+    <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
+    <xacro:arg name="initial_positions_file" default="$(find devol_description)/config/initial_positions.yaml"/>
+
+    <!-- convert to property to use substitution in function -->
+    <xacro:property name="initial_positions_file" default="$(arg initial_positions_file)"/>
+
+    <xacro:property name="body_width" value="$(arg body_width)"/>
+    <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
+    <xacro:property name="wheel_separation" value="${(body_width) + (wheel_width)}"/>
+
+    <xacro:devol_drive 
+        parent="$(arg parent)"
+        name="$(arg name)"
+        tf_prefix="$(arg tf_prefix)" 
+        ur_type="$(arg ur_type)"
+        joint_limit_params="$(arg joint_limit_params)"
+        kinematics_params="$(arg kinematics_params)"
+        physical_params="$(arg physical_params)"
+        visual_params="$(arg visual_params)"
+        transmission_hw_interface="$(arg transmission_hw_interface)"
+        safety_limits="$(arg safety_limits)"
+        safety_pos_margin="$(arg safety_pos_margin)"
+        safety_k_position="$(arg safety_k_position)"
+        use_mock_hardware="$(arg use_mock_hardware)"
+        mock_sensor_commands="$(arg mock_sensor_commands)"
+        robot_ip="$(arg robot_ip)"
+        script_filename="$(arg script_filename)"
+        input_recipe_filename="$(arg input_recipe_filename)"
+        output_recipe_filename="$(arg output_recipe_filename)"
+        initial_positions="${xacro.load_yaml((initial_positions_file))}"
+        use_gazebo="$(arg use_gazebo)"
+        force_abs_paths="$(arg use_gazebo)"
+        body_length="$(arg body_length)"
+        body_width="$(arg body_width)"
+        body_height="$(arg body_height)"
+        body_density="$(arg body_density)"
+        wheel_radius="$(arg wheel_radius)"
+        wheel_width="$(arg wheel_width)"
+        wheel_density="$(arg wheel_density)"
+        caster_radius="$(arg caster_radius)"
+        caster_density="$(arg caster_density)"
+        max_linear_acceleration="$(arg max_linear_acceleration)">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:devol_drive>
+
+    <xacro:devol_ros2_control name="devol_ros2_control" prefix="$(arg tf_prefix)" use_gazebo="$(arg use_gazebo)"/>
+
+    <xacro:if value="$(arg use_gazebo)">
+        <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive.gazebo.xacro"/>
+        <xacro:devol_drive_gazebo 
+            wheel_separation="${(wheel_separation)}"
+            wheel_radius="$(arg wheel_radius)"
+            max_linear_acceleration="$(arg max_linear_acceleration)"
+            tf_prefix="$(arg tf_prefix)" 
+             />
+    </xacro:if>
+
+</robot>

@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="diff_drive_gazebo" params="
+    wheel_separation
+    wheel_radius
+    max_linear_acceleration
+    tf_prefix">
+
+    <!-- ros_control plugin -->
+    <!-- Gazebo Parameters -->
+    <gazebo reference="${tf_prefix}body_link">
+        <mu1>1.0</mu1>
+        <mu2>1.0</mu2>
+
+        <material> 
+            <ambient>0.0 0.0 0.2 1</ambient>
+            <diffuse>0.0 0.0 0.4 1</diffuse>
+            <specular>0.5 0.5 0.7 1</specular>
+            <emissive>0 0 0 1</emissive>
+        </material>
+    </gazebo>
+
+
+    <gazebo reference="${tf_prefix}right_wheel_link">
+        <mu1>1.0</mu1>
+        <mu2>1.0</mu2>
+
+        <material>
+          <ambient>0.2 0.0 0.2 1</ambient>
+          <diffuse>0.4 0.0 0.4 1</diffuse>
+          <specular>0.5 0.3 0.6 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+    </gazebo>
+
+    <gazebo reference="${tf_prefix}left_wheel_link">
+        <mu1>1.0</mu1>
+        <mu2>1.0</mu2>
+
+        <material>
+          <ambient>0.2 0.0 0.2 1</ambient>
+          <diffuse>0.4 0.0 0.4 1</diffuse>
+          <specular>0.5 0.3 0.6 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+    </gazebo>
+
+    <gazebo reference="${tf_prefix}caster_link">
+        <mu1>0.000001</mu1>
+        <mu2>0.000001</mu2>
+
+        <material>
+          <ambient>0.0 0.2 0.0 1</ambient>
+          <diffuse>0.0 0.5 0.0 1</diffuse>
+          <specular>0.4 0.6 0.4 1</specular>
+          <emissive>0 0 0 1</emissive>
+          </material>
+    </gazebo>
+
+    <gazebo>
+      <plugin
+        filename="gz-sim-diff-drive-system"
+        name="gz::sim::systems::DiffDrive">
+        <left_joint>${tf_prefix}left_wheel_joint</left_joint>
+        <right_joint>${tf_prefix}right_wheel_joint</right_joint>
+        <wheel_separation>${wheel_separation}</wheel_separation>
+        <wheel_radius>${wheel_radius}</wheel_radius>
+        <odom_publish_frequency>1</odom_publish_frequency>
+        <max_linear_acceleration>${max_linear_acceleration}</max_linear_acceleration>
+        <min_linear_acceleration>-1</min_linear_acceleration>
+        <max_angular_acceleration>2</max_angular_acceleration>
+        <min_angular_acceleration>-2</min_angular_acceleration>
+        <max_linear_velocity>0.5</max_linear_velocity>
+        <min_linear_velocity>-0.5</min_linear_velocity>
+        <max_angular_velocity>1</max_angular_velocity>
+        <min_angular_velocity>-1</min_angular_velocity>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

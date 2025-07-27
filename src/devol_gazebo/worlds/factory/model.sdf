@@ -244,46 +244,8 @@
       <direction>0.1 0.1 -1</direction>
     </light>
 
-    <!-- Add a stand for the manipulator -->
-    <model name="stand">
-      <static>true</static>
-      <link name="devol_stand">
-        <collision name="collision">
-          <geometry>
-            <cylinder>
-                <radius>0.09</radius>
-                <length>0.3</length>
-            </cylinder>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <cylinder>
-                <radius>0.09</radius>
-                <length>0.3</length>
-            </cylinder>
-          </geometry>
-          <material>
-            <ambient>0.0 0.176 0.447 1</ambient>
-            <diffuse>0.0 0.176 0.447 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-          </material>
-        </visual>
-      </link>
-      <pose>0 0 0.15 0 0 0</pose>
-    </model>
-
-    <!-- Add Husky Robot for placing items on top of. -->
-    <model name="husky">
-      <include merge="true">
-        <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MARBLE_HUSKY_SENSOR_CONFIG_5</uri>
-      </include>
-      <pose>1.71 0.2 0.18 0 0 1.570796327</pose>
-      <static>true</static>
-    </model>
-
     <!-- table -->
-    <model name="table_single_link">
+    <!-- <model name="table_single_link">
       <static>true</static>
       <pose>-1.2 -2.35 0 0 0 1.570796327</pose>
 
@@ -399,7 +361,7 @@
         </collision>
 
       </link>
-    </model>
+    </model> -->
 
     <!-- Add a block for the manipulator to grab and place on the Husky-->
     <model name="target_block">
