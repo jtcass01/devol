@@ -52,6 +52,7 @@
     output_recipe_filename="$(arg output_recipe_filename)"
     initial_positions="${xacro.load_yaml((initial_positions_file))}"
     use_gazebo="$(arg use_gazebo)"
+    force_abs_paths="$(arg use_gazebo)"
     >
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:devol>

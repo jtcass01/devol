@@ -106,18 +106,18 @@ def generate_launch_description():
 
     moveit_config = (
         MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
-        .robot_description_semantic(file_path=join(get_package_share_directory(moveit_package),
-                                              "config",
-                                              "devol.srdf"))
-        .robot_description(file_path=join(get_package_share_directory(moveit_package),
-                                     "config",
-                                     urdf_filename))
-        .joint_limits(file_path=join(get_package_share_directory(moveit_package),
-                                     "config",
-                                     "joint_limits.yaml"))
-        .trajectory_execution(file_path=join(get_package_share_directory(moveit_package),
-                                        "config",
-                                        "moveit_controllers.yaml"))
+        # .robot_description_semantic(file_path=join(get_package_share_directory(moveit_package),
+        #                                       "config",
+        #                                       "devol.srdf"))
+        # .robot_description(file_path=join(get_package_share_directory(moveit_package),
+        #                              "config",
+        #                              urdf_filename))
+        # .joint_limits(file_path=join(get_package_share_directory(moveit_package),
+        #                              "config",
+        #                              "joint_limits.yaml"))
+        # .trajectory_execution(file_path=join(get_package_share_directory(moveit_package),
+        #                                 "config",
+        #                                 "moveit_controllers.yaml"))
         .to_moveit_configs()
     )
 
@@ -173,8 +173,7 @@ def generate_launch_description():
                 TextSubstitution(text='-r -v 4 '),
                 PathJoinSubstitution([
                     project_world_directory, world_directory, 'model.sdf'
-                ]),
-                TextSubstitution(text=' --physics-engine gz-physics-bullet-featherstone-plugin')
+                ])
             ]
         }.items(),
     )
@@ -194,10 +193,11 @@ def generate_launch_description():
         executable='parameter_bridge',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-                   "/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
-                   "/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
-                   "/depth/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
-                   "/depth/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"],
+                   "/model/devol/color_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+                   "/model/devol/color_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+                   "/model/devol/depth_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+                   "/model/devol/depth_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+                   ],
         output='screen'
     )
 
