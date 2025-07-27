@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get upgrade -y \
     && apt-get install -y ros-dev-tools ros-${ROS_DISTRO}-desktop \
     # Ros2 control libraries
-    ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers ros-${ROS_DISTRO}-teleop-twist-keyboard \
     # Universal Robots Library
     ros-${ROS_DISTRO}-ur \
     # Gazebo Libraries

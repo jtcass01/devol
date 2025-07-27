@@ -1,7 +1,7 @@
 # This config file is used by ros2_control
 controller_manager:
   ros__parameters:
-    update_rate: 1000  # Hz
+    update_rate: 100  # Hz
     use_sim_time: true
 
     hand_controller:
@@ -17,11 +17,10 @@ controller_manager:
 
 hand_controller:
   ros__parameters:
-    use_sim_time: true
     joint: robotiq_85_left_knuckle_joint
+    use_sim_time: true
 ur_manipulator_controller:
   ros__parameters:
-    use_sim_time: true
     joints:
       - shoulder_pan_joint
       - shoulder_lift_joint
@@ -35,3 +34,4 @@ ur_manipulator_controller:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: true
+    use_sim_time: true

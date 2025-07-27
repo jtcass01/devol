@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="devol_drive_gazebo" params="
+    wheel_separation
+    wheel_radius
+    max_linear_acceleration
+    tf_prefix">
+
+    <!-- Gazebo Parameters -->
+    <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive.gazebo.xacro"/>
+    <xacro:diff_drive_gazebo 
+        wheel_separation="${(wheel_separation)}"
+        wheel_radius="$(arg wheel_radius)"
+        max_linear_acceleration="$(arg max_linear_acceleration)" 
+        tf_prefix="$(arg tf_prefix)"/>
+
+    <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
+    <xacro:devol_gazebo
+      tf_prefix="$(arg tf_prefix)" 
+      />
+
+  </xacro:macro>
+</robot>
