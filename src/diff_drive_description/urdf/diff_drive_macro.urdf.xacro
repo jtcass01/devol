@@ -36,8 +36,6 @@
         <xacro:property name="caster_inertia_z" value="${2.0/5.0 * caster_mass * caster_radius * caster_radius}"/>
 
         <!-- Body Link -->
-        <link name="${parent}"/>
-
         <link name="${tf_prefix}body_link">
             <visual>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>

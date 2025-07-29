@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="dual_devol">
+    <!-- Import devol urdf file -->
+    <xacro:include filename="$(find dual_devol_description)/urdf/dual_devol.urdf.xacro" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="$(find dual_devol_moveit_config)/config/dual_devol.ros2_control.xacro" />
+
+    <xacro:dual_devol_ros2_control robot_one_prefix="artemis" robot_two_prefix="apollo"/>
+
+</robot>

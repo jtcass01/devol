@@ -9,15 +9,15 @@
 
     <!-- Gazebo Parameters -->
     <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive.gazebo.xacro"/>
-    <xacro:diff_drive_gazebo 
-        wheel_separation="${(wheel_separation)}"
-        wheel_radius="$(arg wheel_radius)"
-        max_linear_acceleration="$(arg max_linear_acceleration)" 
-        tf_prefix="$(arg tf_prefix)"/>
-
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
+    <xacro:diff_drive_gazebo 
+        wheel_separation="${wheel_separation}"
+        wheel_radius="${wheel_radius}"
+        max_linear_acceleration="${max_linear_acceleration}" 
+        tf_prefix="${tf_prefix}"/>
+
     <xacro:devol_gazebo
-      tf_prefix="$(arg tf_prefix)" 
+      tf_prefix="${tf_prefix}" 
       />
 
   </xacro:macro>

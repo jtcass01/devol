@@ -64,6 +64,8 @@
         name="gz::sim::systems::DiffDrive">
         <left_joint>${tf_prefix}left_wheel_joint</left_joint>
         <right_joint>${tf_prefix}right_wheel_joint</right_joint>
+        <topic>/model/${tf_prefix}devol_drive/cmd_vel</topic>
+        <odom_topic>/model/${tf_prefix}devol_drive/odom</odom_topic>
         <wheel_separation>${wheel_separation}</wheel_separation>
         <wheel_radius>${wheel_radius}</wheel_radius>
         <odom_publish_frequency>1</odom_publish_frequency>

@@ -6,6 +6,6 @@
     <!-- Import control_xacro -->
     <xacro:include filename="$(find devol_moveit_config)/config/devol.ros2_control.xacro" />
 
-    <xacro:devol_ros2_control prefix="fake" name="FakeSystem"/>
+    <xacro:devol_ros2_control tf_prefix="fake" name="FakeSystem"/>
 
 </robot>

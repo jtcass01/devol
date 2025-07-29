@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="dual_devol_gazebo" params="
+    wheel_separation
+    wheel_radius
+    max_linear_acceleration
+    robot_one_prefix
+    robot_two_prefix
+    ">
+
+    <!-- Gazebo Parameters -->
+    <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive.gazebo.xacro"/>
+
+    <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(find dual_devol_description)/config/ros2_controllers.yaml</parameters>
+      </plugin>
+    </gazebo>
+
+    <xacro:devol_drive_gazebo 
+        wheel_separation="${wheel_separation}"
+        wheel_radius="${wheel_radius}"
+        max_linear_acceleration="${max_linear_acceleration}" 
+        tf_prefix="${robot_one_prefix}"/>
+    <xacro:devol_drive_gazebo 
+        wheel_separation="${wheel_separation}"
+        wheel_radius="${wheel_radius}"
+        max_linear_acceleration="${max_linear_acceleration}" 
+        tf_prefix="${robot_two_prefix}"/>
+
+  </xacro:macro>
+</robot>

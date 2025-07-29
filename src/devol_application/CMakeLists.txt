@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(gz-msgs10 QUIET REQUIRED)
 find_package(gz-transport13 QUIET REQUIRED OPTIONAL_COMPONENTS log)
@@ -17,13 +18,25 @@ set(GZ_TRANSPORT_VER ${gz-transport13_VERSION_MAJOR})
 # Add library for devol_robot
 add_library(devol_robot src/devol_robot.cpp)
 target_link_libraries(devol_robot ${GZ-MSGS_LIBRARIES} gz-transport${GZ_TRANSPORT_VER}::core)
-ament_target_dependencies(devol_robot "rclcpp" "moveit_msgs" "moveit_ros_planning_interface")
+ament_target_dependencies(devol_robot "rclcpp" "moveit_msgs" "geometry_msgs" "moveit_ros_planning_interface")
 
-add_executable(pick_and_place src/pick_and_place.cpp)
-target_link_libraries(pick_and_place devol_robot)
-ament_target_dependencies(pick_and_place "rclcpp" "moveit_msgs" "moveit_ros_planning_interface")
+add_library(devol_drive_robot src/devol_drive_robot.cpp)
+target_link_libraries(devol_drive_robot ${GZ-MSGS_LIBRARIES} gz-transport${GZ_TRANSPORT_VER}::core)
+ament_target_dependencies(devol_drive_robot "rclcpp" "moveit_msgs" "geometry_msgs" "moveit_ros_planning_interface")
 
-install(TARGETS pick_and_place
+add_executable(pick_and_place_demo src/pick_and_place_demo.cpp)
+target_link_libraries(pick_and_place_demo devol_robot)
+ament_target_dependencies(pick_and_place_demo "rclcpp" "moveit_msgs" "geometry_msgs" "moveit_ros_planning_interface")
+
+add_executable(devol_drive_demo src/devol_drive_demo.cpp)
+target_link_libraries(devol_drive_demo devol_drive_robot devol_robot)
+ament_target_dependencies(devol_drive_demo "rclcpp" "moveit_msgs" "geometry_msgs" "moveit_ros_planning_interface")
+
+install(TARGETS pick_and_place_demo
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS devol_drive_demo
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -73,6 +73,7 @@ def generate_launch_description():
     robot_description_content: ParameterValue = ParameterValue(Command([
         'xacro', ' ', urdf_model, ' ',
         'name:=', name, ' ',
+        'use_gazebo:=false ',
     ]), value_type=str)
 
     # Subscribe to the joint states of the robot, and publish them to the robot state publisher

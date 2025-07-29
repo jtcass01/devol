@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- ros2_control description -->
+    <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive.ros2_control.xacro"/>
+    <xacro:include filename="$(find devol_description)/urdf/devol.ros2_control.xacro"/>
+
+    <xacro:macro name="devol_drive_ros2_control" params="tf_prefix use_gazebo:=^|false">
+        <xacro:devol_ros2_control name="${tf_prefix}devol_ros2_control" tf_prefix="${tf_prefix}" use_gazebo="${use_gazebo}"/>
+        <xacro:diff_drive_ros2_control name="${tf_prefix}diff_drive_ros2_control" tf_prefix="${tf_prefix}" use_gazebo="${use_gazebo}"/>
+    </xacro:macro>
+</robot>

@@ -5,6 +5,7 @@
     <!-- Import diff macro -->
     <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive_macro.urdf.xacro"/>
     <!-- ros2_control description -->
+    <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive.ros2_control.xacro"/>
 
     <!-- Robot Parameters -->
     <xacro:arg name="parent" default="empty"/>  <!-- Set this to world for rviz and others -->
@@ -19,12 +20,15 @@
     <xacro:arg name="caster_density" default="0.1"/>
     <xacro:arg name="max_linear_acceleration" default="10"/>
     <xacro:arg name="use_gazebo" default="true"/>
+    <xacro:arg name="tf_prefix" default=""/>
 
     <xacro:property name="body_width" value="$(arg body_width)"/>
     <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
     <xacro:property name="wheel_separation" value="${(body_width) + (wheel_width)}"/>
 
+    <link name="$(arg parent)"/>
     <xacro:diff_drive 
+        tf_prefix="$(arg tf_prefix)"
         parent="$(arg parent)"
         body_length="$(arg body_length)"
         body_width="$(arg body_width)"
@@ -47,4 +51,5 @@
             tf_prefix="$(arg tf_prefix)"/>
     </xacro:if>
 
+    <xacro:diff_drive_ros2_control name="diff_drive_ros2_control" tf_prefix="$(arg tf_prefix)" use_gazebo="$(arg use_gazebo)"/>
 </robot>

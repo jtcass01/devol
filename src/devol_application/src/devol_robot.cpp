@@ -1,23 +1,33 @@
 #include "devol_robot.h"
 
-Robot::Robot(moveit::planning_interface::MoveGroupInterface &ur_manipulator_group_interface_,
+DevolRobot::DevolRobot(moveit::planning_interface::MoveGroupInterface &ur_manipulator_group_interface,
              moveit::planning_interface::MoveGroupInterface &hand_group_interface,
              moveit::planning_interface::PlanningSceneInterface &planning_scene_interface,
              const rclcpp::Logger &logger,
-             const rclcpp::Node::SharedPtr &node) :
-             ur_manipulator_group_interface_(ur_manipulator_group_interface_),
+             const rclcpp::Node::SharedPtr &node,
+             const std::string &tf_prefix) :
+             ur_manipulator_group_interface_(ur_manipulator_group_interface),
              hand_group_interface_(hand_group_interface),
              planning_scene_interface_(planning_scene_interface),
+             tf_prefix_(tf_prefix),
              logger_(logger),
              node_(node)
 {
+    std::string attach_topic = tf_prefix + "devol_attach/attach";
+    std::string detach_topic = tf_prefix + "devol_attach/detach";
+    gripper_joint_ = tf_prefix + "robotiq_85_left_knuckle_joint";
+
     ur_manipulator_group_interface_.setPlanningPipelineId("ompl");
     ur_manipulator_group_interface_.setPlannerId("LBKPIECEkConfigDefault");
-    ur_manipulator_group_interface_.setMaxVelocityScalingFactor(0.5);
-    ur_manipulator_group_interface_.setMaxAccelerationScalingFactor(0.5);
+    ur_manipulator_group_interface_.setMaxVelocityScalingFactor(1.0);
+    ur_manipulator_group_interface_.setMaxAccelerationScalingFactor(1.0);
     ur_manipulator_group_interface_.setGoalPositionTolerance(0.01);
     ur_manipulator_group_interface_.setGoalOrientationTolerance(0.05);
-    ur_manipulator_group_interface_.setPlanningTime(30.0);
+    ur_manipulator_group_interface_.setPlanningTime(60.0);
+
+    pub_attach_ = gz_node_.Advertise<gz::msgs::Empty>(attach_topic);
+    pub_detach_ = gz_node_.Advertise<gz::msgs::Empty>(detach_topic);
+
 
     while (pub_detach_.HasConnections() == false)
     {
@@ -31,35 +41,53 @@ Robot::Robot(moveit::planning_interface::MoveGroupInterface &ur_manipulator_grou
     }
 
     this->detach_object_from_end_effector();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     this->go_home();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
     this->set_gripper_position(GRIPPER_POSITION::OPEN);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-    // Initialize the robot
-    RCLCPP_INFO(logger_, "Robot initialized. In Ready Position.");
+    // Initialize the DevolRobot
+    RCLCPP_INFO(logger_, "DevolRobot initialized. In Ready Position.");
 }
 
 
-Robot::~Robot(){}
+DevolRobot::~DevolRobot(){}
 
-bool Robot::go_home()
+void DevolRobot::go_home()
 {
-    RCLCPP_INFO(logger_, "Going to ready position");
-    ur_manipulator_group_interface_.setNamedTarget("ready");
-    moveit::planning_interface::MoveGroupInterface::Plan plan;
-    moveit::core::MoveItErrorCode ok = ur_manipulator_group_interface_.plan(plan);
+    std::string elbow_joint = tf_prefix_ + "elbow_joint";
+    std::string shoulder_lift_joint = tf_prefix_ + "shoulder_lift_joint";
+    std::string shoulder_pan_joint = tf_prefix_ + "shoulder_pan_joint";
+    std::string wrist_1_joint = tf_prefix_ + "wrist_1_joint";
+    std::string wrist_2_joint = tf_prefix_ + "wrist_2_joint";
+    std::string wrist_3_joint = tf_prefix_ + "wrist_3_joint";
 
-    if (ok)
-    {
-        ur_manipulator_group_interface_.execute(plan);
-        RCLCPP_INFO(logger_, "Planning succeeded");
-        return true;
-    }
+    ur_manipulator_group_interface_.setJointValueTarget({{elbow_joint, 1.8571}});
+    ur_manipulator_group_interface_.setJointValueTarget({{shoulder_lift_joint, -2.6729}});
+    ur_manipulator_group_interface_.setJointValueTarget({{shoulder_pan_joint, 0}});
+    ur_manipulator_group_interface_.setJointValueTarget({{wrist_1_joint, 0.729}});
+    ur_manipulator_group_interface_.setJointValueTarget({{wrist_2_joint, 1.8398}});
+    ur_manipulator_group_interface_.setJointValueTarget({{wrist_3_joint, 0}});
 
-    RCLCPP_ERROR(logger_, "Planning failed");
-    return false;
+    ur_manipulator_group_interface_.move();
+    // RCLCPP_INFO(logger_, "Going to ready position");
+    // ur_manipulator_group_interface_.setNamedTarget("ready");
+    // moveit::planning_interface::MoveGroupInterface::Plan plan;
+    // moveit::core::MoveItErrorCode ok = ur_manipulator_group_interface_.plan(plan);
+
+    // if (ok)
+    // {
+    //     ur_manipulator_group_interface_.execute(plan);
+    //     RCLCPP_INFO(logger_, "Planning succeeded");
+    //     return true;
+    // }
+
+    // RCLCPP_ERROR(logger_, "Planning failed");
+    // return false;
 }
 
-bool Robot::set_manipulator_goal(const geometry_msgs::msg::Pose &pose)
+bool DevolRobot::set_manipulator_goal(const geometry_msgs::msg::Pose &pose)
 {
     ur_manipulator_group_interface_.setPoseTarget(pose);
     moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -76,21 +104,21 @@ bool Robot::set_manipulator_goal(const geometry_msgs::msg::Pose &pose)
     return false;
 }
 
-void Robot::set_gripper_position(GRIPPER_POSITION position)
+void DevolRobot::set_gripper_position(GRIPPER_POSITION position)
 {
     switch(position)
     {
         case GRIPPER_POSITION::OPEN:
             RCLCPP_INFO(logger_, "Setting gripper to OPEN");
-            hand_group_interface_.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.0}});
+            hand_group_interface_.setJointValueTarget({{gripper_joint_, 0.0}});
             break;
         case GRIPPER_POSITION::CLOSE:
             RCLCPP_INFO(logger_, "Setting gripper to CLOSE");
-            hand_group_interface_.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.8}});
+            hand_group_interface_.setJointValueTarget({{gripper_joint_, 0.8}});
             break;
         case GRIPPER_POSITION::GRAB:
             RCLCPP_INFO(logger_, "Setting gripper to GRAB");
-            hand_group_interface_.setJointValueTarget({{"robotiq_85_left_knuckle_joint", 0.105}});
+            hand_group_interface_.setJointValueTarget({{gripper_joint_, 0.105}});
             break;
         default:
             RCLCPP_ERROR(logger_, "Invalid gripper position");
@@ -99,7 +127,7 @@ void Robot::set_gripper_position(GRIPPER_POSITION position)
     hand_group_interface_.move();
 }
 
-void Robot::attach_object(const std::string &object_id)
+void DevolRobot::attach_object(const std::string &object_id)
 {
     moveit_msgs::msg::AttachedCollisionObject attached_object;
     attached_object.link_name = ur_manipulator_group_interface_.getEndEffectorLink();
@@ -113,7 +141,7 @@ void Robot::attach_object(const std::string &object_id)
     RCLCPP_INFO(logger_, "Attached the object to the end effector.");
 }
 
-void Robot::detach_object(const std::string &object_id)
+void DevolRobot::detach_object(const std::string &object_id)
 {
     moveit_msgs::msg::AttachedCollisionObject detached_object;
     detached_object.link_name = ur_manipulator_group_interface_.getEndEffectorLink();
@@ -126,7 +154,7 @@ void Robot::detach_object(const std::string &object_id)
     RCLCPP_INFO(logger_, "Detached the object from the end effector.");
 }
 
-void Robot::allow_collision_between(const std::string &object1, const std::string &object2)
+void DevolRobot::allow_collision_between(const std::string &object1, const std::string &object2)
 {
     moveit_msgs::msg::PlanningScene planning_scene_msg;
     planning_scene_msg.is_diff = true;
@@ -148,12 +176,12 @@ void Robot::allow_collision_between(const std::string &object1, const std::strin
     RCLCPP_INFO(logger_, "Allowed collision between %s and %s", object1.c_str(), object2.c_str());
 }
 
-void Robot::attach_object_to_end_effector()
+void DevolRobot::attach_object_to_end_effector()
 {
     pub_attach_.Publish(gz::msgs::Empty());
 }
 
-void Robot::detach_object_from_end_effector()
+void DevolRobot::detach_object_from_end_effector()
 {
     pub_detach_.Publish(gz::msgs::Empty());
 }

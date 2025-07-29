@@ -9,27 +9,26 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 
     <!-- ros_control plugin -->
     <gazebo>
-      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <!-- <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
         <parameters>$(find devol_description)/config/ros2_controllers.yaml</parameters>
-      </plugin>
+      </plugin> -->
 
       <plugin
         filename="libgz-sim-detachable-joint-system.so"
         name="gz::sim::systems::DetachableJoint">
         <parent_link>${tf_prefix}wrist_3_link</parent_link>
-        <child_link>target_block</child_link>
-        <child_model>target_block</child_model>
-        <child_model_link>target_block</child_model_link>
+        <child_link>target_block_0</child_link>
+        <child_model>target_block_0</child_model>
+        <child_model_link>target_block_0</child_model_link>
         <attach_topic>/${tf_prefix}devol_attach/attach</attach_topic>
         <detach_topic>/${tf_prefix}devol_attach/detach</detach_topic>
       </plugin>
     </gazebo>
 
     <!-- Camera -->
-    <gazebo reference="camera_color_frame">
-
+    <gazebo reference="${tf_prefix}_camera_color_frame">
       <sensor type="camera" name="${tf_prefix}realsense_d405_camera">
-        <pose relative_to="camera_color_frame">0 0 0 3.14159 0 0</pose>
+        <pose relative_to="${tf_prefix}_camera_color_frame">0 0 0 3.14159 0 0</pose>
         <topic>/model/${tf_prefix}devol/color_raw</topic>
 
         <camera>
@@ -54,11 +53,11 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
     </gazebo>
 
     <!-- Depth Camera  -->
-    <gazebo reference="camera_depth_frame">
+    <gazebo reference="${tf_prefix}_camera_depth_frame">
 
       <sensor type="depth_camera" name="${tf_prefix}realsense_d405_depth_camera">
         <topic>/model/${tf_prefix}devol/depth_raw</topic>
-        <pose relative_to="camera_color_frame">0 0 0 3.14159 0 0</pose>
+        <pose relative_to="${tf_prefix}_camera_color_frame">0 0 0 3.14159 0 0</pose>
 
         <camera>
           <camera_info_topic>/model/${tf_prefix}devol/depth_info</camera_info_topic>

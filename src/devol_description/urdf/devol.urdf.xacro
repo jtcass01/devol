@@ -57,7 +57,7 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:devol>
 
-  <xacro:devol_ros2_control name="devol_ros2_control" prefix="$(arg tf_prefix)" use_gazebo="$(arg use_gazebo)"/>
+  <xacro:devol_ros2_control name="devol_ros2_control" tf_prefix="$(arg tf_prefix)" use_gazebo="$(arg use_gazebo)"/>
 
   <xacro:if value="$(arg use_gazebo)">
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>

@@ -55,7 +55,7 @@
             connected_to="${tf_prefix}tool0"
         />
 
-        <xacro:sensor_d405 parent="${tf_prefix}gripper_mount_link" use_nominal_extrinsics="true">
+        <xacro:sensor_d405 parent="${tf_prefix}gripper_mount_link" name="${tf_prefix}_camera" use_nominal_extrinsics="true">
             <origin xyz="0 0.08 0" rpy="0 -1.570795 1.570795"/>
         </xacro:sensor_d405>
 
@@ -63,12 +63,12 @@
             name="RobotiqGripperHardwareInterface"
             parent="${tf_prefix}gripper_mount_link"
             prefix="${tf_prefix}"
-            include_ros2_control="${not use_gazebo}"
+            include_ros2_control="${not use_gazebo and not use_mock_hardware}"
         >
             <origin xyz="0 0 0" rpy="0 0 0"/>
         </xacro:robotiq_gripper>
 
-        <xacro:unless value="${use_gazebo}">
+        <xacro:unless value="${use_gazebo or use_mock_hardware}">
             <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro"/>
             <xacro:include filename="$(find robotiq_description)/urdf/robotiq_gripper.ros2_control.xacro"/>
             

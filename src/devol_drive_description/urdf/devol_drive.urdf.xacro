@@ -5,7 +5,7 @@
     <!-- Import devol macro -->
     <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive_macro.urdf.xacro"/>
     <!-- ros2_control description -->
-    <xacro:include filename="$(find devol_description)/urdf/devol.ros2_control.xacro"/>
+    <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive.ros2_control.xacro"/>
 
     <!-- Robot Parameters -->
     <xacro:arg name="parent" default="empty"/>  <!-- Set this to world for rviz and others -->
@@ -84,7 +84,7 @@
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </xacro:devol_drive>
 
-    <xacro:devol_ros2_control name="devol_ros2_control" prefix="$(arg tf_prefix)" use_gazebo="$(arg use_gazebo)"/>
+    <xacro:devol_drive_ros2_control tf_prefix="$(arg tf_prefix)" use_gazebo="$(arg use_gazebo)"/>
 
     <xacro:if value="$(arg use_gazebo)">
         <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive.gazebo.xacro"/>

@@ -124,7 +124,7 @@ void initialize_collision_objects(moveit::planning_interface::MoveGroupInterface
     planning_scene_interface.applyCollisionObject(husky);
 
     //Add the target block to be picked up
-    moveit_msgs::msg::CollisionObject target_block = [&] {
+    moveit_msgs::msg::CollisionObject target_block_0 = [&] {
         shape_msgs::msg::SolidPrimitive primitive;
         primitive.type = primitive.BOX;
         primitive.dimensions = {0.055, 0.055, 0.075}; // Width, Depth, Height
@@ -136,9 +136,9 @@ void initialize_collision_objects(moveit::planning_interface::MoveGroupInterface
         pose.position.z = 0.788;
         pose.orientation.w = 1.0;
 
-        return createCollisionObject("target_block", ur_manipulator_group_interface.getPlanningFrame(), primitive, pose, logger, node);
+        return createCollisionObject("target_block_0", ur_manipulator_group_interface.getPlanningFrame(), primitive, pose, logger, node);
     }();
-    planning_scene_interface.applyCollisionObject(target_block);
+    planning_scene_interface.applyCollisionObject(target_block_0);
 }
 
 geometry_msgs::msg::Pose make_pose(double x, double y, double z, double qx, double qy, double qz, double qw)
@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
     initialize_collision_objects(ur_manipulator_group_interface, planning_scene_interface, logger, node);
 
     // Create a robot object, includes going to ready position
-    Robot robot(ur_manipulator_group_interface, hand_group_interface, planning_scene_interface, logger, node);
+    DevolRobot robot(ur_manipulator_group_interface, hand_group_interface, planning_scene_interface, logger, node, "");
     std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
 
     // Go to above pick up position
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
     if (success)
     {
         // Attach the object to the robot's end effector
-        robot.attach_object("target_block");
+        robot.attach_object("target_block_0");
         RCLCPP_INFO(logger, "Attached the object to the end effector.");
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
         std::this_thread::sleep_for(std::chrono::milliseconds(sleep_between_steps));
 
         // Detach the object from the robot's end effector
-        robot.detach_object("target_block");
+        robot.detach_object("target_block_0");
         robot.detach_object_from_end_effector();
         RCLCPP_INFO(logger, "Detached the object from the end effector.");
 

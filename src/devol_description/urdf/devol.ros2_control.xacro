@@ -3,7 +3,7 @@
     <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro"/>
     <xacro:include filename="$(find robotiq_description)/urdf/robotiq_gripper.ros2_control.xacro"/>
 
-    <xacro:macro name="devol_ros2_control" params="name prefix use_gazebo:=^|false">
+    <xacro:macro name="devol_ros2_control" params="name tf_prefix use_gazebo:=^|false">
 
         <ros2_control name="${name}" type="system">
             <hardware>
@@ -16,49 +16,49 @@
                     <plugin>mock_components/GenericSystem</plugin>
                 </xacro:unless>
             </hardware>
-            <joint name="shoulder_pan_joint">
+            <joint name="${tf_prefix}shoulder_pan_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">3.14159</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="shoulder_lift_joint">
+            <joint name="${tf_prefix}shoulder_lift_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">0.0</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="elbow_joint">
+            <joint name="${tf_prefix}elbow_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">0.0</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="wrist_1_joint">
+            <joint name="${tf_prefix}wrist_1_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">0.0</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="wrist_2_joint">
+            <joint name="${tf_prefix}wrist_2_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">0.0</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="wrist_3_joint">
+            <joint name="${tf_prefix}wrist_3_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">0.0</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="robotiq_85_left_knuckle_joint">
+            <joint name="${tf_prefix}robotiq_85_left_knuckle_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">0.0</param>
@@ -66,11 +66,11 @@
                 <state_interface name="velocity"/>
             </joint>
 
-            <joint name="robotiq_85_right_knuckle_joint" />
-            <joint name="robotiq_85_left_inner_knuckle_joint" />
-            <joint name="robotiq_85_right_inner_knuckle_joint" />
-            <joint name="robotiq_85_left_finger_tip_joint" />
-            <joint name="robotiq_85_right_finger_tip_joint" />
+            <joint name="${tf_prefix}robotiq_85_right_knuckle_joint" />
+            <joint name="${tf_prefix}robotiq_85_left_inner_knuckle_joint" />
+            <joint name="${tf_prefix}robotiq_85_right_inner_knuckle_joint" />
+            <joint name="${tf_prefix}robotiq_85_left_finger_tip_joint" />
+            <joint name="${tf_prefix}robotiq_85_right_finger_tip_joint" />
 
         </ros2_control>
     </xacro:macro>

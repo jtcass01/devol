@@ -244,130 +244,11 @@
       <direction>0.1 0.1 -1</direction>
     </light>
 
-    <!-- table -->
-    <!-- <model name="table_single_link">
-      <static>true</static>
-      <pose>-1.2 -2.35 0 0 0 1.570796327</pose>
-
-      <link name="table">
-        <visual name="tabletop">
-          <geometry>
-            <box>
-              <size>2.0 2.5 0.1</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.7 0.5 0.3 1</ambient>
-            <diffuse>0.7 0.5 0.3 1</diffuse>
-          </material>
-          <pose>0 0 1.0 0 0 0</pose>
-        </visual>
-
-        <collision name="tabletop_collision">
-          <geometry>
-            <box>
-              <size>2.0 2.5 0.1</size>
-            </box>
-          </geometry>
-          <pose>0 0 1.0 0 0 0</pose>
-        </collision>
-
-        <visual name="leg1_visual">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.2 0.1 1</ambient>
-            <diffuse>0.4 0.2 0.1 1</diffuse>
-          </material>
-          <pose> 0.95  1.2 0.5 0 0 0</pose>
-        </visual>
-
-        <collision name="leg1_collision">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <pose> 0.95  1.2 0.5 0 0 0</pose>
-        </collision>
-
-        <visual name="leg2_visual">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.2 0.1 1</ambient>
-            <diffuse>0.4 0.2 0.1 1</diffuse>
-          </material>
-          <pose>-0.95  1.2 0.5 0 0 0</pose>
-        </visual>
-
-        <collision name="leg2_collision">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <pose>-0.95  1.2 0.5 0 0 0</pose>
-        </collision>
-
-        <visual name="leg3_visual">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.2 0.1 1</ambient>
-            <diffuse>0.4 0.2 0.1 1</diffuse>
-          </material>
-          <pose> 0.95 -1.2 0.5 0 0 0</pose>
-        </visual>
-
-        <collision name="leg3_collision">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <pose> 0.95 -1.2 0.5 0 0 0</pose>
-        </collision>
-
-        <visual name="leg4_visual">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.2 0.1 1</ambient>
-            <diffuse>0.4 0.2 0.1 1</diffuse>
-          </material>
-          <pose>-0.95 -1.2 0.5 0 0 0</pose>
-        </visual>
-
-        <collision name="leg4_collision">
-          <geometry>
-            <box>
-              <size>0.1 0.1 1.0</size>
-            </box>
-          </geometry>
-          <pose>-0.95 -1.2 0.5 0 0 0</pose>
-        </collision>
-
-      </link>
-    </model> -->
-
     <!-- Add a block for the manipulator to grab and place on the Husky-->
-    <model name="target_block">
+    <model name="target_block_0">
       <static>false</static>
-      <pose>0 -1.4 1.0875 0 0 0</pose>
-      <link name="target_block">
+      <pose>0 -1.4 0.05 0 0 0</pose>
+      <link name="target_block_0">
         <visual name="block_visual">
           <geometry>
             <box>
@@ -409,5 +290,99 @@
         </inertial>
       </link>
     </model>
+
+    <!-- Add a block for the manipulator to grab and place on the Husky-->
+    <model name="target_block_1">
+      <static>false</static>
+      <pose>0.1 -1.4 0.05 0 0 0</pose>
+      <link name="target_block_1">
+        <visual name="block_visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.075</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.1 0.6 0.1 1</ambient>
+            <diffuse>0.0 0.8 0.0 1</diffuse>
+          </material>
+        </visual>
+
+        <collision name="block_collision">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.075</size>
+            </box>
+          </geometry>
+
+          <surface>
+            <friction>
+              <bullet>
+                <friction>1.0</friction>
+              </bullet>
+            </friction>
+          </surface>
+        </collision>
+
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>1e-5</ixx>
+            <iyy>1e-5</iyy>
+            <izz>1e-5</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <model name="target_block_2">
+      <static>false</static>
+      <pose>-0.1 -1.4 0.05 0 0 0</pose>
+      <link name="target_block_2">
+        <visual name="block_visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.075</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.6 0.1 0.1 1</ambient>
+            <diffuse>0.8 0.0 0.0 1</diffuse>
+          </material>
+        </visual>
+
+        <collision name="block_collision">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.075</size>
+            </box>
+          </geometry>
+
+          <surface>
+            <friction>
+              <bullet>
+                <friction>1.0</friction>
+              </bullet>
+            </friction>
+          </surface>
+        </collision>
+
+        <inertial>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>1e-5</ixx>
+            <iyy>1e-5</iyy>
+            <izz>1e-5</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
   </world>
 </sdf>

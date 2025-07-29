@@ -1,0 +1,244 @@
+[INFO] [launch]: All log files can be found below /home/jakeadelic/.ros/log/2025-07-29-07-46-06-629211-kylar-36529
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [create-1]: process started with pid [36533]
+[INFO] [move_group-2]: process started with pid [36534]
+[INFO] [robot_state_publisher-3]: process started with pid [36535]
+[INFO] [gazebo-4]: process started with pid [36536]
+[INFO] [parameter_bridge-5]: process started with pid [36537]
+[robot_state_publisher-3] [INFO] [1753789567.880278893] [robot_state_publisher]: Robot initialized
+[create-1] [INFO] [1753789567.881233671] [ros_gz_sim]: Requesting list of world names.
+[parameter_bridge-5] [INFO] [1753789567.897559711] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.898274839] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/artemis_devol/color_raw (gz.msgs.Image) -> /model/artemis_devol/color_raw (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.900845341] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/artemis_devol/color_info (gz.msgs.CameraInfo) -> /model/artemis_devol/color_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.901450410] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/artemis_devol/depth_raw (gz.msgs.Image) -> /model/artemis_devol/depth_raw (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.901815923] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/artemis_devol/depth_info (gz.msgs.CameraInfo) -> /model/artemis_devol/depth_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.902149814] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/artemis_devol_drive/cmd_vel (gz.msgs.Twist) -> /model/artemis_devol_drive/cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.902756684] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/model/artemis_devol_drive/cmd_vel (geometry_msgs/msg/Twist) -> /model/artemis_devol_drive/cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.903355254] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/artemis_devol_drive/odometry (gz.msgs.Odometry) -> /model/artemis_devol_drive/odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.904738913] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/model/artemis_devol_drive/odometry (nav_msgs/msg/Odometry) -> /model/artemis_devol_drive/odometry (gz.msgs.Odometry)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.905297482] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/apollo_devol/color_raw (gz.msgs.Image) -> /model/apollo_devol/color_raw (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.905738217] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/apollo_devol/color_info (gz.msgs.CameraInfo) -> /model/apollo_devol/color_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.906261883] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/apollo_devol/depth_raw (gz.msgs.Image) -> /model/apollo_devol/depth_raw (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.906852399] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/apollo_devol/depth_info (gz.msgs.CameraInfo) -> /model/apollo_devol/depth_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.907335536] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/apollo_devol_drive/cmd_vel (gz.msgs.Twist) -> /model/apollo_devol_drive/cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.907768101] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/model/apollo_devol_drive/cmd_vel (geometry_msgs/msg/Twist) -> /model/apollo_devol_drive/cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.908211471] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/apollo_devol_drive/odometry (gz.msgs.Odometry) -> /model/apollo_devol_drive/odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-5] [INFO] [1753789567.908632487] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/model/apollo_devol_drive/odometry (nav_msgs/msg/Odometry) -> /model/apollo_devol_drive/odometry (gz.msgs.Odometry)] (Lazy 0)
+[move_group-2] [INFO] [1753789567.934027133] [move_group.moveit.moveit.ros.rdf_loader]: Loaded robot model in 0 seconds
+[move_group-2] [INFO] [1753789567.934128311] [move_group.moveit.moveit.core.robot_model]: Loading robot model 'dual_devol'...
+[move_group-2] [WARN] [1753789567.934141587] [move_group.moveit.moveit.core.robot_model]: Skipping virtual joint 'virtual_joint' because its child frame 'artemis_base_link' does not match the URDF frame 'empty'
+[move_group-2] [WARN] [1753789567.934149474] [move_group.moveit.moveit.core.robot_model]: Skipping virtual joint 'virtual_joint' because its child frame 'apollo_base_link' does not match the URDF frame 'empty'
+[move_group-2] [INFO] [1753789567.934155944] [move_group.moveit.moveit.core.robot_model]: No root/virtual joint specified in SRDF. Assuming fixed joint
+[move_group-2] [INFO] [1753789567.998590887] [move_group.moveit.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'artemis_ur_manipulator': 1 1 1 1 1 1
+[move_group-2] [INFO] [1753789567.998918807] [move_group.moveit.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'apollo_ur_manipulator': 1 1 1 1 1 1
+[move_group-2] [INFO] [1753789568.255387321] [move_group.moveit.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-2] [INFO] [1753789568.255565159] [move_group.moveit.moveit.ros.moveit_cpp]: Listening to 'joint_states' for joint states
+[move_group-2] [INFO] [1753789568.256308444] [move_group.moveit.moveit.ros.current_state_monitor]: Listening to joint states on topic 'joint_states'
+[move_group-2] [INFO] [1753789568.256737706] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to '/attached_collision_object' for attached collision objects
+[move_group-2] [INFO] [1753789568.256760427] [move_group.moveit.moveit.ros.planning_scene_monitor]: Stopping existing planning scene publisher.
+[move_group-2] [INFO] [1753789568.257058570] [move_group.moveit.moveit.ros.planning_scene_monitor]: Stopped publishing maintained planning scene.
+[move_group-2] [INFO] [1753789568.257590861] [move_group.moveit.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-2] [INFO] [1753789568.257798792] [move_group.moveit.moveit.ros.planning_scene_monitor]: Starting planning scene monitor
+[move_group-2] [INFO] [1753789568.258513104] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to '/planning_scene'
+[move_group-2] [INFO] [1753789568.258535749] [move_group.moveit.moveit.ros.planning_scene_monitor]: Starting world geometry update monitor for collision objects, attached objects, octomap updates.
+[move_group-2] [INFO] [1753789568.258912783] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to 'collision_object'
+[move_group-2] [INFO] [1753789568.259228900] [move_group.moveit.moveit.ros.planning_scene_monitor]: Listening to 'planning_scene_world' for planning scene world geometry
+[move_group-2] [WARN] [1753789568.259381225] [move_group.moveit.moveit.ros.occupancy_map_monitor]: Resolution not specified for Octomap. Assuming resolution = 0.1 instead
+[move_group-2] [ERROR] [1753789568.259394416] [move_group.moveit.moveit.ros.occupancy_map_monitor]: No 3D sensor plugin(s) defined for octomap updates
+[move_group-2] [INFO] [1753789568.363465180] [move_group.moveit.moveit.ros.planning_pipeline]: Successfully loaded planner 'OMPL'
+[move_group-2] [INFO] [1753789568.364251218] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.365013911] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.365026256] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.365227043] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.365235886] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.365255472] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.365260159] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.365269545] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.366007336] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-2] [INFO] [1753789568.367776710] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-2] [INFO] [1753789568.367789722] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.369642818] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.369663266] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.370130404] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.372315524] [move_group.moveit.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-2] [INFO] [1753789568.382780443] [move_group.moveit.moveit.planners.pilz.command_planner]: Available plugins: pilz_industrial_motion_planner/PlanningContextLoaderCIRC pilz_industrial_motion_planner/PlanningContextLoaderLIN pilz_industrial_motion_planner/PlanningContextLoaderPTP 
+[move_group-2] [INFO] [1753789568.382806281] [move_group.moveit.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderCIRC
+[move_group-2] [INFO] [1753789568.383967966] [move_group.moveit.moveit.planners.pilz.command_planner]: Registered Algorithm [CIRC]
+[move_group-2] [INFO] [1753789568.383990565] [move_group.moveit.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderLIN
+[move_group-2] [INFO] [1753789568.384800425] [move_group.moveit.moveit.planners.pilz.command_planner]: Registered Algorithm [LIN]
+[move_group-2] [INFO] [1753789568.384817749] [move_group.moveit.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderPTP
+[move_group-2] [INFO] [1753789568.385629402] [move_group.moveit.moveit.planners.pilz.command_planner]: Registered Algorithm [PTP]
+[move_group-2] [INFO] [1753789568.385662624] [move_group.moveit.moveit.ros.planning_pipeline]: Successfully loaded planner 'Pilz Industrial Motion Planner'
+[move_group-2] [INFO] [1753789568.386454954] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.386548370] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.386556330] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.386980645] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.386996416] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.387019836] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.387024434] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.387036694] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.387834548] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.388883511] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.388908108] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.389198463] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.392360198] [move_group.moveit.moveit.ros.planning_pipeline]: Successfully loaded planner 'CHOMP'
+[move_group-2] [INFO] [1753789568.393250324] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.393350163] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.393357488] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.393751049] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.393768165] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.393795843] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.393800882] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.393813183] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.394584654] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-2] [INFO] [1753789568.395133536] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-2] [INFO] [1753789568.395146828] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.395619897] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.395636769] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.395976197] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.399773278] [move_group.moveit.moveit.ros.planning_pipeline]: Successfully loaded planner 'STOMP'
+[move_group-2] [INFO] [1753789568.400572817] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.400653484] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-2] [INFO] [1753789568.400661017] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.400874759] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-2] [INFO] [1753789568.400884290] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.400902369] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-2] [INFO] [1753789568.400907561] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.400918738] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-2] [INFO] [1753789568.401640429] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-2] [INFO] [1753789568.402064858] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-2] [INFO] [1753789568.402076359] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.402459294] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-2] [INFO] [1753789568.402470993] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.402711480] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-2] [INFO] [1753789568.444388147] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added FollowJointTrajectory controller for apollo_ur_manipulator_controller
+[move_group-2] [INFO] [1753789568.446379316] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added ParallelGripperCommand controller for apollo_hand_controller
+[move_group-2] [INFO] [1753789568.448136258] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added FollowJointTrajectory controller for artemis_ur_manipulator_controller
+[move_group-2] [INFO] [1753789568.449857785] [move_group.moveit.moveit.plugins.simple_controller_manager]: Added ParallelGripperCommand controller for artemis_hand_controller
+[move_group-2] [INFO] [1753789568.450067925] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 4 controllers in list
+[move_group-2] [INFO] [1753789568.450103917] [move_group.moveit.moveit.plugins.simple_controller_manager]: Returned 4 controllers in list
+[move_group-2] [INFO] [1753789568.450501924] [move_group.moveit.moveit.ros.trajectory_execution_manager]: Trajectory execution is managing controllers
+[move_group-2] [INFO] [1753789568.450520313] [move_group]: MoveGroup debug mode is ON
+[move_group-2] [INFO] [1753789568.465763302] [move_group.moveit.moveit.planners.pilz.move_group_sequence_action]: initialize move group sequence action
+[move_group-2] [INFO] [1753789568.468227640] [move_group.moveit.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-2] [INFO] [1753789568.468546875] [move_group.moveit.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-2] [INFO] [1753789568.469336052] [move_group.moveit.moveit.ros.move_group.executable]: 
+[move_group-2] 
+[move_group-2] ********************************************************
+[move_group-2] * MoveGroup using: 
+[move_group-2] *     - apply_planning_scene_service
+[move_group-2] *     - clear_octomap_service
+[move_group-2] *     - get_group_urdf
+[move_group-2] *     - load_geometry_from_file
+[move_group-2] *     - CartesianPathService
+[move_group-2] *     - execute_trajectory_action
+[move_group-2] *     - get_planning_scene_service
+[move_group-2] *     - kinematics_service
+[move_group-2] *     - move_action
+[move_group-2] *     - motion_plan_service
+[move_group-2] *     - query_planners_service
+[move_group-2] *     - state_validation_service
+[move_group-2] *     - save_geometry_to_file
+[move_group-2] *     - SequenceAction
+[move_group-2] *     - SequenceService
+[move_group-2] ********************************************************
+[move_group-2] 
+[move_group-2] [INFO] [1753789568.469374567] [move_group.moveit.moveit.ros.move_group.context]: MoveGroup context using pipeline ompl
+[move_group-2] [INFO] [1753789568.469384378] [move_group.moveit.moveit.ros.move_group.context]: MoveGroup context initialization complete
+[move_group-2] [96mLoading 'move_group/ApplyPlanningSceneService'...[0m
+[move_group-2] [96mLoading 'move_group/ClearOctomapService'...[0m
+[move_group-2] [96mLoading 'move_group/GetUrdfService'...[0m
+[move_group-2] [96mLoading 'move_group/LoadGeometryFromFileService'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupCartesianPathService'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupExecuteTrajectoryAction'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupGetPlanningSceneService'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupKinematicsService'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupMoveAction'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupPlanService'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupQueryPlannersService'...[0m
+[move_group-2] [96mLoading 'move_group/MoveGroupStateValidationService'...[0m
+[move_group-2] [96mLoading 'move_group/SaveGeometryToFileService'...[0m
+[move_group-2] [96mLoading 'pilz_industrial_motion_planner/MoveGroupSequenceAction'...[0m
+[move_group-2] [96mLoading 'pilz_industrial_motion_planner/MoveGroupSequenceService'...[0m
+[move_group-2] 
+[move_group-2] [92mYou can start planning now![0m
+[move_group-2] 
+[gazebo-4] [1;36m[Dbg] [gz.cc:166] [0m[1;36mSubscribing to [[0m[1;36m/gazebo/starting_world[0m[1;36m].[0m[1;36m[0m
+[gazebo-4] [1;36m[Dbg] [gz.cc:168] [0m[1;36mWaiting for a world to be set from the GUI...[0m[1;36m[0m
+[gazebo-4] [1;32m[Msg] [0m[1;32mReceived world [[0m[1;32m/home/jakeadelic/programming/devol/install/devol_gazebo/share/devol_gazebo/worlds/factory/model.sdf[0m[1;32m] from the GUI.[0m[1;32m[0m
+[gazebo-4] [1;36m[Dbg] [gz.cc:172] [0m[1;36mUnsubscribing from [[0m[1;36m/gazebo/starting_world[0m[1;36m].[0m[1;36m[0m
+[gazebo-4] [1;32m[Msg] [0m[1;32mGazebo Sim Server v[0m[1;32m8.9.0[0m[1;32m[0m
+[gazebo-4] [1;32m[Msg] [0m[1;32mLoading SDF world file[[0m[1;32m/home/jakeadelic/programming/devol/install/devol_gazebo/share/devol_gazebo/worlds/factory/model.sdf[0m[1;32m].[0m
+[gazebo-4] [1;33mWarning [Utils.cc:115][0m Non-unique name[target_block_0] detected 2 times in XML children of world with name[devol-demo].[1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:413:17: QML ToolButton: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:413:17: QML ToolButton: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;31m[Err] [Server.cc:86] [0m[1;31mError Code [0m[1;31m2[0m[1;31m: [0m[1;31mMsg: [0m[1;31mmodel with name[target_block_0] already exists.[0m[1;31m[0m
+[gazebo-4] [1;31m[Err] [Server.cc:86] [0m[1;31mError Code [0m[1;31m9[0m[1;31m: [0m[1;31mMsg: [0m[1;31mFailed to load a world.[0m[1;31m[0m
+[gazebo-4] [1;36m[Dbg] [gz.cc:434] [0m[1;36mShutting down gz-sim-server[0m[1;36m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:413:17: QML ToolButton: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-4] [1;32m[Msg] [0m[1;32mGazebo Sim GUI    v[0m[1;32m8.9.0[0m[1;32m[0m
+[gazebo-4] [1;36m[Dbg] [Gui.cc:275] [0m[1;36mWaiting for subscribers to [[0m[1;36m/gazebo/starting_world[0m[1;36m]...[0m[1;36m[0m
+[gazebo-4] [1;36m[Dbg] [Application.cc:96] [0m[1;36mInitializing application.[0m[1;36m[0m
+[gazebo-4] [1;36m[Dbg] [Application.cc:170] [0m[1;36mQt using OpenGL graphics interface[0m[1;36m[0m
+[gazebo-4] [1;36m[GUI] [Dbg] [Application.cc:657] [0m[1;36mCreate main window[0m[1;36m[0m
+[gazebo-4] [1;36m[GUI] [Dbg] [PathManager.cc:68] [0m[1;36mRequesting resource paths through [[0m[1;36m/gazebo/resource_paths/get[0m[1;36m][0m[1;36m[0m
+[gazebo-4] [1;36m[GUI] [Dbg] [SignalHandler.cc:142] [0m[1;36mReceived signal[[0m[1;36m2[0m[1;36m].[0m
+[gazebo-4] [1;36m[GUI] [Dbg] [SignalHandler.cc:142] [0m[1;36mReceived signal[[0m[1;36m2[0m[1;36m].[0m
+[gazebo-4] [1;36m[GUI] [Dbg] [Application.cc:237] [0m[1;36mTerminating application.[0m[1;36m[0m
+[INFO] [gazebo-4]: process has finished cleanly [pid 36536]
+[create-1] [INFO] [1753789572.881662478] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789577.881997877] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789582.882369882] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789587.882803173] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789592.883217906] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789597.883645209] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789602.884095079] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789607.884521383] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789612.884929061] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789617.885355181] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789622.885784860] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789627.886206411] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789632.886633992] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789637.887068147] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789642.887501840] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789647.887911423] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789652.888341889] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789657.888787582] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789662.889213090] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789667.889682770] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789672.890098663] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789677.890489680] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789682.890918802] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789687.891360562] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789692.891818868] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789697.892269794] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789702.892720896] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789707.893101650] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789712.893554861] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789717.894009976] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789722.894426649] [ros_gz_sim]: Requesting list of world names.
+[create-1] [INFO] [1753789727.894896883] [ros_gz_sim]: Requesting list of world names.
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[move_group-2] [INFO] [1753789729.981664118] [rclcpp]: signal_handler(signum=2)
+[parameter_bridge-5] [INFO] [1753789729.981714630] [rclcpp]: signal_handler(signum=2)
+[robot_state_publisher-3] [INFO] [1753789729.981730173] [rclcpp]: signal_handler(signum=2)
+[create-1] [INFO] [1753789729.981733816] [rclcpp]: signal_handler(signum=2)
+[move_group-2] Stack trace (most recent call last):
+[move_group-2] #6    Object "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2", at 0xffffffffffffffff, in 
+[move_group-2] #5    Object "/opt/ros/jazzy/lib/moveit_ros_move_group/move_group", at 0x6027d1ecda44, in _start
+[move_group-2] #4    Source "../csu/libc-start.c", line 360, in __libc_start_main_impl [0x78c448e2a28a]
+[move_group-2] #3    Source "../sysdeps/nptl/libc_start_call_main.h", line 58, in __libc_start_call_main [0x78c448e2a1c9]
+[move_group-2] #2    Object "/opt/ros/jazzy/lib/moveit_ros_move_group/move_group", at 0x6027d1ecc517, in main
+[move_group-2] #1    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x78c449707969, in rclcpp::Executor::~Executor()
+[move_group-2] #0    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x78c449701dae, in 
+[move_group-2] Segmentation fault (Address not mapped to object [0x78c4180ce170])
+[INFO] [parameter_bridge-5]: process has finished cleanly [pid 36537]
+[INFO] [robot_state_publisher-3]: process has finished cleanly [pid 36535]
+[ERROR] [move_group-2]: process has died [pid 36534, exit code -11, cmd '/opt/ros/jazzy/lib/moveit_ros_move_group/move_group --ros-args --params-file /tmp/launch_params_1wcvyace --params-file /tmp/launch_params_fh1dsl6p'].
+[create-1] [INFO] [1753789732.895323245] [ros_gz_sim]: Timed out when getting world names.
+[ERROR] [create-1]: process has died [pid 36533, exit code 255, cmd '/opt/ros/jazzy/lib/ros_gz_sim/create -topic robot_description -name dual_devol -x 0 -y 0 -z 0.3 -allow_renaming true --ros-args --params-file /tmp/launch_params_jxtexn4j'].

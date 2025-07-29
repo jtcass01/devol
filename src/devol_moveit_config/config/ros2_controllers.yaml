@@ -5,11 +5,17 @@ controller_manager:
 
     hand_controller:
       type: parallel_gripper_action_controller/GripperActionController
-
+    # apollo_hand_controller:
+    #   type: parallel_gripper_action_controller/GripperActionController
+    # artemis_hand_controller:
+    #   type: parallel_gripper_action_controller/GripperActionController
 
     ur_manipulator_controller:
       type: joint_trajectory_controller/JointTrajectoryController
-
+    # apollo_ur_manipulator_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+    # artemis_ur_manipulator_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -32,3 +38,41 @@ ur_manipulator_controller:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: true
+
+# apollo_hand_controller:
+#   ros__parameters:
+#     joint: apollo_robotiq_85_left_knuckle_joint
+# apollo_ur_manipulator_controller:
+#   ros__parameters:
+#     joints:
+#       - apollo_shoulder_pan_joint
+#       - apollo_shoulder_lift_joint
+#       - apollo_elbow_joint
+#       - apollo_wrist_1_joint
+#       - apollo_wrist_2_joint
+#       - apollo_wrist_3_joint
+#     command_interfaces:
+#       - position
+#     state_interfaces:
+#       - position
+#       - velocity
+#     allow_nonzero_velocity_at_trajectory_end: true
+
+# artemis_hand_controller:
+#   ros__parameters:
+#     joint: artemis_robotiq_85_left_knuckle_joint
+# artemis_ur_manipulator_controller:
+#   ros__parameters:
+#     joints:
+#       - artemis_shoulder_pan_joint
+#       - artemis_shoulder_lift_joint
+#       - artemis_elbow_joint
+#       - artemis_wrist_1_joint
+#       - artemis_wrist_2_joint
+#       - artemis_wrist_3_joint
+#     command_interfaces:
+#       - position
+#     state_interfaces:
+#       - position
+#       - velocity
+#     allow_nonzero_velocity_at_trajectory_end: true

@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+
+<!-- Reference: https://github.com/lucasmazzetto/gazebo_differential_drive_robot -->
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+    <!-- import macros -->
+    <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive_macro.urdf.xacro"/>
+
+    <xacro:macro name="dual_devol" params="
+        parent
+        name
+        robot_one_prefix
+        robot_two_prefix
+        robot_one_name
+        robot_two_name
+        ur_type
+        joint_limit_params
+        kinematics_params
+        physical_params
+        visual_params
+        transmission_hw_interface
+        safety_limits
+        safety_pos_margin
+        safety_k_position
+        use_mock_hardware
+        mock_sensor_commands
+        robot_ip
+        script_filename
+        input_recipe_filename
+        output_recipe_filename
+        initial_positions
+        *origin
+        use_gazebo
+        force_abs_paths
+        body_length:=0.5
+        body_width:=0.3
+        body_height:=0.1
+        body_density:=7850.0
+        wheel_radius:=0.1
+        wheel_width:=0.05
+        wheel_density:=900
+        caster_radius:=0.1
+        caster_density:=0.1
+        max_linear_acceleration:=10
+    ">
+
+        <!-- Robot One -->
+        <xacro:devol_drive 
+            parent="${parent}"
+            name="${robot_one_name}"
+            tf_prefix="${robot_one_prefix}" 
+            ur_type="${ur_type}"
+            joint_limit_params="${joint_limit_params}"
+            kinematics_params="${kinematics_params}"
+            physical_params="${physical_params}"
+            visual_params="${visual_params}"
+            transmission_hw_interface="${transmission_hw_interface}"
+            safety_limits="${safety_limits}"
+            safety_pos_margin="${safety_pos_margin}"
+            safety_k_position="${safety_k_position}"
+            use_mock_hardware="${use_mock_hardware}"
+            mock_sensor_commands="${mock_sensor_commands}"
+            robot_ip="${robot_ip}"
+            script_filename="${script_filename}"
+            input_recipe_filename="${input_recipe_filename}"
+            output_recipe_filename="${output_recipe_filename}"
+            initial_positions="${xacro.load_yaml((initial_positions_file))}"
+            use_gazebo="${use_gazebo}"
+            force_abs_paths="${use_gazebo}"
+            body_length="${body_length}"
+            body_width="${body_width}"
+            body_height="${body_height}"
+            body_density="${body_density}"
+            wheel_radius="${wheel_radius}"
+            wheel_width="${wheel_width}"
+            wheel_density="${wheel_density}"
+            caster_radius="${caster_radius}"
+            caster_density="${caster_density}"
+            max_linear_acceleration="${max_linear_acceleration}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:devol_drive>
+
+        <link name="${robot_two_name}_spawn_frame"/>
+        <joint name="${robot_two_name}_spawn_joint" type="fixed">
+            <origin xyz="0 -2.0 0" rpy="0 0 0"/>
+            <parent link="${parent}"/>
+            <child link="${robot_two_name}_spawn_frame"/> <!-- whatever the root link is -->
+        </joint>
+        <!-- Robot Two -->
+        <xacro:devol_drive 
+            parent="${robot_two_name}_spawn_frame"
+            name="${robot_two_name}"
+            tf_prefix="${robot_two_prefix}" 
+            ur_type="${ur_type}"
+            joint_limit_params="${joint_limit_params}"
+            kinematics_params="${kinematics_params}"
+            physical_params="${physical_params}"
+            visual_params="${visual_params}"
+            transmission_hw_interface="${transmission_hw_interface}"
+            safety_limits="${safety_limits}"
+            safety_pos_margin="${safety_pos_margin}"
+            safety_k_position="${safety_k_position}"
+            use_mock_hardware="${use_mock_hardware}"
+            mock_sensor_commands="${mock_sensor_commands}"
+            robot_ip="${robot_ip}"
+            script_filename="${script_filename}"
+            input_recipe_filename="${input_recipe_filename}"
+            output_recipe_filename="${output_recipe_filename}"
+            initial_positions="${xacro.load_yaml((initial_positions_file))}"
+            use_gazebo="${use_gazebo}"
+            force_abs_paths="${use_gazebo}"
+            body_length="${body_length}"
+            body_width="${body_width}"
+            body_height="${body_height}"
+            body_density="${body_density}"
+            wheel_radius="${wheel_radius}"
+            wheel_width="${wheel_width}"
+            wheel_density="${wheel_density}"
+            caster_radius="${caster_radius}"
+            caster_density="${caster_density}"
+            max_linear_acceleration="${max_linear_acceleration}">
+            <origin xyz="0.0 -2.0 0" rpy="0 0 0"/>
+        </xacro:devol_drive>
+    </xacro:macro>
+</robot>
