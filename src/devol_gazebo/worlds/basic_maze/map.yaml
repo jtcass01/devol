@@ -1,0 +1,25 @@
+# Map definition for basic_maze (scaled to 3x)
+# Resolution in meters per cell
+resolution: 0.05
+
+# Map dimensions in meters
+width: 9.0
+height: 9.0
+
+# Origin (bottom-left corner) in meters
+origin_x: -4.5
+origin_y: -4.5
+
+# Wall definitions: [center_x, center_y, size_x, size_y]
+walls:
+  # Outer walls
+  - [-2.25, 3.75, 3.0, 0.15]    # Top Left
+  - [2.25, 3.75, 3.0, 0.15]     # Top Right
+  - [-2.25, -3.75, 3.0, 0.15]   # Bottom Left
+  - [2.25, -3.75, 3.0, 0.15]    # Bottom Right
+  - [-3.75, 0.0, 0.15, 7.5]     # Left
+  - [3.75, 0.0, 0.15, 7.5]      # Right
+  # Inner walls
+  - [0.0, 0.0, 4.5, 0.15]       # Inner Wall 1 (horizontal center)
+  - [0.0, 1.875, 2.25, 0.15]    # Inner Wall 2 (horizontal upper)
+  - [0.0, -1.875, 2.25, 0.15]   # Inner Wall 3 (horizontal lower)

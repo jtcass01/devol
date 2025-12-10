@@ -73,13 +73,12 @@ def generate_launch_description():
     declare_world_directory_cmd = DeclareLaunchArgument(
         "world",
         default_value="empty",
-        choices=["empty", "factory"]
+        choices=['empty', "basic_maze", "Maze_hr", "Maze_ng", "Maze_ql_1"]
     )
 
     robot_description_content: ParameterValue = ParameterValue(Command(
         [
-            PathJoinSubstitution([FindExecutable(name="xacro")]), ' ', default_urdf_path,
-            ""
+            PathJoinSubstitution([FindExecutable(name="xacro")]), ' ', default_urdf_path, ' '
         ]
     ), value_type=str)
 
@@ -99,7 +98,7 @@ def generate_launch_description():
         package="ros_gz_sim",
         executable="create",
         output="screen",
-        arguments=["-topic", 'robot_description', '-name', 'diff_drive', '-x', '0', '-y', '0', '-z', '0', '-allow_renaming', 'true']
+        arguments=["-topic", 'robot_description', '-name', 'diff_drive', '-x', '0', '-y', '0', '-z', '0.0']
     )
 
     start_gz_cmd = IncludeLaunchDescription(
@@ -108,7 +107,7 @@ def generate_launch_description():
             'gz_args': [
                 TextSubstitution(text='-r -v 4 '),
                 PathJoinSubstitution([
-                    project_world_directory, world_directory, 'model.sdf'
+                    project_world_directory, world_directory, 'maze_world.sdf'
                 ]),
             ]
         }.items(),

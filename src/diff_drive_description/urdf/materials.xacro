@@ -1,16 +1,47 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
-
-    <material name="dark-blue-metal">
-        <color rgba="${0/255} ${0/255} ${102/255} 1.0" />
+    <!-- Chasis cool-blue -->
+    <material name="chasis-material">
+        <color rgba="${70/255} ${130/255} ${180/255} 1.0" />
+        <ambient>0.1 0.2 0.3 1</ambient>  <!-- Soft blue under ambient light -->
+        <diffuse>0.3 0.5 0.7 1</diffuse>  <!-- Calm, mid-tone blue under direct lighting -->
+        <specular>0.2 0.3 0.4 1</specular>  <!-- Slight shine with blue undertones -->
+        <emissive>0.0 0.0 0.0 1</emissive>  <!-- No glow -->
     </material>
 
-    <material name="dark-purple-metal">
-        <color rgba="${102/255} ${0/255} ${102/255} 1.0" />
+    <!-- Right Wheel cool-teal -->
+    <material name="right-wheel-material">
+        <color rgba="${0/255} ${128/255} ${128/255} 1.0" />
+        <ambient>0.1 0.3 0.3 1</ambient>  <!-- Muted teal under ambient light -->
+        <diffuse>0.0 0.5 0.5 1</diffuse>  <!-- Teal under direct lighting -->
+        <specular>0.1 0.3 0.3 1</specular>  <!-- Slight shine with a cool tint -->
+        <emissive>0.0 0.0 0.0 1</emissive>  <!-- No glow -->
     </material>
 
-    <material name="metallic-green">
-        <color rgba="${0/255} ${128/255} ${0/255} 1.0" />
+    <!-- Left Wheel deep-purple -->
+    <material name="left-wheel-material">
+        <color rgba="${80/255} ${0/255} ${128/255} 1.0" />
+        <ambient>0.2 0.0 0.2 1</ambient>  <!-- Soft deep purple under ambient light -->
+        <diffuse>0.5 0.0 0.6 1</diffuse>  <!-- Deep purple under direct lighting -->
+        <specular>0.3 0.0 0.4 1</specular>  <!-- Glossy with purple tint -->
+        <emissive>0.0 0.0 0.0 1</emissive>  <!-- No glow -->
     </material>
 
+    <!-- Caster Wheel cool-green -->
+    <material name="caster-wheel-material">
+        <color rgba="${50/255} ${205/255} ${50/255} 1.0" />
+        <ambient>0.1 0.3 0.1 1</ambient>  <!-- Muted lime green under ambient light -->
+        <diffuse>0.2 0.8 0.2 1</diffuse>  <!-- Bright green under direct lighting -->
+        <specular>0.2 0.4 0.2 1</specular>  <!-- Slight shine with a green tint -->
+        <emissive>0.0 0.0 0.0 1</emissive>  <!-- No glow -->
+    </material>
+
+    <!-- LIDAR laser-red -->
+    <material name="lidar-material">
+        <color rgba="${200/255} ${0/255} ${0/255} 1.0" />
+        <ambient>0.2 0.0 0.0 1</ambient>  <!-- Dim red under ambient light -->
+        <diffuse>1.0 0.0 0.0 1</diffuse>  <!-- Bright red under direct lighting -->
+        <specular>0.3 0.0 0.0 1</specular>  <!-- Glossy red -->
+        <emissive>0.3 0.0 0.0 1</emissive>  <!-- Glowing red (representing laser-like effect) -->
+    </material>
 </robot>
