@@ -7,7 +7,6 @@
     <xacro:include filename="$(find devol_description)/urdf/devol_macro.urdf.xacro"/>
 
     <xacro:macro name="devol_drive" params="
-        parent
         name
         tf_prefix
         ur_type
@@ -43,7 +42,6 @@
         <xacro:property name="caster_offset" value="${body_length/2 - caster_radius}"/>
 
         <xacro:diff_drive 
-            parent="${parent}"
             tf_prefix="${tf_prefix}"
             body_length="${body_length}"
             body_width="${body_width}"

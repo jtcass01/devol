@@ -48,8 +48,6 @@
             <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
         </xacro:ur_robot>
             
-        <!-- ros2 control instance -->
-
         <xacro:ur_to_robotiq 
             prefix="${tf_prefix}"
             connected_to="${tf_prefix}tool0"

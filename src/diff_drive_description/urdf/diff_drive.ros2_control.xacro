@@ -2,6 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <xacro:macro name="diff_drive_ros2_control" params="name tf_prefix use_gazebo:=^|false">
         <ros2_control name="${name}" type="system">
+        
             <hardware>
                 <xacro:if value="${use_gazebo}">
                     <!-- Use Gazebo plugin for simulation -->
@@ -12,6 +13,7 @@
                     <plugin>mock_components/GenericSystem</plugin>
                 </xacro:unless>
             </hardware>
+
             <joint name="${tf_prefix}left_wheel_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
@@ -19,6 +21,7 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
+
             <joint name="${tf_prefix}right_wheel_joint">
                 <command_interface name="position"/>
                 <state_interface name="position">
