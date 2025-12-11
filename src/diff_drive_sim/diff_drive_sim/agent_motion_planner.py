@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import numpy as np
-from numpy import ndarray, inf
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 from threading import Thread, Event
 
 import rclpy
@@ -40,21 +39,23 @@ class AgentMotionPlanner(RCLPY_Node):
 
         self.declare_parameter('publish_rate', 10.0)
         self.declare_parameter('goal_tolerance', 0.15)
+        self.declare_parameter('lookahead', 0.3)
         self.declare_parameter('intermediate_goal_tolerance', 0.15)
-        self.publish_rate = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
-        self.goal_tolerance = float(self.get_parameter('goal_tolerance').get_parameter_value().double_value)
-        self.intermediate_goal_tolerance = float(self.get_parameter('intermediate_goal_tolerance').get_parameter_value().double_value)
-        self.dt = 1.0 / self.publish_rate
+        self._publish_rate: float = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
+        self._goal_tolerance: float = float(self.get_parameter('goal_tolerance').get_parameter_value().double_value)
+        self._lookahead: float = float(self.get_parameter('lookahead').get_parameter_value().double_value)
+        self._intermediate_goal_tolerance: float = float(self.get_parameter('intermediate_goal_tolerance').get_parameter_value().double_value)
+        self._dt: float = 1.0 / self._publish_rate
 
         # TF
         self._tf_buffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self._tf_buffer, self)
+        self._listener = tf2_ros.TransformListener(self._tf_buffer, self)
 
         # I/O
         qos_profile = QoSProfile(depth=10)
-        self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', qos_profile)
-        self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_received, 10)
-        self.goals_sub = self.create_subscription(MarkerArray, '/goal_points', self.goal_points_received, 10)
+        self._goal_pub = self.create_publisher(PoseStamped, '/goal_pose', qos_profile)
+        self._map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_received, 10)
+        self._goals_sub = self.create_subscription(MarkerArray, '/goal_points', self.goal_points_received, 10)
 
         # State
         self._goal_index = 0
@@ -74,10 +75,10 @@ class AgentMotionPlanner(RCLPY_Node):
 
         # TF frames
         self._to_frame = 'maze_world'
-        self._from_frame = 'diff_drive/base_link'
+        self._from_frame = 'diff_drive/body_link'
 
         # Timer loop
-        self.timer = self.create_timer(self.dt, self.plan_to_goals)
+        self.timer = self.create_timer(self._dt, self.plan_to_goals)
 
         self.get_logger().info(f'AgentMotionPlanner started.')
 
@@ -156,11 +157,11 @@ class AgentMotionPlanner(RCLPY_Node):
         msg.header.frame_id = self._to_frame
         msg.pose.position.x = position[0]
         msg.pose.position.y = position[1]
-        self.goal_pub.publish(msg)
+        self._goal_pub.publish(msg)
 
-    def world_shift_trailer_hitch(self, x, y, theta, length: float = 0.3):
-        x_trailer = x + length * np.cos(theta)
-        y_trailer = y + length * np.sin(theta)
+    def world_shift_trailer_hitch(self, x, y, theta):
+        x_trailer = x + self._lookahead * np.cos(theta)
+        y_trailer = y + self._lookahead * np.sin(theta)
         return x_trailer, y_trailer
 
     def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
@@ -206,7 +207,7 @@ class AgentMotionPlanner(RCLPY_Node):
         self._robot_grid_state = self.world_to_grid(robot_state[0], robot_state[1])
         self._goal_grid_state = self.world_to_grid(goal_state[0], goal_state[1])
 
-        if euclidean_distance(robot_state, goal_state) <= self.goal_tolerance:
+        if euclidean_distance(robot_state, goal_state) <= self._goal_tolerance:
             # Goal acheived!
             self.get_logger().info(f'Successfully reached goal #{self._goal_index+1} at ({goal_state[0]}, {goal_state[1]})')
 
@@ -229,7 +230,7 @@ class AgentMotionPlanner(RCLPY_Node):
                 trailer_hitch_goal: Tuple[float, float] = self.world_shift_trailer_hitch(intermediate_goal[0], intermediate_goal[1], yaw)
 
                 # Check if at intermediate goal:
-                if euclidean_distance(robot_state, intermediate_goal) <= self.intermediate_goal_tolerance:
+                if euclidean_distance(robot_state, intermediate_goal) <= self._intermediate_goal_tolerance:
                     self._path_index += 1
                 else:
                     self.send_goal_pose(trailer_hitch_goal)

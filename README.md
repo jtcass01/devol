@@ -4,9 +4,43 @@
 Packages include:
 - devol_description: description of a UR manipulator with simple end effector and camera on wrist.
 - diff_drive_description: description of a differential drive system.
-- devol_drive_description: description of a Devol robot mounted ontop of a diff_drive system.
-- dual_devol_description: description of two Devol Drive robots.
+- devol_drive_description: description of a Devol robot mounted ontop of a diff_drive system. (in-progress)
+- diff_drive_sim: A collection of nodes for controlling a diff_drive robot.
 
-See docs/FinalProject_525_630_CASSADY_CHANDRA.pdf for a detailed report on the project.
+Code Tested Directly on Ubuntu 24.04. Docker container tested on RHEL8 OS.
 
-[![Video Demonstration of Pick and Place](https://img.youtube.com/vi/oQB3xyw07hM/0.jpg)](https://www.youtube.com/watch?v=oQB3xyw07hM)
+## 1.0 Directions for Running Diff Drive Simulation
+If you are managing the packages on your own without the need for docker, you can skip instructions 1.2 and 1.3.
+
+### 1.1 Clone Git Repository
+```bash
+git clone https://github.com/jtcass01/devol.git
+```
+
+### 1.2 Build and Start Docker container
+If you don't have docker compose, you can install it here: https://docs.docker.com/compose/install/.
+Once it is installed run the following command to build the docker container from the root directory of the repository.
+
+```bash
+. bin/docker/build_sim_container.sh && . bin/docker/start.sh
+```
+
+### 1.3 Enter the docker Container
+```bash
+. bin/docker/interactive.sh
+```
+
+### 1.4 Build the packages
+```bash
+. bin/build.sh
+```
+
+### 1.5 Source Devol packages
+```bash
+. install/setup.bash
+```
+
+### 1.6 Run full simulation. -- You should see the robot plan and execute pathing to three goal points.
+```bash
+. bin/run.sh
+```

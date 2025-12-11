@@ -36,7 +36,7 @@
         <!-- Body Link -->
         <!-- <link name="${tf_prefix}odom" /> -->
 
-        <link name="${tf_prefix}base_link">
+        <link name="${tf_prefix}body_link">
             <visual>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
                 <geometry>
@@ -183,13 +183,13 @@
         <!-- <joint name="${tf_prefix}floor_fixed_joint" type="fixed">
             <origin xyz="0 0 ${wheel_radius+body_height/2}" rpy="0 0 0"/>
             <parent link="${tf_prefix}odom"/>
-            <child link="${tf_prefix}base_link"/>
+            <child link="${tf_prefix}body_link"/>
         </joint> -->
 
         <!-- Left Wheel Joint -->
         <joint name="${tf_prefix}left_wheel_joint" type="continuous">
             <origin xyz="-${wheel_offset} ${wheel_separation/2} -${wheel_radius/2}" rpy="0 0 0"/>
-            <parent link="${tf_prefix}base_link"/>
+            <parent link="${tf_prefix}body_link"/>
             <child link="${tf_prefix}left_wheel"/>
             <axis xyz="0 1 0"/>
             <limit effort="100" velocity="10.0"/>
@@ -199,7 +199,7 @@
         <!-- Right Wheel Joint -->
         <joint name="${tf_prefix}right_wheel_joint" type="continuous">
             <origin xyz="-${wheel_offset} ${-wheel_separation/2} -${wheel_radius/2}" rpy="0 0 0"/>
-            <parent link="${tf_prefix}base_link"/>
+            <parent link="${tf_prefix}body_link"/>
             <child link="${tf_prefix}right_wheel"/>
             <axis xyz="0 1 0"/>
             <limit effort="100" velocity="10.0"/>
@@ -209,14 +209,14 @@
         <!-- Caster Wheel Joint (fixed) or Ball?!? -->
         <joint name="${tf_prefix}caster_joint" type="fixed">
             <origin xyz="${caster_offset} 0 -${body_height/2+wheel_radius/2}" rpy="0 0 0"/>
-            <parent link="${tf_prefix}base_link"/>
+            <parent link="${tf_prefix}body_link"/>
             <child link="${tf_prefix}caster"/>
         </joint>
 
         <!-- Lidar Joint (fixed) -->
         <joint name="${tf_prefix}lidar_joint" type="fixed">
             <origin xyz="${caster_offset} 0 ${body_height/2+0.02}" rpy="0 0 0"/> <!-- Using the same position as the caster wheel but above it! -->
-            <parent link="${tf_prefix}base_link"/>
+            <parent link="${tf_prefix}body_link"/>
             <child link="${tf_prefix}lidar"/>
         </joint>
 

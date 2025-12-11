@@ -76,7 +76,7 @@ def generate_launch_description():
                 {'kp': 0.8},
                 {'kd': 0.2},
                 {'ki': 0.0},
-                {'lookahead': 0.1},
+                {'lookahead': 0.3},
                 {'publish_rate': 30.0},
                 {'max_linear_vel': 0.75},
                 {'max_angular_vel': 1.0},

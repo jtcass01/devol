@@ -1,6 +1,6 @@
 <sdf version='1.11'>
   <model name='diff_drive'>
-    <link name='base_link'>
+    <link name='body_link'>
       <inertial>
         <pose>0.0084905660377358506 0 -0.004056603773584906 0 0 0</pose>
         <mass>10.6</mass>
@@ -13,7 +13,7 @@
           <izz>1.468259434749815</izz>
         </inertia>
       </inertial>
-      <collision name='base_link_collision'>
+      <collision name='body_link_collision'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
@@ -32,7 +32,7 @@
           </friction>
         </surface>
       </collision>
-      <collision name='base_link_fixed_joint_lump__diff_drive/caster_collision_1'>
+      <collision name='body_link_fixed_joint_lump__diff_drive/caster_collision_1'>
         <pose>0.14999999999999999 0 -0.10000000000000001 0 0 0</pose>
         <geometry>
           <sphere>
@@ -51,7 +51,7 @@
           </friction>
         </surface>
       </collision>
-      <collision name='base_link_fixed_joint_lump__diff_drive/lidar_collision_2'>
+      <collision name='body_link_fixed_joint_lump__diff_drive/lidar_collision_2'>
         <pose>0.14999999999999999 0 0.070000000000000007 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -71,7 +71,7 @@
           </friction>
         </surface>
       </collision>
-      <visual name='base_link_visual'>
+      <visual name='body_link_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
@@ -83,7 +83,7 @@
           <ambient>0.343137264 0.637254953 0.882352948 1</ambient>
         </material>
       </visual>
-      <visual name='base_link_fixed_joint_lump__diff_drive/caster_visual_1'>
+      <visual name='body_link_fixed_joint_lump__diff_drive/caster_visual_1'>
         <pose>0.14999999999999999 0 -0.10000000000000001 0 0 0</pose>
         <geometry>
           <sphere>
@@ -95,7 +95,7 @@
           <ambient>0.24509804 1 0.24509804 1</ambient>
         </material>
       </visual>
-      <visual name='base_link_fixed_joint_lump__diff_drive/lidar_visual_2'>
+      <visual name='body_link_fixed_joint_lump__diff_drive/lidar_visual_2'>
         <pose>0.14999999999999999 0 0.070000000000000007 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -138,8 +138,8 @@
       </sensor>
     </link>
     <joint name='left_wheel_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.10000000000000001 0.14999999999999999 -0.050000000000000003 0 0 0</pose>
-      <parent>base_link</parent>
+      <pose relative_to='body_link'>-0.10000000000000001 0.14999999999999999 -0.050000000000000003 0 0 0</pose>
+      <parent>body_link</parent>
       <child>left_wheel</child>
       <axis>
         <xyz>0 1 0</xyz>
@@ -206,8 +206,8 @@
       </visual>
     </link>
     <joint name='right_wheel_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.10000000000000001 -0.14999999999999999 -0.050000000000000003 0 0 0</pose>
-      <parent>base_link</parent>
+      <pose relative_to='body_link'>-0.10000000000000001 -0.14999999999999999 -0.050000000000000003 0 0 0</pose>
+      <parent>body_link</parent>
       <child>right_wheel</child>
       <axis>
         <xyz>0 1 0</xyz>
@@ -284,7 +284,7 @@
       <topic>/cmd_vel</topic>
       <odom_topic>/odom</odom_topic>
       <frame_id>odom</frame_id>
-      <child_frame_id>base_link</child_frame_id>
+      <child_frame_id>body_link</child_frame_id>
       <tf_topic>/tf</tf_topic>
     </plugin>
     <plugin name='gz::sim::systems::JointStatePublisher' filename='gz-sim-joint-state-publisher-system'>
@@ -305,13 +305,13 @@
     <plugin name='gz::sim::systems::Sensors' filename='gz-sim-sensors-system'>
       <render_engine>ogre2</render_engine>
     </plugin>
-    <frame name='caster_joint' attached_to='base_link'>
+    <frame name='caster_joint' attached_to='body_link'>
       <pose>0.14999999999999999 0 -0.10000000000000001 0 0 0</pose>
     </frame>
     <frame name='caster' attached_to='caster_joint'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
-    <frame name='lidar_joint' attached_to='base_link'>
+    <frame name='lidar_joint' attached_to='body_link'>
       <pose>0.14999999999999999 0 0.070000000000000007 0 0 0</pose>
     </frame>
     <frame name='lidar' attached_to='lidar_joint'>

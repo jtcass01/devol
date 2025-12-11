@@ -9,7 +9,7 @@
 
     <!-- ros_control plugin -->
     <!-- Gazebo Parameters -->
-    <gazebo reference="${tf_prefix}base_link">
+    <gazebo reference="${tf_prefix}body_link">
         <mu1>1.0</mu1>
         <mu2>1.0</mu2>
     </gazebo>
@@ -77,7 +77,7 @@
         <topic>/cmd_vel</topic>
         <odom_topic>/odom</odom_topic>
         <frame_id>odom</frame_id>
-        <child_frame_id>${tf_prefix}base_link</child_frame_id>
+        <child_frame_id>${tf_prefix}body_link</child_frame_id>
         <tf_topic>/tf</tf_topic>
       </plugin>
 

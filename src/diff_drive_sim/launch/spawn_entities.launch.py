@@ -121,10 +121,10 @@ def generate_launch_description():
         )
 
         # Static transform publishers
-        base_link_to_diff_drive_tf = Node(
+        body_link_to_diff_drive_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0',  '0', '0',  '0', '0', 'diff_drive/base_link', 'base_link'],
+            arguments=['0', '0',  '0', '0',  '0', '0', 'diff_drive/body_link', 'body_link'],
             output='screen'
         )
 
@@ -145,7 +145,7 @@ def generate_launch_description():
         lidar_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'diff_drive/lidar', 'diff_drive/base_link/lidar_sensor'],
+            arguments=['0', '0', '0', '0', '0', '0', 'diff_drive/lidar', 'diff_drive/body_link/lidar_sensor'],
             output='screen'
         )
 
@@ -181,7 +181,7 @@ def generate_launch_description():
             spawn_goal2,
             spawn_goal3,
             odom_to_diff_drive_tf,
-            base_link_to_diff_drive_tf,
+            body_link_to_diff_drive_tf,
             maze_world_tf,
             lidar_tf,
             robot_state_publisher,
