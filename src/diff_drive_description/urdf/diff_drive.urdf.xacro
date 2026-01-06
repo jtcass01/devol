@@ -8,15 +8,14 @@
     <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive.ros2_control.xacro"/>
 
     <!-- Robot Parameters -->
-    <xacro:arg name="parent" default="empty"/>  <!-- Set this to world for rviz and others -->
-    <xacro:arg name="body_length" default="0.5"/>
-    <xacro:arg name="body_width" default="0.3"/>
+    <xacro:arg name="body_length" default="0.4"/>
+    <xacro:arg name="body_width" default="0.25"/>
     <xacro:arg name="body_height" default="0.1"/>
     <xacro:arg name="body_density" default="7850.0"/>
     <xacro:arg name="wheel_radius" default="0.1"/>
     <xacro:arg name="wheel_width" default="0.05"/>
     <xacro:arg name="wheel_density" default="900"/>
-    <xacro:arg name="caster_radius" default="0.1"/>
+    <xacro:arg name="caster_radius" default="0.05"/>
     <xacro:arg name="caster_density" default="0.1"/>
     <xacro:arg name="max_linear_acceleration" default="10"/>
     <xacro:arg name="use_gazebo" default="true"/>
@@ -24,12 +23,13 @@
 
     <xacro:property name="body_width" value="$(arg body_width)"/>
     <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
+    <xacro:property name="body_length" value="$(arg body_length)"/>
+    <xacro:property name="caster_radius" value="$(arg caster_radius)"/>
     <xacro:property name="wheel_separation" value="${(body_width) + (wheel_width)}"/>
+    <xacro:property name="caster_offset" value="${(body_length)/2 - (caster_radius)}"/>
 
-    <link name="$(arg parent)"/>
     <xacro:diff_drive 
         tf_prefix="$(arg tf_prefix)"
-        parent="$(arg parent)"
         body_length="$(arg body_length)"
         body_width="$(arg body_width)"
         body_height="$(arg body_height)"

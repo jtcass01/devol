@@ -11,7 +11,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
-from moveit_configs_utils import MoveItConfigsBuilder
 
 
 ARGUMENTS = []
@@ -19,14 +18,13 @@ ARGUMENTS = []
 
 def generate_launch_description():
     # Define file names
-    urdf_package = "devol_drive_description"
-    moveit_package = "devol_moveit_config"
+    urdf_package = "a200_description"
     project_gz_package_name: str = "devol_gazebo"
     gz_package_name: str = "ros_gz_sim"
 
     gz_launch_filename: str = "gz_sim.launch.py"
-    urdf_filename = "devol_drive.urdf.xacro"
-    rviz_config_filename = "devol_drive.rviz"
+    urdf_filename = "a200.urdf.xacro"
+    rviz_config_filename = "a200.rviz"
 
     # Define paths
     pkg_share_description = FindPackageShare(urdf_package)
@@ -47,10 +45,6 @@ def generate_launch_description():
 
     # Launch configuration variables
     world_directory = LaunchConfiguration("world")
-    use_sim_time: LaunchConfiguration = LaunchConfiguration("use_sim_time")
-    publish_robot_description_semantic = LaunchConfiguration(
-        "publish_robot_description_semantic"
-    )
 
     # Declare launch arguments
     declare_rviz_config_cmd = DeclareLaunchArgument(
@@ -79,24 +73,17 @@ def generate_launch_description():
     declare_world_directory_cmd = DeclareLaunchArgument(
         "world",
         default_value="empty",
-        choices=["empty", "factory"]
+        choices=['empty', "basic_maze", "Maze_hr", "Maze_ng", "Maze_ql_1"]
     )
 
     robot_description_content: ParameterValue = ParameterValue(Command(
         [
-            PathJoinSubstitution([FindExecutable(name="xacro")]), 
-            ' ', default_urdf_path, ' ',
-            "use_gazebo:=true ",
+            PathJoinSubstitution([FindExecutable(name="xacro")]), ' ', default_urdf_path, ' '
         ]
     ), value_type=str)
 
     robot_description = {'robot_description': robot_description_content,
                          'use_sim_time': True}
-
-    moveit_config = (
-        MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
-        .to_moveit_configs()
-    )
 
     # Subscribe to the joint states of the robot, and publish them to the robot state publisher
     start_robot_state_publisher_cmd: Node = Node(
@@ -104,8 +91,7 @@ def generate_launch_description():
         executable='robot_state_publisher',
         namespace='a200_0000',
         output='screen',
-        parameters=[robot_description,
-                    {"use_sim_time": use_sim_time}])
+        parameters=[robot_description])
 
 
     # Spawn robot command
@@ -113,22 +99,7 @@ def generate_launch_description():
         package="ros_gz_sim",
         executable="create",
         output="screen",
-        arguments=["-topic", '/a200_0000/robot_description', '-name', 'devol_drive', '-x', '0', '-y', '0', '-z', '0.2', '-allow_renaming', 'true'],
-        parameters=[{"use_sim_time": use_sim_time}]
-    )
-
-    start_move_group_cmd: Node = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
-        output="screen",
-        parameters=[
-            moveit_config.to_dict(),
-            {
-                "use_sim_time": use_sim_time,
-                "robot_description": robot_description_content,
-                "publish_robot_description_semantic": publish_robot_description_semantic,
-            }
-        ]
+        arguments=["-topic", '/a200_0000/robot_description', '-name', 'a200', '-x', '0', '-y', '0', '-z', '0.0']
     )
 
     start_gz_cmd = IncludeLaunchDescription(
@@ -147,18 +118,18 @@ def generate_launch_description():
         "GZ_SIM_RESOURCE_PATH",
         value=PathJoinSubstitution(
             [project_world_directory, world_directory, 
-             ":", FindPackageShare("devol_drive_description"), 
+             ":", FindPackageShare("diff_drive_description"), 
              ":$GZ_SIM_RESOURCE_PATH"])
     )
 
-    start_gz_bridge_cmd: Node = Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
-        parameters=[{'qos_overrides./model/devol_drive.subscriber.reliability': 'reliable',
-                     "use_sim_time": use_sim_time}],
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
-        output='screen'
-    )
+    # start_gz_bridge_cmd: Node = Node(
+    #     package='ros_gz_bridge',
+    #     executable='parameter_bridge',
+    #     parameters=[{'qos_overrides./model/diff_drive.subscriber.reliability': 'reliable'}],
+    #     arguments=['/model/diff_drive/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+    #                '/model/diff_drive/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry'],
+    #     output='screen'
+    # )
 
     # Create the launch description and populate with arguments
     ld = LaunchDescription(ARGUMENTS)
@@ -172,10 +143,9 @@ def generate_launch_description():
 
     # Add actions
     ld.add_action(gz_spawn_entity_cmd)
-    ld.add_action(start_move_group_cmd)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
-    ld.add_action(start_gz_bridge_cmd)
+    # ld.add_action(start_gz_bridge_cmd)
 
     return ld

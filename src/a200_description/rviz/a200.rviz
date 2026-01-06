@@ -72,27 +72,157 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        left_wheel:
+        top_chassis_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        lidar_dome:
+        inertial_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        caster:
+        front_left_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        lidar:
+        front_right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_wheel:
+        rear_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_bumper_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_bumper_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        default_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_footprint:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_bumper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_bumper_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_bumper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_bumper_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        top_plate_adjust_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        top_plate_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        top_plate_mount_ur:
+          Alpha: 1
+          Show Axes: true
+          Show Trail: false
+          Value: true
+        sensor_arch_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor_arch_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        user_bay_cover_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fath_pivot_0_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fath_pivot_0_hinge_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fath_pivot_0_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        bracket_0_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        bracket_0_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        lidar2d_0_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        lidar2d_0_laser:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        lidar3d_0_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        lidar3d_0_laser:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_0_bottom_screw_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_0_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -108,7 +238,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: floor
+    Fixed Frame: base_link
     Frame Rate: 30
   Name: root
   Tools:

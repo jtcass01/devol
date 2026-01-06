@@ -3,11 +3,10 @@
 <!-- Reference: https://github.com/lucasmazzetto/gazebo_differential_drive_robot -->
 <robot xmlns:xacro="http://wiki.ros.org/xacro">
     <!-- import macros -->
-    <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive_macro.urdf.xacro"/>
+    <xacro:include filename="$(find a200_description)/urdf/a200_macro.urdf.xacro"/>
     <xacro:include filename="$(find devol_description)/urdf/devol_macro.urdf.xacro"/>
 
     <xacro:macro name="devol_drive" params="
-        parent
         name
         tf_prefix
         ur_type
@@ -42,23 +41,10 @@
     ">
         <xacro:property name="caster_offset" value="${body_length/2 - caster_radius}"/>
 
-        <xacro:diff_drive 
-            parent="${parent}"
-            tf_prefix="${tf_prefix}"
-            body_length="${body_length}"
-            body_width="${body_width}"
-            body_height="${body_height}"
-            body_density="${body_density}"
-            wheel_radius="${wheel_radius}"
-            wheel_width="${wheel_width}"
-            wheel_density="${wheel_density}"
-            caster_radius="${caster_radius}"
-            caster_density="${caster_density}"
-            max_linear_acceleration="${max_linear_acceleration}"
-        />
+        <xacro:a200 />
 
         <xacro:devol 
-            parent="${tf_prefix}body_link" 
+            parent="${tf_prefix}top_plate_mount_ur" 
             name="${name}"
             tf_prefix="${tf_prefix}" 
             ur_type="${ur_type}"

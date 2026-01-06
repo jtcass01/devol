@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<!-- Reference: https://github.com/lucasmazzetto/gazebo_differential_drive_robot -->
+<robot name="a200" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Import a200 macro -->
+    <xacro:include filename="$(find a200_description)/urdf/a200_macro.urdf.xacro"/>
+
+    <xacro:a200 />
+</robot>

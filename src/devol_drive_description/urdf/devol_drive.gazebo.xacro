@@ -8,13 +8,7 @@
     tf_prefix">
 
     <!-- Gazebo Parameters -->
-    <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive.gazebo.xacro"/>
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
-    <xacro:diff_drive_gazebo 
-        wheel_separation="${wheel_separation}"
-        wheel_radius="${wheel_radius}"
-        max_linear_acceleration="${max_linear_acceleration}" 
-        tf_prefix="${tf_prefix}"/>
 
     <xacro:devol_gazebo
       tf_prefix="${tf_prefix}" 

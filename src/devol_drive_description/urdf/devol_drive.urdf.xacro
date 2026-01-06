@@ -8,10 +8,9 @@
     <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive.ros2_control.xacro"/>
 
     <!-- Robot Parameters -->
-    <xacro:arg name="parent" default="empty"/>  <!-- Set this to world for rviz and others -->
     <xacro:arg name="name" default="devol_drive"/>
     <xacro:arg name="tf_prefix" default="" />
-    <xacro:arg name="ur_type" default="ur3"/>
+    <xacro:arg name="ur_type" default="ur5e"/>
     <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
     <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
     <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
@@ -50,7 +49,6 @@
     <xacro:property name="wheel_separation" value="${(body_width) + (wheel_width)}"/>
 
     <xacro:devol_drive 
-        parent="$(arg parent)"
         name="$(arg name)"
         tf_prefix="$(arg tf_prefix)" 
         ur_type="$(arg ur_type)"
