@@ -70,7 +70,7 @@ Visualization Manager:
           Value: true
         diff_drive:
           Value: true
-        diff_drive/base_link:
+        diff_drive/body_link:
           Value: true
         diff_drive/caster:
           Value: true
@@ -91,7 +91,7 @@ Visualization Manager:
         map:
           maze_world:
             diff_drive:
-              diff_drive/base_link:
+              diff_drive/body_link:
                 {}
               diff_drive/caster:
                 {}

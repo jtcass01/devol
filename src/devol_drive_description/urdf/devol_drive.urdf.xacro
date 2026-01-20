@@ -25,14 +25,14 @@
     <xacro:arg name="script_filename" default="None" />
     <xacro:arg name="input_recipe_filename" default="None" />
     <xacro:arg name="output_recipe_filename" default="None" />
-    <xacro:arg name="body_length" default="0.5"/>
-    <xacro:arg name="body_width" default="0.3"/>
+    <xacro:arg name="body_length" default="0.4"/>
+    <xacro:arg name="body_width" default="0.25"/>
     <xacro:arg name="body_height" default="0.1"/>
     <xacro:arg name="body_density" default="7850.0"/>
     <xacro:arg name="wheel_radius" default="0.1"/>
     <xacro:arg name="wheel_width" default="0.05"/>
     <xacro:arg name="wheel_density" default="900"/>
-    <xacro:arg name="caster_radius" default="0.1"/>
+    <xacro:arg name="caster_radius" default="0.05"/>
     <xacro:arg name="caster_density" default="0.1"/>
     <xacro:arg name="max_linear_acceleration" default="10"/>
     <xacro:arg name="use_gazebo" default="true"/>

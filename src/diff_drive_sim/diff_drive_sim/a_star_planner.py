@@ -35,13 +35,11 @@ def list_neighbors(map: ndarray, p: Tuple[int, int]) -> List[Tuple[int, int]]:
     return neighbors
 
 class Edge: 
-    """
-    This class provides a basic data structure for representing
+    """This class provides a basic data structure for representing
     a directional edge in a graph. Travel is possible between
     the starting node to the ending node at the given cost
-    but travel in the opposite direction is not allowed.
-    """
-    def __init__(self,starting_node, ending_node, cost):
+    but travel in the opposite direction is not allowed."""
+    def __init__(self, starting_node, ending_node, cost):
         self.start = starting_node
         self.end = ending_node 
         self.cost = cost 
@@ -57,10 +55,8 @@ class Edge:
         return False
 
 class Node:
-    """
-    This class provides a basic data structure for representing
-    a node in A* Graph
-    """
+    """This class provides a basic data structure for representing
+    a node in A* Graph"""
     def __init__(self, name, h):
         #The name of the node (can be anything, just for human readable output)
         self.name = name
@@ -100,16 +96,13 @@ class Node:
     def __lt__(self, other: Node):
         return self.f < other.f
 
-def a_star_grid(map: ndarray, start:Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
-    """
-    This function will compute the optimal path between a start point and an end point given a grid-based
+def a_star_grid(map: ndarray, start: Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
+    """This function will compute the optimal path between a start point and an end point given a grid-based
     map. It is up to the student to implement the heuristic function and cost function. Assume a cell's 
     indices represent it's position in cartesian space. (e.g. cells [1,3] and [1,5] are 2 units apart). 
 
     If no path exists then this function should return an empty list.
 
-    Worth 50 pts
-    
     Input
       :param map: An ndarray representing free space and occupied space
       :param start: A tuple of indicies indicating the starting cell of the search
@@ -118,8 +111,7 @@ def a_star_grid(map: ndarray, start:Tuple[int, int], goal: Tuple[int, int]) -> L
     Output
       :return: path: a list of Tuples indicating the indicies of the cells that make up the path with 
                     the starting cell as the first element of the list and the ending cell as the last
-                    element in the list
-    """
+                    element in the list"""
     open_list: List[Tuple[int, int]] = [start]
     closed_list: List[Tuple[int, int]] = []
     g_cost: Dict[Tuple[int, int], float] = {start: 0.0}
@@ -155,23 +147,18 @@ def a_star_grid(map: ndarray, start:Tuple[int, int], goal: Tuple[int, int]) -> L
     return []
 
 def a_star_graph(start: Node, goal: Node) -> List[Node]:
-    """
-    This function will compute the optimal path between a starting node and an ending node.
+    """This function will compute the optimal path between a starting node and an ending node.
     The result should be a list of the Edges that represent the optimal path to the goal. 
     For this function the cost and heuristic functions are defined when the node is originally created.
 
-    
     If no path exists then this function should return an empty list.
 
-    Worth 50 pts
-    
     Input
       :param start: The starting node of the search
       :param goal: The ending node of the search
 
     Output
-      :return: path: a list of Node objects representing the optimal path to the goal 
-    """
+      :return: path: a list of Node objects representing the optimal path to the goal"""
     open_list: List[Node] = [start]
     closed_list: List[Node] = []
     came_from: Dict[Node, Node] = {}
@@ -235,7 +222,6 @@ def graph_demo():
         print(e_i)
 
 def grid_demo():
-
     map = array([[0,0,1,0,0,0,0,0,0],
                  [0,0,1,0,0,0,0,0,0],
                  [0,0,1,0,0,1,1,1,0],

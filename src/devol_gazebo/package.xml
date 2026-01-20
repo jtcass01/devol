@@ -10,7 +10,6 @@
 
   <depend>ros_gz</depend>
   <depend>ros_gz_bridge</depend>
-  <depend>devol_description</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

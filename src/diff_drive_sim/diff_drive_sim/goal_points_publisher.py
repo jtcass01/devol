@@ -7,7 +7,6 @@ Reads goal positions from poses.csv file.
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point
 from std_msgs.msg import Header
 from visualization_msgs.msg import MarkerArray, Marker
 from ament_index_python.packages import get_package_share_directory

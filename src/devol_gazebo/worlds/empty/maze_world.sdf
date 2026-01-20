@@ -1,0 +1,71 @@
+<sdf version="1.7">
+  <world name="odom">
+    <plugin
+        filename="gz-sim-physics-system"
+        name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin
+        filename="gz-sim-user-commands-system"
+        name="gz::sim::systems::UserCommands">
+    </plugin>
+    <plugin
+        filename="gz-sim-scene-broadcaster-system"
+        name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+    <plugin
+        filename="libgz-sim-sensors-system.so"
+        name="gz::sim::systems::Sensors">
+    </plugin>
+    <plugin
+        filename="libgz-sim-imu-system.so"
+        name="gz::sim::systems::Imu">
+    </plugin>
+    <plugin
+        filename="libgz-sim-navsat-system.so"
+        name="gz::sim::systems::NavSat">
+    </plugin>
+
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.1</mu>   <!-- lateral friction -->
+                <mu2>0.1</mu2> <!-- secondary friction -->
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>    
+
+    <physics name='default_physics' type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+  </world>
+</sdf>

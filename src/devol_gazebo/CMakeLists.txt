@@ -8,7 +8,6 @@ project(devol_gazebo)
 # The 'set' directive defines a variable (e.g. 'GZ_PLUGIN_VER').
 # Such variables can be used lateron in the CMakeLists.txt file.
 find_package(ament_cmake REQUIRED)
-find_package(devol_description REQUIRED)
 
 find_package(gz-cmake3 REQUIRED)
 find_package(gz-plugin2 REQUIRED COMPONENTS register)
@@ -85,6 +84,11 @@ install(
 install(
   DIRECTORY worlds/
   DESTINATION share/${PROJECT_NAME}/worlds
+)
+
+install(
+  DIRECTORY sdf/
+  DESTINATION share/${PROJECT_NAME}/sdf
 )
 
 # Following directives are used when testing.

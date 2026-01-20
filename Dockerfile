@@ -38,12 +38,21 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y ros-dev-tools ros-${ROS_DISTRO}-desktop \
     # Ros2 control libraries
     ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers ros-${ROS_DISTRO}-teleop-twist-keyboard \
+    # MoveIt Libraries
+    ros-${ROS_DISTRO}-moveit \
     # Universal Robots Library
     ros-${ROS_DISTRO}-ur \
     # Gazebo Libraries
     ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control \
     # Robotiq Libraries
     ros-${ROS_DISTRO}-robotiq-description ros-${ROS_DISTRO}-robotiq-controllers \
+    # Camera libraries
+    ros-${ROS_DISTRO}-vision-msgs ros-${ROS_DISTRO}-moveit-ros-perception \
+    ros-${ROS_DISTRO}-librealsense2* ros-${ROS_DISTRO}-realsense2* \
+    # Dynamixel libary
+    ros-${ROS_DISTRO}-dynamixel-workbench-toolbox \
+    # Python libraries
+    ros-${ROS_DISTRO}-moveit-py \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -57,7 +66,7 @@ USER ${USERNAME}
 # Upgrade pip and install Python dependencies
 RUN python3 -m venv /home/${USERNAME}/.devol_venv \
     && . /home/${USERNAME}/.devol_venv/bin/activate \
-    && pip install --upgrade pip setuptools \
+    && pip install --upgrade pip setuptools numpy matplotlib scipy \
     && pip install --upgrade colcon-common-extensions \
     && . /opt/ros/${ROS_DISTRO}/setup.sh
 
