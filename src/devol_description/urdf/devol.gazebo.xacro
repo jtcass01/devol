@@ -29,10 +29,10 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
     <gazebo reference="${tf_prefix}_camera_color_frame">
       <sensor type="camera" name="${tf_prefix}realsense_d405_camera">
         <pose relative_to="${tf_prefix}_camera_color_frame">0 0 0 3.14159 0 0</pose>
-        <topic>/model/${tf_prefix}devol/color_raw</topic>
+        <topic>/${tf_prefix}devol/sensors/camera/image</topic>
 
         <camera>
-          <camera_info_topic>/model/${tf_prefix}devol/color_info</camera_info_topic>
+          <camera_info_topic>/${tf_prefix}devol/sensors/camera/color_info</camera_info_topic>
           <horizontal_fov>1.518</horizontal_fov>
           <image>
             <width>1280</width>
@@ -56,11 +56,11 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
     <gazebo reference="${tf_prefix}_camera_depth_frame">
 
       <sensor type="depth_camera" name="${tf_prefix}realsense_d405_depth_camera">
-        <topic>/model/${tf_prefix}devol/depth_raw</topic>
+        <topic>/${tf_prefix}devol/sensors/camera/depth_image</topic>
         <pose relative_to="${tf_prefix}_camera_color_frame">0 0 0 3.14159 0 0</pose>
 
         <camera>
-          <camera_info_topic>/model/${tf_prefix}devol/depth_info</camera_info_topic>
+          <camera_info_topic>/${tf_prefix}devol/sensors/camera/depth_info</camera_info_topic>
           <horizontal_fov>1.518</horizontal_fov>
           <image>
             <width>1280</width>

@@ -153,6 +153,14 @@ def generate_launch_description():
              ":$GZ_SIM_RESOURCE_PATH"])
     )
 
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', join(urdf_pkg_share, 'rviz', 'devol_drive.rviz')]
+    )
+
     start_devol_drive_bridge_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             join(urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
@@ -176,7 +184,13 @@ def generate_launch_description():
             # Simulation clock
             # -----------------
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-        ]
+            '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+            ],
+       remappings=[
+           ('/model/devol_drive/tf', '/tf'),
+           ('/tf_static', '/tf_static'),
+           ('/model/devol_drive/pose', '/tf'),
+       ]
     )
 
     # Create the launch description and populate with arguments
@@ -197,5 +211,6 @@ def generate_launch_description():
     ld.add_action(start_gz_cmd)
     ld.add_action(start_system_bridge_cmd)
     ld.add_action(start_devol_drive_bridge_cmd)
+    ld.add_action(rviz)
 
     return ld
