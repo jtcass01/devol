@@ -56,7 +56,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: robot_description
+        Value: /a200_0000/robot_description
       Enabled: true
       Links:
         All Links Enabled: true

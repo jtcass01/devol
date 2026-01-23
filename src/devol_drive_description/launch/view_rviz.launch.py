@@ -79,6 +79,7 @@ def generate_launch_description():
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
+        namespace='a200_0000',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time,
                      'robot_description': robot_description_content}])
@@ -88,6 +89,7 @@ def generate_launch_description():
         package='joint_state_publisher',
         executable='joint_state_publisher',
         name='joint_state_publisher',
+        namespace='a200_0000',
         parameters=[{'use_sim_time': use_sim_time}],
         condition=UnlessCondition(jsp_gui),
     )
@@ -96,6 +98,7 @@ def generate_launch_description():
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
         name='joint_state_publisher_gui',
+        namespace='a200_0000',
         parameters=[{'use_sim_time': use_sim_time}],
         condition=IfCondition(jsp_gui),
     )

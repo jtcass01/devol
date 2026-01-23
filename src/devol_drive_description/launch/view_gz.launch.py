@@ -1,3 +1,4 @@
+from os.path import join
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.substitutions import (
@@ -13,13 +14,13 @@ from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
 from moveit_configs_utils import MoveItConfigsBuilder
 
-
-ARGUMENTS = []
+from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
     # Define file names
     urdf_package = "devol_drive_description"
+    urdf_pkg_share = get_package_share_directory(urdf_package)
     moveit_package = "devol_moveit_config"
     project_gz_package_name: str = "devol_gazebo"
     gz_package_name: str = "ros_gz_sim"
@@ -120,6 +121,7 @@ def generate_launch_description():
     start_move_group_cmd: Node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
+        namespace='a200_0000',
         output="screen",
         parameters=[
             moveit_config.to_dict(),
@@ -137,7 +139,7 @@ def generate_launch_description():
             'gz_args': [
                 TextSubstitution(text='-r -v 4 '),
                 PathJoinSubstitution([
-                    project_world_directory, world_directory, 'model.sdf'
+                    project_world_directory, world_directory, 'maze_world.sdf'
                 ]),
             ]
         }.items(),
@@ -151,17 +153,34 @@ def generate_launch_description():
              ":$GZ_SIM_RESOURCE_PATH"])
     )
 
-    start_gz_bridge_cmd: Node = Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
-        parameters=[{'qos_overrides./model/devol_drive.subscriber.reliability': 'reliable',
-                     "use_sim_time": use_sim_time}],
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
-        output='screen'
+    start_devol_drive_bridge_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            join(urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
+        )
+    )
+
+    start_system_bridge_cmd = Node(
+       package='ros_gz_bridge',
+       executable='parameter_bridge',
+       name='ros_gz_bridge_system',
+       output='screen',
+        parameters=[
+            {
+                'use_sim_time': True,
+                'qos_overrides./tf.publisher.durability': 'transient_local',
+                'qos_overrides./tf_static.publisher.durability': 'transient_local',
+            }
+        ],
+       arguments=[
+            # -----------------
+            # Simulation clock
+            # -----------------
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+        ]
     )
 
     # Create the launch description and populate with arguments
-    ld = LaunchDescription(ARGUMENTS)
+    ld = LaunchDescription()
 
     # Declare the launch options
     ld.add_action(declare_rviz_config_cmd)
@@ -176,6 +195,7 @@ def generate_launch_description():
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
-    ld.add_action(start_gz_bridge_cmd)
+    ld.add_action(start_system_bridge_cmd)
+    ld.add_action(start_devol_drive_bridge_cmd)
 
     return ld

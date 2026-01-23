@@ -93,7 +93,10 @@ def generate_launch_description():
         executable='robot_state_publisher',
         namespace='a200_0000',
         output='screen',
-        parameters=[robot_description])
+        parameters=[robot_description],
+        remappings=[
+            ('/joint_states', 'dynamic_joint_states')
+        ])
 
 
     # Spawn robot command
@@ -126,7 +129,41 @@ def generate_launch_description():
              ":$GZ_SIM_RESOURCE_PATH"])
     )
 
-    start_gz_bridge_cmd = IncludeLaunchDescription(
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', join(urdf_pkg_share, 'rviz', 'a200.rviz')]
+    )
+
+    start_system_bridge_cmd = Node(
+       package='ros_gz_bridge',
+       executable='parameter_bridge',
+       name='ros_gz_bridge_system',
+       output='screen',
+        parameters=[
+            {
+                'use_sim_time': True,
+                'qos_overrides./tf.publisher.durability': 'transient_local',
+                'qos_overrides./tf_static.publisher.durability': 'transient_local',
+            }
+        ],
+       arguments=[
+            # -----------------
+            # Simulation clock
+            # -----------------
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+           '/model/a200/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+        ],
+        remappings=[
+           ('/model/a200_0000/tf', '/tf'),
+           ('/tf_static', '/tf_static'),
+           ('/model/a200/pose', '/tf'),
+       ]
+    )
+
+    start_a200_bridge_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             join(urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
         )
@@ -147,6 +184,8 @@ def generate_launch_description():
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
-    ld.add_action(start_gz_bridge_cmd)
+    ld.add_action(start_system_bridge_cmd)
+    ld.add_action(start_a200_bridge_cmd)
+    ld.add_action(rviz)
 
     return ld

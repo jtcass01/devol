@@ -16,11 +16,6 @@ def generate_launch_description():
         ],
        arguments=[
             # -----------------
-            # Simulation clock
-            # -----------------
-            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-
-            # -----------------
             # Velocity command
             # -----------------
            '/a200_0000/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
@@ -29,6 +24,7 @@ def generate_launch_description():
             # Joint States
             # -----------------
            '/a200_0000/dynamic_joint_states@sensor_msgs/msg/JointState@gz.msgs.Model',
+           '/a200_0000/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
 
             # -----------------
             # 2D LiDAR
@@ -45,7 +41,7 @@ def generate_launch_description():
             '/a200_0000/sensors/lidar3d_0/points'
             '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
 
-                        # -----------------
+            # -----------------
             # Camera (RGB)
             # -----------------
             '/a200_0000/sensors/camera_0/image'
@@ -65,10 +61,9 @@ def generate_launch_description():
             # -----------------
             '/a200_0000/sensors/camera_0/points'
             '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
-
            ],
-       remappings=[
-           ('/model/a200_0000/robot/tf', '/tf'),
+        remappings=[
+           ('/a200_0000/dynamic_joint_states', '/a200_0000/joint_states'),
        ])
 
    return LaunchDescription([bridge])
