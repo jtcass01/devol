@@ -100,8 +100,8 @@ def generate_launch_description():
             name='diffdrive_pid',
             output='screen',
             parameters=[
-                {'kp': 0.8},
-                {'kd': 0.2},
+                {'kp': 0.9},
+                {'kd': 0.0},
                 {'ki': 0.0},
                 {'lookahead': 0.3},
                 {'publish_rate': 30.0},
