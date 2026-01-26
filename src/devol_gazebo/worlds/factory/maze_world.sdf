@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <sdf version="1.9">
-  <world name="devol-demo">
+  <world name="maze_world">
     <plugin
       filename="gz-sim-physics-system"
       name="gz::sim::systems::Physics">

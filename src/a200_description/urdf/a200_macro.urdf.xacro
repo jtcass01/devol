@@ -3,6 +3,7 @@
 <robot xmlns:xacro="http://wiki.ros.org/xacro">
     <!-- import macros -->
     <xacro:include filename="$(find a200_description)/urdf/a200.materials.xacro"/>
+    <xacro:include filename="$(find a200_description)/urdf/a200.gazebo.xacro"/>
     <xacro:include filename= "$(find realsense2_description)/urdf/_d435.urdf.xacro"/>
 
     <xacro:macro name="a200" >
@@ -74,16 +75,6 @@
             </geometry>
             </collision>
         </link>
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="front_left_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
         <joint name="front_left_wheel_joint" type="continuous">
             <parent link="a200_base_link"/>
             <child link="front_left_wheel_link"/>
@@ -109,16 +100,6 @@
             </geometry>
             </collision>
         </link>
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="front_right_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
         <joint name="front_right_wheel_joint" type="continuous">
             <parent link="a200_base_link"/>
             <child link="front_right_wheel_link"/>
@@ -145,16 +126,6 @@
             </geometry>
             </collision>
         </link>
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="rear_left_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
         <joint name="rear_left_wheel_joint" type="continuous">
             <parent link="a200_base_link"/>
             <child link="rear_left_wheel_link"/>
@@ -180,47 +151,12 @@
             </geometry>
             </collision>
         </link>
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="rear_right_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
         <joint name="rear_right_wheel_joint" type="continuous">
             <parent link="a200_base_link"/>
             <child link="rear_right_wheel_link"/>
             <origin rpy="0 0 0" xyz="-0.256 -0.2775 0"/>
             <axis rpy="0 0 0" xyz="0 1 0"/>
         </joint>
-        <gazebo>
-            <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-            <parameters>/home/jakeadelic/clearpath/platform/config/control.yaml</parameters>
-            <ros>
-                <remapping>~/odom:=platform/odom</remapping>
-                <remapping>~/cmd_vel:=platform/cmd_vel</remapping>
-                <remapping>/tf:=tf</remapping>
-                <remapping>/tf_static:=tf_static</remapping>
-                <remapping>/diagnostics:=diagnostics</remapping>
-                <remapping>/dynamic_joint_states:=platform/dynamic_joint_states</remapping>
-                <remapping>joint_states:=platform/joint_states</remapping>
-                <remapping>~/reference:=platform/cmd_vel</remapping>
-                <remapping>~/odometry:=platform/odom</remapping>
-                <namespace>a200_0000</namespace>
-            </ros>
-            </plugin>
-        </gazebo>
-        <gazebo>
-            <plugin filename="libgz-sim-pose-publisher-system.so" name="gz::sim::systems::PosePublisher">
-            <publish_link_pose>true</publish_link_pose>
-            <publish_nested_model_pose>true</publish_nested_model_pose>
-            <use_pose_vector_msg>true</use_pose_vector_msg>
-            <update_frequency>50</update_frequency>
-            </plugin>
-        </gazebo>
         <ros2_control name="a200_hardware" type="system">
             <hardware>
             <plugin>gz_ros2_control/GazeboSimSystem</plugin>
@@ -521,36 +457,6 @@
             <parent link="lidar2d_0_link"/>
             <child link="lidar2d_0_laser"/>
         </joint>
-        <gazebo reference="lidar2d_0_laser">
-            <sensor name="lidar2d_0" type="gpu_lidar">
-            <update_rate>40</update_rate>
-            <visualize>true</visualize>
-            <always_on>true</always_on>
-            <gz_frame_id>lidar2d_0_laser</gz_frame_id>
-            <topic>a200_0000/sensors/lidar2d_0/scan</topic>
-            <lidar>
-                <scan>
-                <horizontal>
-                    <samples>540</samples>
-                    <resolution>1</resolution>
-                    <min_angle>-2.356</min_angle>
-                    <max_angle>2.356</max_angle>
-                </horizontal>
-                <vertical>
-                    <samples>1</samples>
-                    <resolution>1</resolution>
-                    <min_angle>0</min_angle>
-                    <max_angle>0</max_angle>
-                </vertical>
-                </scan>
-                <range>
-                <min>0.05</min>
-                <max>25.0</max>
-                <resolution>0.01</resolution>
-                </range>
-            </lidar>
-            </sensor>
-        </gazebo>
         <link name="lidar3d_0_link">
             <inertial>
             <mass value="0.83"/>
@@ -597,36 +503,6 @@
             <parent link="lidar3d_0_link"/>
             <child link="lidar3d_0_laser"/>
         </joint>
-        <gazebo reference="lidar3d_0_laser">
-            <sensor name="lidar3d_0" type="gpu_lidar">
-            <update_rate>20</update_rate>
-            <visualize>true</visualize>
-            <always_on>true</always_on>
-            <gz_frame_id>lidar3d_0_laser</gz_frame_id>
-            <topic>a200_0000/sensors/lidar3d_0/scan</topic>
-            <lidar>
-                <scan>
-                <horizontal>
-                    <samples>900</samples>
-                    <resolution>1</resolution>
-                    <min_angle>-3.141592</min_angle>
-                    <max_angle>3.141592</max_angle>
-                </horizontal>
-                <vertical>
-                    <samples>15</samples>
-                    <resolution>1</resolution>
-                    <min_angle>-0.261799</min_angle>
-                    <max_angle>0.261799</max_angle>
-                </vertical>
-                </scan>
-                <range>
-                <min>0.9</min>
-                <max>130.0</max>
-                <resolution>0.01</resolution>
-                </range>
-            </lidar>
-            </sensor>
-        </gazebo>
         <!-- camera body, with origin at bottom screw mount -->
         <joint name="camera_0_joint" type="fixed">
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -639,54 +515,7 @@
             <origin rpy="3.14159 0 3.14159" xyz="0 0 0.022"/>
         </xacro:sensor_d435>
 
-        <gazebo reference="rear_camera_color_frame">
-            <sensor name="realsense_d435_camera" type="rgbd_camera">
-                <camera>
-                    <horizontal_fov>1.25</horizontal_fov>
-                    <image>
-                    <width>640</width>
-                    <height>480</height>
-                    </image>
-                    <clip>
-                    <near>0.3</near>
-                    <far>100</far>
-                    </clip>
-                    <gz_frame_id>rear_camera_color_frame</gz_frame_id>
-                    <optical_frame_id>rear_camera_color_frame</optical_frame_id>
-                </camera>
-                <always_on>1</always_on>
-                <update_rate>30</update_rate>
-                <visualize>true</visualize>
-                <gz_frame_id>rear_camera_color_frame</gz_frame_id>
-                <topic>a200_0000/sensors/camera_0</topic>
-            </sensor>
-        </gazebo>
-
-        <gazebo>
-            <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-                <left_joint>front_left_wheel_joint</left_joint>
-                <left_joint>rear_left_wheel_joint</left_joint>
-                <right_joint>front_right_wheel_joint</right_joint>
-                <right_joint>rear_right_wheel_joint</right_joint>
-                <wheel_separation>0.555</wheel_separation>
-                <wheel_radius>0.1651</wheel_radius>
-                <odom_publish_frequency>30</odom_publish_frequency>
-                <max_wheel_torque>2.0</max_wheel_torque>
-                <max_wheel_acceleration>0.75</max_wheel_acceleration>
-                <topic>/a200_0000/cmd_vel</topic>
-                <odom_topic>/a200_0000/odom</odom_topic>
-                <frame_id>odom</frame_id>
-                <child_frame_id>a200_base_link</child_frame_id>
-                <tf_topic>/model/a200_0000/tf</tf_topic>
-                <publish_odom_tf>true</publish_odom_tf>
-            </plugin>
-        </gazebo>
-
-        <gazebo>
-            <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
-                <topic>/a200_0000/dynamic_joint_states</topic>
-            </plugin>
-        </gazebo>
+        <xacro:a200_gazebo />
 
     </xacro:macro>
 </robot>

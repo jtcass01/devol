@@ -98,6 +98,12 @@ def generate_launch_description():
             ('/joint_states', 'dynamic_joint_states')
         ])
 
+    lidar2d_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'lidar2d_0_link', 'a200_0000/robot/base_link/lidar2d_0'],
+        output='screen'
+    )
 
     # Spawn robot command
     gz_spawn_entity_cmd: Node = Node(
@@ -181,6 +187,7 @@ def generate_launch_description():
 
     # Add actions
     ld.add_action(gz_spawn_entity_cmd)
+    ld.add_action(lidar2d_tf)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
