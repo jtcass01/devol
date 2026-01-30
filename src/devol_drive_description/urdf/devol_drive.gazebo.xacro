@@ -13,6 +13,5 @@
     <xacro:devol_gazebo
       tf_prefix="${tf_prefix}" 
       />
-
   </xacro:macro>
 </robot>

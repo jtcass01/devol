@@ -1,9 +1,8 @@
 from os.path import join
 from launch import LaunchDescription
-from launch_ros.actions import Node
-
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -14,16 +13,33 @@ def generate_launch_description():
     devol_urdf_package = "devol_description"
     devol_urdf_pkg_share = get_package_share_directory(devol_urdf_package)
 
-    a200_bridge = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            join(a200_urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-        )
+    declare_namespace = DeclareLaunchArgument(
+        'namespace',
+        default_value='/devol_drive',
+        description='Namespace for topics'
     )
 
-    devol_bridge = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            join(devol_urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-        )
-    )
+    def launch_setup(context):
+        namespace = context.perform_substitution(LaunchConfiguration('namespace'))
 
-    return LaunchDescription([a200_bridge, devol_bridge])
+        a200_bridge = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                join(a200_urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
+            ),
+            launch_arguments={
+                'namespace': namespace
+            }.items()
+        )
+
+        devol_bridge = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                join(devol_urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
+            ),
+            launch_arguments={
+                'namespace': namespace
+            }.items()
+        )
+
+        return [a200_bridge, devol_bridge]
+
+    return LaunchDescription([declare_namespace, OpaqueFunction(function=launch_setup)])

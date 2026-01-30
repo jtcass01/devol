@@ -11,17 +11,11 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
-ARGUMENTS = [
-    DeclareLaunchArgument('name', default_value='devol',
-                          description='Prefix for all joint names'),
-]
-
-
 def generate_launch_description():
     # Define file names
     urdf_package = "devol_description"
     urdf_filename = "devol.urdf.xacro"
-    rviz_config_filename = "view_devol.rviz"
+    rviz_config_filename = "devol.rviz"
 
     # Define paths
     pkg_share_description = FindPackageShare(urdf_package)
@@ -38,9 +32,14 @@ def generate_launch_description():
     use_rviz = LaunchConfiguration("use_rviz")
     urdf_model = LaunchConfiguration("urdf_model")
     use_sim_time = LaunchConfiguration("use_sim_time")
-    name = LaunchConfiguration("name")
 
     # Declare launch arguments
+    declare_jsp_gui_cmd = DeclareLaunchArgument(
+        "jsp_gui",
+        default_value="true",
+        choices=["true", "false"],
+        description="Launch the Joint State Publisher GUI",
+    )
     declare_jsp_gui_cmd = DeclareLaunchArgument(
         "jsp_gui",
         default_value="true",
@@ -72,7 +71,7 @@ def generate_launch_description():
 
     robot_description_content: ParameterValue = ParameterValue(Command([
         'xacro', ' ', urdf_model, ' ',
-        'name:=', name, ' ',
+        'name:=devol ',
         'use_gazebo:=false ',
     ]), value_type=str)
 
@@ -114,7 +113,7 @@ def generate_launch_description():
     )
 
     # Create the launch description and populate with arguments
-    ld = LaunchDescription(ARGUMENTS)
+    ld = LaunchDescription()
 
     # Declare the launch options
     ld.add_action(declare_jsp_gui_cmd)

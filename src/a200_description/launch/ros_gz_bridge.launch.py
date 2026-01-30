@@ -1,69 +1,86 @@
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 def generate_launch_description():
-   bridge = Node(
-       package='ros_gz_bridge',
-       executable='parameter_bridge',
-       name='ros_gz_bridge',
-       output='screen',
-        parameters=[
-            {
-                'use_sim_time': True,
-                'qos_overrides./tf.publisher.durability': 'transient_local',
-                'qos_overrides./tf_static.publisher.durability': 'transient_local',
-            }
-        ],
-       arguments=[
-            # -----------------
-            # Velocity command
-            # -----------------
-           '/a200_0000/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+    declare_namespace = DeclareLaunchArgument(
+        'namespace',
+        default_value='/a200_0000',
+        description='Namespace for topics'
+    )
 
-            # -----------------
-            # Joint States
-            # -----------------
-           '/a200_0000/dynamic_joint_states@sensor_msgs/msg/JointState@gz.msgs.Model',
-           '/a200_0000/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
+    def launch_setup(context):
+        namespace = context.perform_substitution(LaunchConfiguration('namespace'))
 
-            # -----------------
-            # 2D LiDAR
-            # -----------------
-            '/a200_0000/sensors/lidar2d_0/scan'
-            '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
+        bridge = Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='ros_gz_bridge',
+            output='screen',
+                parameters=[
+                    {
+                        'use_sim_time': True,
+                        'qos_overrides./tf.publisher.durability': 'transient_local',
+                        'qos_overrides./tf_static.publisher.durability': 'transient_local',
+                    }
+                ],
+            arguments=[
+                # -----------------
+                # Velocity command
+                # -----------------
+                f'{namespace}/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
 
-            # -----------------
-            # 3D LiDAR
-            # -----------------
-            '/a200_0000/sensors/lidar3d_0/scan'
-            '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
+                # -----------------
+                # Joint States
+                # -----------------
+                f'{namespace}/dynamic_joint_states@sensor_msgs/msg/JointState@gz.msgs.Model',
+                f'{namespace}/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
 
-            '/a200_0000/sensors/lidar3d_0/points'
-            '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
+                # -----------------
+                # 2D LiDAR
+                # -----------------
+                f'{namespace}/sensors/lidar2d_0/scan'
+                '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
 
-            # -----------------
-            # Camera (RGB)
-            # -----------------
-            '/a200_0000/sensors/camera_0/image'
-            '@sensor_msgs/msg/Image[gz.msgs.Image',
+                # -----------------
+                # 3D LiDAR
+                # -----------------
+                f'{namespace}/sensors/lidar3d_0/scan'
+                '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
 
-            '/a200_0000/sensors/camera_0/camera_info'
-            '@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+                f'{namespace}/sensors/lidar3d_0/points'
+                '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
 
-            # -----------------
-            # Camera (Depth)
-            # -----------------
-            '/a200_0000/sensors/camera_0/depth_image'
-            '@sensor_msgs/msg/Image[gz.msgs.Image',
+                # -----------------
+                # Camera (RGB)
+                # -----------------
+                f'{namespace}/sensors/camera_0/image'
+                '@sensor_msgs/msg/Image[gz.msgs.Image',
 
-            # -----------------
-            # Camera Point Cloud
-            # -----------------
-            '/a200_0000/sensors/camera_0/points'
-            '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
-           ],
-        remappings=[
-           ('/a200_0000/dynamic_joint_states', '/a200_0000/joint_states'),
-       ])
+                f'{namespace}/sensors/camera_0/camera_info'
+                '@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
 
-   return LaunchDescription([bridge])
+                # -----------------
+                # Camera (Depth)
+                # -----------------
+                f'{namespace}/sensors/camera_0/depth_image'
+                '@sensor_msgs/msg/Image[gz.msgs.Image',
+
+                # -----------------
+                # Camera Point Cloud
+                # -----------------
+                f'{namespace}/sensors/camera_0/points'
+                '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
+            ],
+            remappings=[
+                (f'{namespace}/dynamic_joint_states', f'{namespace}/joint_states'),
+            ])
+
+
+        return [
+            bridge
+        ]
+
+    return LaunchDescription([declare_namespace,
+        OpaqueFunction(function=launch_setup)])

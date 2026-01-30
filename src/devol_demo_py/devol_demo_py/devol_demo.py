@@ -19,7 +19,7 @@ class DevolDemoNode(Node):
         )
 
         self._logger = self.get_logger()
-        self._robot: DevolRobot = DevolRobot(node=self, robot_name="devol", target_object_count=3)
+        self._robot: DevolRobot = DevolRobot(node=self, robot_name="devol", namespace='/devol', target_object_count=3)
 
         signal(SIGINT, self._signal_handler)
 

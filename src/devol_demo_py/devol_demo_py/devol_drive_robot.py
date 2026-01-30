@@ -22,6 +22,7 @@ class DevolDriveRobot:
         self,
         node: Node,
         robot_name: str,
+        namespace: str = '',
         planning_group: str = "ur_manipulator",
         target_object_count: int = 3
     ):
@@ -33,12 +34,13 @@ class DevolDriveRobot:
         self._devol_robot: DevolRobot = DevolRobot(
             node=node,
             robot_name=robot_name,
+            namespace=namespace,
             planning_group=planning_group,
             target_object_count=target_object_count
         )
         
         # Initialize differential drive publisher
-        cmd_topic: str = f"/model/{self._tf_prefix}drive/cmd_vel"
+        cmd_topic: str = f"{namespace}/cmd_vel"
         
         # Create QoS profile (equivalent to C++ QoS setup)
         qos_profile = QoSProfile(depth=10)

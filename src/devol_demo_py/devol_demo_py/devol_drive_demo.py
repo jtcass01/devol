@@ -19,7 +19,7 @@ class DevolDriveDemoNode(Node):
         )
 
         self._logger = self.get_logger()
-        self._robot: DevolDriveRobot = DevolDriveRobot(node=self, robot_name="devol", target_object_count=3)
+        self._robot: DevolDriveRobot = DevolDriveRobot(node=self, robot_name="devol_drive", namespace='/devol_drive', target_object_count=3)
 
         signal(SIGINT, self._signal_handler)
 
@@ -60,26 +60,26 @@ class DevolDriveDemoNode(Node):
             return False
         
         # 4. Go home
-        try:
-            if await self._robot.go_home():
-                self._logger.info("Robot moved to home position")
-            else:
-                self._logger.error("Failed to move robot home")
-                return False
-        except Exception as e:
-            self._logger.error(f"Exception during go home: {e}")
-            return False
+        # try:
+        #     if await self._robot.go_home():
+        #         self._logger.info("Robot moved to home position")
+        #     else:
+        #         self._logger.error("Failed to move robot home")
+        #         return False
+        # except Exception as e:
+        #     self._logger.error(f"Exception during go home: {e}")
+        #     return False
 
         # 5. Close gripper
-        try:
-            if await self._robot.set_gripper_position(GRIPPER_POSITION.CLOSE):
-                self._logger.info("Gripper closed successfully")
-            else:
-                self._logger.error("Failed to close gripper")
-                return False
-        except Exception as e:
-            self._logger.error(f"Exception during gripper close: {e}")
-            return False
+        # try:
+        #     if await self._robot.set_gripper_position(GRIPPER_POSITION.CLOSE):
+        #         self._logger.info("Gripper closed successfully")
+        #     else:
+        #         self._logger.error("Failed to close gripper")
+        #         return False
+        # except Exception as e:
+        #     self._logger.error(f"Exception during gripper close: {e}")
+        #     return False
 
         # 6. Switch to velocity control and test
         try:

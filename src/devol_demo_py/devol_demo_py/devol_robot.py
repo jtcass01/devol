@@ -46,41 +46,42 @@ class DevolRobot:
         node: Node,
         robot_name: str,
         planning_group: str = "ur_manipulator",
+        namespace: str = '',
         target_object_count: int = 3
     ):
         self._node: Node = node
         self._logger = node.get_logger()
         self._robot_name: str = robot_name
-        self._tf_prefix: str = f"{self._robot_name}_"
+        self._namespace: str = namespace
         self._planning_group: str = planning_group
 
         # Member Variables
         self._manipulator_joints: List[str] = [
-            f"{self._tf_prefix}elbow_joint",
-            f"{self._tf_prefix}shoulder_lift_joint",
-            f"{self._tf_prefix}shoulder_pan_joint",
-            f"{self._tf_prefix}wrist_1_joint",
-            f"{self._tf_prefix}wrist_2_joint",
-            f"{self._tf_prefix}wrist_3_joint"
+            f"elbow_joint",
+            f"shoulder_lift_joint",
+            f"shoulder_pan_joint",
+            f"wrist_1_joint",
+            f"wrist_2_joint",
+            f"wrist_3_joint"
         ]
         self._end_effector_touch_links: List[str] = [
-            f"{self._tf_prefix}robotiq_85_left_finger_tip_link",
-            f"{self._tf_prefix}robotiq_85_right_finger_tip_link",
-            f"{self._tf_prefix}robotiq_85_left_finger_link",
-            f"{self._tf_prefix}robotiq_85_right_finger_link",
-            f"{self._tf_prefix}robotiq_85_left_inner_knuckle_link",
-            f"{self._tf_prefix}robotiq_85_right_inner_knuckle_link",
-            f"{self._tf_prefix}robotiq_85_left_knuckle_link",
-            f"{self._tf_prefix}robotiq_85_right_knuckle_link"
+            f"robotiq_85_left_finger_tip_link",
+            f"robotiq_85_right_finger_tip_link",
+            f"robotiq_85_left_finger_link",
+            f"robotiq_85_right_finger_link",
+            f"robotiq_85_left_inner_knuckle_link",
+            f"robotiq_85_right_inner_knuckle_link",
+            f"robotiq_85_left_knuckle_link",
+            f"robotiq_85_right_knuckle_link"
         ]
-        self._gripper_joint: str = f"{self._tf_prefix}robotiq_85_left_knuckle_joint"
+        self._gripper_joint: str = f"robotiq_85_left_knuckle_joint"
         self._gripper_position_map: Dict[GRIPPER_POSITION, float] = {
             GRIPPER_POSITION.OPEN: 0.0,
             GRIPPER_POSITION.CLOSE: 0.8,
             GRIPPER_POSITION.GRAB: 0.105
         }
-        self._base_link: str = f"{self._tf_prefix}base_link"
-        self._end_effector_link: str = f"{self._tf_prefix}tool0"
+        self._base_link: str = f"base_link"
+        self._end_effector_link: str = f"tool0"
         self._ur_manipulator_controller_name: str = f"ur_manipulator_controller"
         self._hand_controller_name: str = f"hand_controller"
         self._velocity_controller_name: str = f"ur_velocity_controller"
@@ -103,41 +104,41 @@ class DevolRobot:
         self._hand_action_client: ActionClient = ActionClient(
             self._node,
             ParallelGripperCommand,
-            f"/{self._robot_name}/{self._hand_controller_name}/gripper_cmd"
+            f"{self._namespace}/{self._hand_controller_name}/gripper_cmd"
         )
 
         # Initialize Movegroup interfaces
         self._move_group_client: ActionClient = ActionClient(
             self._node,
             MoveGroup,
-            f"/{self._robot_name}/move_action"
+            f"{self._namespace}/move_action"
         )
 
         # Controller manager service client
         self._controller_switch_client: Client = self._node.create_client(
             SwitchController,
-            f'/{self._robot_name}/controller_manager/switch_controller'
+            f'{self._namespace}/controller_manager/switch_controller'
         )
         self._controller_list_client: Client = self._node.create_client(
             ListControllers,
-            f'/{self._robot_name}/controller_manager/list_controllers'
+            f'{self._namespace}/controller_manager/list_controllers'
         )
         self._controller_load_client: Client = self._node.create_client(
-            LoadController, f'/{self._robot_name}/controller_manager/load_controller'
+            LoadController, f'{self._namespace}/controller_manager/load_controller'
         )
         self._controller_configure_client: Client = self._node.create_client(
-            ConfigureController, f'/{self._robot_name}/controller_manager/configure_controller'
+            ConfigureController, f'{self._namespace}/controller_manager/configure_controller'
         )
         self._velocity_command_pub: Publisher = self._node.create_publisher(
             Float64MultiArray,
-            f"/{self._robot_name}/{self._velocity_controller_name}/commands",
+            f"{self._namespace}/{self._velocity_controller_name}/commands",
             10
         )
 
         # Create publishers
         self._planning_scene_pub: Publisher = self._node.create_publisher(
             PlanningScene,
-            "/planning_scene",
+            f"{self._namespace}/planning_scene",
             10
         )
 
@@ -162,9 +163,9 @@ class DevolRobot:
         
         for client_name, service_client in service_clients.items():
             if not service_client.wait_for_service(timeout_sec=5.0):
-                self._logger.error(f"{client_name.capitalize()} service not available")
+                self._logger.error(f"{client_name.capitalize()} service ({service_client.service_name}) not available")
             else:
-                self._logger.info(f"{client_name.capitalize()} client initialized successfully")
+                self._logger.info(f"{client_name.capitalize()} client ({service_client.service_name}) initialized successfully")
 
     async def initialize_control(self) -> bool:
         # Activate joint_state_broadcaster 
@@ -204,8 +205,8 @@ class DevolRobot:
         """Initialize Gazebo attach/detach topics"""
         for object_index in range(self._target_object_count):
             object_id = f"target_block_{object_index}"
-            attach_topic = f"/{self._tf_prefix}attach_{object_index}/attach"
-            detach_topic = f"/{self._tf_prefix}attach_{object_index}/detach"
+            attach_topic = f"{self._namespace}/attach_{object_index}/attach"
+            detach_topic = f"{self._namespace}/attach_{object_index}/detach"
             
             topics = AttachDetachTopics()
             topics.attach_pub = self._node.create_publisher(Empty, attach_topic, 10)

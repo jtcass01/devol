@@ -1,4 +1,5 @@
 from os.path import join
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.substitutions import (
@@ -19,16 +20,16 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     # Define file names
-    urdf_package = "devol_drive_description"
-    moveit_package = "devol_moveit_config"
+    urdf_package = "devol_description"
+    moveit_package = 'devol_moveit_config'
     urdf_pkg_share = get_package_share_directory(urdf_package)
     project_gz_package_name: str = "devol_gazebo"
     gz_package_name: str = "ros_gz_sim"
-    namespace: str = '/devol_drive'
+    namespace: str = '/devol'
 
     gz_launch_filename: str = "gz_sim.launch.py"
-    urdf_filename = "devol_drive.urdf.xacro"
-    rviz_config_filename = "devol_drive.rviz"
+    urdf_filename = "devol.urdf.xacro"
+    rviz_config_filename = "devol.rviz"
 
     # Define paths
     pkg_share_description = FindPackageShare(urdf_package)
@@ -36,7 +37,7 @@ def generate_launch_description():
         [pkg_share_description, "urdf", urdf_filename]
     )
     default_rviz_path = PathJoinSubstitution(
-        [pkg_share_description, "config", rviz_config_filename]
+        [pkg_share_description, "rviz", rviz_config_filename]
     )
     project_gz_path: FindPackageShare = FindPackageShare(project_gz_package_name)
     project_world_directory: PathJoinSubstitution = PathJoinSubstitution(
@@ -49,10 +50,8 @@ def generate_launch_description():
 
     # Launch configuration variables
     world_directory = LaunchConfiguration("world")
-    use_sim_time: LaunchConfiguration = LaunchConfiguration("use_sim_time")
-    publish_robot_description_semantic = LaunchConfiguration(
-        "publish_robot_description_semantic"
-    )
+    use_sim_time: LaunchConfiguration = LaunchConfiguration('use_sim_time')
+    publish_robot_description_semantic = LaunchConfiguration("publish_robot_description_semantic")
 
     # Declare launch arguments
     declare_rviz_config_cmd = DeclareLaunchArgument(
@@ -81,40 +80,36 @@ def generate_launch_description():
     declare_world_directory_cmd = DeclareLaunchArgument(
         "world",
         default_value="empty",
-        choices=["empty", "factory"]
+        choices=['empty', "basic_maze", "Maze_hr", "Maze_ng", "Maze_ql_1"]
     )
     declare_namespace_cmd = DeclareLaunchArgument(
         "namespace",
-        default_value="/devol_drive"
+        default_value="/devol"
     )
 
     robot_description_content: ParameterValue = ParameterValue(Command(
         [
-            PathJoinSubstitution([FindExecutable(name="xacro")]), 
-            ' ', default_urdf_path, ' ',
-            "use_gazebo:=true ",
+            PathJoinSubstitution([FindExecutable(name="xacro")]), ' ', default_urdf_path, ' '
         ]
     ), value_type=str)
 
     robot_description = {'robot_description': robot_description_content,
                          'use_sim_time': True}
-
     moveit_config = (
-        MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
-        .to_moveit_configs()
+        MoveItConfigsBuilder(robot_name='devol', package_name=moveit_package)
     )
 
     start_move_group_cmd: Node = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
+        package='moveit_ros_move_group',
+        executable='move_group',
         namespace=namespace,
-        output="screen",
+        output='screen',
         parameters=[
             moveit_config.to_dict(),
             {
-                "use_sim_time": use_sim_time,
-                "robot_description": robot_description_content,
-                "publish_robot_description_semantic": publish_robot_description_semantic,
+                'use_sim_time': use_sim_time,
+                'robot_description': robot_description_content,
+                'publish_robot_description_semantic': publish_robot_description_semantic
             }
         ]
     )
@@ -126,23 +121,15 @@ def generate_launch_description():
         namespace=namespace,
         output='screen',
         parameters=[robot_description,
-                    {"use_sim_time": use_sim_time}])
-
+                    {'use_sim_time': use_sim_time}])
 
     # Spawn robot command
     gz_spawn_entity_cmd: Node = Node(
         package="ros_gz_sim",
         executable="create",
         output="screen",
-        arguments=["-topic", f'{namespace}/robot_description', '-name', 'devol_drive', '-x', '0', '-y', '0', '-z', '0.2'],
-        parameters=[{"use_sim_time": use_sim_time}]
-    )
-
-    lidar2d_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0', '0', '0', '0', '0', '0', 'lidar2d_0_link', 'devol_drive/robot/base_link/lidar2d_0'],
-        output='screen'
+        arguments=["-topic", f'{namespace}/robot_description', '-name', 'devol', '-x', '0', '-y', '0', '-z', '0.2'],
+        parameters=[{'use_sim_time': use_sim_time}]
     )
 
     start_gz_cmd = IncludeLaunchDescription(
@@ -161,7 +148,9 @@ def generate_launch_description():
         "GZ_SIM_RESOURCE_PATH",
         value=PathJoinSubstitution(
             [project_world_directory, world_directory, 
-             ":", FindPackageShare("devol_drive_description"), 
+             ":", FindPackageShare("ur_description"), 
+             ":", FindPackageShare("robotiq_description"), 
+             ":", FindPackageShare("realsense2_description"),
              ":$GZ_SIM_RESOURCE_PATH"])
     )
 
@@ -170,16 +159,7 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         output='screen',
-        arguments=['-d', join(urdf_pkg_share, 'rviz', 'devol_drive.rviz')]
-    )
-
-    start_devol_drive_bridge_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            join(urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-        ),
-        launch_arguments={
-            'namespace': LaunchConfiguration('namespace')
-        }.items()
+        arguments=['-d', join(urdf_pkg_share, 'rviz', 'devol.rviz')]
     )
 
     start_system_bridge_cmd = Node(
@@ -199,13 +179,21 @@ def generate_launch_description():
             # Simulation clock
             # -----------------
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-            '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
-            ],
-       remappings=[
-           ('/model/devol_drive/tf', '/tf'),
+           '/model/devol/pose@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
+        ],
+        remappings=[
            ('/tf_static', '/tf_static'),
-           ('/model/devol_drive/pose', '/tf'),
+           ('/model/devol/pose', '/tf'),
        ]
+    )
+
+    start_devol_bridge_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            join(urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
+        ),
+        launch_arguments={
+            'namespace': LaunchConfiguration('namespace')
+        }.items()
     )
 
     # Create the launch description and populate with arguments
@@ -221,13 +209,12 @@ def generate_launch_description():
 
     # Add actions
     ld.add_action(gz_spawn_entity_cmd)
-    ld.add_action(lidar2d_tf)
     ld.add_action(start_move_group_cmd)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
     ld.add_action(start_system_bridge_cmd)
-    ld.add_action(start_devol_drive_bridge_cmd)
+    ld.add_action(start_devol_bridge_cmd)
     ld.add_action(rviz)
 
     return ld

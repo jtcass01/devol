@@ -5,5 +5,51 @@
     <!-- Import a200 macro -->
     <xacro:include filename="$(find a200_description)/urdf/a200_macro.urdf.xacro"/>
 
+    <xacro:arg name="use_gazebo" default="true"/>
+
     <xacro:a200 />
+
+    <xacro:if value="$(arg use_gazebo)">
+        <gazebo>
+            <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+                <parameters>$(find a200_description)/config/ros2_controllers.yaml</parameters>
+                <ros>
+                    <remapping>~/odom:=a200_0000/odom</remapping>
+                    <remapping>~/cmd_vel:=a200_0000/cmd_vel</remapping>
+                    <remapping>/tf:=tf</remapping>
+                    <remapping>/tf_static:=tf_static</remapping>
+                    <remapping>/diagnostics:=diagnostics</remapping>
+                    <remapping>/dynamic_joint_states:=a200_0000/dynamic_joint_states</remapping>
+                    <remapping>joint_states:=a200_0000/joint_states</remapping>
+                    <remapping>~/reference:=a200_0000/cmd_vel</remapping>
+                    <remapping>~/odometry:=a200_0000/odom</remapping>
+                    
+                    <namespace>a200_0000</namespace>
+                </ros>
+            </plugin>
+
+            <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+                <topic>/a200_0000/dynamic_joint_states</topic>
+            </plugin>
+
+            <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+                <left_joint>front_left_wheel_joint</left_joint>
+                <left_joint>rear_left_wheel_joint</left_joint>
+                <right_joint>front_right_wheel_joint</right_joint>
+                <right_joint>rear_right_wheel_joint</right_joint>
+                <wheel_separation>0.555</wheel_separation>
+                <wheel_radius>0.1651</wheel_radius>
+                <odom_publish_frequency>30</odom_publish_frequency>
+                <max_wheel_torque>2.0</max_wheel_torque>
+                <max_wheel_acceleration>0.75</max_wheel_acceleration>
+                <topic>/a200_0000/cmd_vel</topic>
+                <odom_topic>/a200_0000/odom</odom_topic>
+                <frame_id>odom</frame_id>
+                <child_frame_id>a200_base_link</child_frame_id>
+                <tf_topic>/model/a200_0000/tf</tf_topic>
+                <publish_odom_tf>true</publish_odom_tf>
+            </plugin>
+        </gazebo>
+    </xacro:if>
+
 </robot>

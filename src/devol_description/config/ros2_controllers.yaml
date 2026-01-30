@@ -1,0 +1,50 @@
+# This config file is used by ros2_control
+devol:
+  controller_manager:
+    ros__parameters:
+      update_rate: 100  # Hz
+      use_sim_time: true
+
+      hand_controller:
+        type: parallel_gripper_action_controller/GripperActionController
+
+      ur_manipulator_controller:
+        type: joint_trajectory_controller/JointTrajectoryController
+
+      ur_velocity_controller:
+        type: velocity_controllers/JointGroupVelocityController
+
+      joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+
+  hand_controller:
+    ros__parameters:
+      joint: robotiq_85_left_knuckle_joint
+      use_sim_time: true
+
+  ur_manipulator_controller:
+    ros__parameters:
+      joints:
+        - shoulder_pan_joint
+        - shoulder_lift_joint
+        - elbow_joint
+        - wrist_1_joint
+        - wrist_2_joint
+        - wrist_3_joint
+      command_interfaces:
+        - position
+      state_interfaces:
+        - position
+        - velocity
+      allow_nonzero_velocity_at_trajectory_end: true
+      use_sim_time: true
+
+  ur_velocity_controller:
+    ros__parameters:
+      joints:
+        - shoulder_pan_joint
+        - shoulder_lift_joint
+        - elbow_joint
+        - wrist_1_joint
+        - wrist_2_joint
+        - wrist_3_joint

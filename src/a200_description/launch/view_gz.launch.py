@@ -23,6 +23,7 @@ def generate_launch_description():
     urdf_pkg_share = get_package_share_directory(urdf_package)
     project_gz_package_name: str = "devol_gazebo"
     gz_package_name: str = "ros_gz_sim"
+    namespace: str = '/a200_0000'
 
     gz_launch_filename: str = "gz_sim.launch.py"
     urdf_filename = "a200.urdf.xacro"
@@ -77,6 +78,10 @@ def generate_launch_description():
         default_value="empty",
         choices=['empty', "basic_maze", "Maze_hr", "Maze_ng", "Maze_ql_1"]
     )
+    declare_namespace_cmd = DeclareLaunchArgument(
+        "namespace",
+        default_value="/a200_0000"
+    )
 
     robot_description_content: ParameterValue = ParameterValue(Command(
         [
@@ -91,7 +96,7 @@ def generate_launch_description():
     start_robot_state_publisher_cmd: Node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        namespace='a200_0000',
+        namespace=namespace,
         output='screen',
         parameters=[robot_description],
         remappings=[
@@ -110,7 +115,7 @@ def generate_launch_description():
         package="ros_gz_sim",
         executable="create",
         output="screen",
-        arguments=["-topic", '/a200_0000/robot_description', '-name', 'a200', '-x', '0', '-y', '0', '-z', '0.2']
+        arguments=["-topic", f'{namespace}/robot_description', '-name', 'a200', '-x', '0', '-y', '0', '-z', '0.2']
     )
 
     start_gz_cmd = IncludeLaunchDescription(
@@ -172,7 +177,10 @@ def generate_launch_description():
     start_a200_bridge_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             join(urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-        )
+        ),
+        launch_arguments={
+            'namespace': LaunchConfiguration('namespace')
+        }.items()
     )
 
     # Create the launch description and populate with arguments
@@ -184,6 +192,7 @@ def generate_launch_description():
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_world_directory_cmd)
     ld.add_action(declare_publish_robot_description_semantic_cmd)
+    ld.add_action(declare_namespace_cmd)
 
     # Add actions
     ld.add_action(gz_spawn_entity_cmd)

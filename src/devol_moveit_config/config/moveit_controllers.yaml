@@ -1,4 +1,6 @@
 # MoveIt uses this configuration for controller management
+trajectory_execution:
+  allowed_start_tolerance: 0.1
 
 moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
 
@@ -6,10 +8,6 @@ moveit_simple_controller_manager:
   controller_names:
     - ur_manipulator_controller
     - hand_controller
-    # - apollo_ur_manipulator_controller
-    # - apollo_hand_controller
-    # - artemis_ur_manipulator_controller
-    # - artemis_hand_controller
 
   ur_manipulator_controller:
     type: FollowJointTrajectory
@@ -22,45 +20,10 @@ moveit_simple_controller_manager:
       - wrist_3_joint
     action_ns: follow_joint_trajectory
     default: true
+
   hand_controller:
     type: ParallelGripperCommand
     joints:
       - robotiq_85_left_knuckle_joint
     action_ns: gripper_cmd
     default: true
-
-  # apollo_ur_manipulator_controller:
-  #   type: FollowJointTrajectory
-  #   joints:
-  #     - apollo_shoulder_pan_joint
-  #     - apollo_shoulder_lift_joint
-  #     - apollo_elbow_joint
-  #     - apollo_wrist_1_joint
-  #     - apollo_wrist_2_joint
-  #     - apollo_wrist_3_joint
-  #   action_ns: follow_joint_trajectory
-  #   default: true
-  # apollo_hand_controller:
-  #   type: ParallelGripperCommand
-  #   joints:
-  #     - apollo_robotiq_85_left_knuckle_joint
-  #   action_ns: gripper_cmd
-  #   default: true
-
-  # artemis_ur_manipulator_controller:
-  #   type: FollowJointTrajectory
-  #   joints:
-  #     - artemis_shoulder_pan_joint
-  #     - artemis_shoulder_lift_joint
-  #     - artemis_elbow_joint
-  #     - artemis_wrist_1_joint
-  #     - artemis_wrist_2_joint
-  #     - artemis_wrist_3_joint
-  #   action_ns: follow_joint_trajectory
-  #   default: true
-  # artemis_hand_controller:
-  #   type: ParallelGripperCommand
-  #   joints:
-  #     - artemis_robotiq_85_left_knuckle_joint
-  #   action_ns: gripper_cmd
-  #   default: true

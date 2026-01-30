@@ -7,24 +7,6 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 
   <xacro:macro name="devol_gazebo" params="tf_prefix">
 
-    <!-- ros_control plugin -->
-    <gazebo>
-      <!-- <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-        <parameters>$(find devol_description)/config/ros2_controllers.yaml</parameters>
-      </plugin> -->
-
-      <!-- <plugin
-        filename="libgz-sim-detachable-joint-system.so"
-        name="gz::sim::systems::DetachableJoint">
-        <parent_link>${tf_prefix}wrist_3_link</parent_link>
-        <child_link>target_block_0</child_link>
-        <child_model>target_block_0</child_model>
-        <child_model_link>target_block_0</child_model_link>
-        <attach_topic>/${tf_prefix}devol_attach/attach</attach_topic>
-        <detach_topic>/${tf_prefix}devol_attach/detach</detach_topic>
-      </plugin> -->
-    </gazebo>
-
     <!-- Camera -->
     <gazebo reference="${tf_prefix}_camera_color_frame">
       <sensor type="camera" name="${tf_prefix}realsense_d405_camera">
