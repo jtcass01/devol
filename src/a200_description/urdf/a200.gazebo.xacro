@@ -5,7 +5,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 -->
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="a200_gazebo">
+    <xacro:macro name="a200_gazebo" params="namespace:=/a200_0000" >
         <gazebo>
             <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
             <wheel link_name="front_left_wheel_link">
@@ -65,7 +65,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
             <visualize>true</visualize>
             <always_on>true</always_on>
             <gz_frame_id>lidar2d_0_laser</gz_frame_id>
-            <topic>a200_0000/sensors/lidar2d_0/scan</topic>
+            <topic>${namespace}/sensors/lidar2d_0/scan</topic>
             <lidar>
                 <scan>
                 <horizontal>
@@ -96,7 +96,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
             <visualize>true</visualize>
             <always_on>true</always_on>
             <gz_frame_id>lidar3d_0_laser</gz_frame_id>
-            <topic>a200_0000/sensors/lidar3d_0/scan</topic>
+            <topic>${namespace}/sensors/lidar3d_0/scan</topic>
             <lidar>
                 <scan>
                 <horizontal>
@@ -140,7 +140,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
                 <update_rate>30</update_rate>
                 <visualize>true</visualize>
                 <gz_frame_id>rear_camera_color_frame</gz_frame_id>
-                <topic>a200_0000/sensors/camera_0</topic>
+                <topic>${namespace}/sensors/camera_0</topic>
             </sensor>
         </gazebo>
     </xacro:macro>

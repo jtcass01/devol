@@ -69,7 +69,6 @@ class DiffDrivePID(Node):
     #   /goal_pose
     # Publishes:
     #   /cmd_vel : geometry_msgs/Twist : This is the desired velocity (linear and angular) for the centerpoint of the robot
-    MAX_LINEAR_VELOCITY: float 
 
     def __init__(self):
         super().__init__('diffdrive_pid')
@@ -86,6 +85,7 @@ class DiffDrivePID(Node):
         self.declare_parameter('x', 0.0) # Starting x position
         self.declare_parameter('y', -3.0) # Starting y position
         self.declare_parameter('yaw', 1.57) # Starting yaw position
+        self.declare_parameter('namespace', '/devol_drive')
         
         self._kp: float = self.get_parameter('kp').get_parameter_value().double_value
         self._ki: float = self.get_parameter('ki').get_parameter_value().double_value
@@ -99,6 +99,7 @@ class DiffDrivePID(Node):
         self._start_x: float = float(self.get_parameter('x').get_parameter_value().double_value)
         self._start_y: float = float(self.get_parameter('y').get_parameter_value().double_value)
         self._start_yaw: float = float(self.get_parameter('yaw').get_parameter_value().double_value)
+        self._namespace: str = str(self.get_parameter('namespace').get_parameter_value().string_value)
 
         self._dt: float = 1.0 / self._publish_rate
         self._integral_error = zeros(2)
@@ -112,11 +113,11 @@ class DiffDrivePID(Node):
             self.create_subscription(PoseStamped, 'goal_pose', 
                                      self._goal_pose_callback,
                                      10)
-        self._cmd_vel_pub: Publisher = self.create_publisher(Twist, '/a200_0000/cmd_vel', 10)
+        self._cmd_vel_pub: Publisher = self.create_publisher(Twist, f'{self._namespace}/cmd_vel', 10)
 
         self._timer: Timer = self.create_timer(self._dt, self._control_loop)
 
-        self._from_frame: str = 'devol_drive/a200_base_link'
+        self._from_frame: str = f'{self._namespace[1:]}/a200_base_link'
         self._to_frame: str = 'map'
 
         # Extra DEBUG stuff left in -- just in case you are curious how pid was tuned.

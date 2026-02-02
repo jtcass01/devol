@@ -18,6 +18,7 @@
   <xacro:arg name="input_recipe_filename" default="None" />
   <xacro:arg name="output_recipe_filename" default="None" />
   <xacro:arg name="use_gazebo" default="true" />
+  <xacro:arg name="namespace" default="/devol" />
 
   <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
   <xacro:arg name="initial_positions_file" default="$(find devol_description)/config/initial_positions.yaml"/>
@@ -63,11 +64,13 @@
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
     <xacro:devol_gazebo
       tf_prefix="$(arg tf_prefix)" 
+      namespace="$(arg namespace)"
       />
 
      <gazebo>
       <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
         <parameters>$(find devol_description)/config/ros2_controllers.yaml</parameters>
+        
           <ros>
             <namespace>devol</namespace>
           </ros>

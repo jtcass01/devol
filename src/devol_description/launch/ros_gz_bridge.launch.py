@@ -29,20 +29,20 @@ def generate_launch_description():
                 # -----------------
                 # Camera (RGB)
                 # -----------------
-                f'{namespace}/sensors/camera/image'
+                f'{namespace}/sensors/camera_1/image'
                 '@sensor_msgs/msg/Image[gz.msgs.Image',
 
-                f'{namespace}/sensors/camera/color_info'
+                f'{namespace}/sensors/camera_1/camera_info'
                 '@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
 
                 # -----------------
                 # Camera (Depth)
                 # -----------------
-                f'{namespace}/sensors/camera/depth_image'
+                f'{namespace}/sensors/camera_1/depth_image'
                 '@sensor_msgs/msg/Image[gz.msgs.Image',
 
-                f'{namespace}/sensors/camera/depth_info'
-                '@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+                f'{namespace}/sensors/camera_1/points'
+                '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
                 ]
         )
 

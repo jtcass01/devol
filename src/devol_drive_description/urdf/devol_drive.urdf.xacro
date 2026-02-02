@@ -37,6 +37,7 @@
     <xacro:arg name="max_linear_acceleration" default="10"/>
     <xacro:arg name="use_gazebo" default="true"/>
     <xacro:arg name="force_abs_paths" default="true"/>
+    <xacro:arg name="namespace" default="/devol_drive"/>
 
     <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
     <xacro:arg name="initial_positions_file" default="$(find devol_description)/config/initial_positions.yaml"/>
@@ -47,6 +48,8 @@
     <xacro:property name="body_width" value="$(arg body_width)"/>
     <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
     <xacro:property name="wheel_separation" value="${(body_width) + (wheel_width)}"/>
+    <xacro:property name="name" value="$(arg name)"/>
+    <xacro:property name="namespace" value="$(arg namespace)"/>
 
     <xacro:devol_drive 
         name="$(arg name)"
@@ -78,7 +81,8 @@
         wheel_density="$(arg wheel_density)"
         caster_radius="$(arg caster_radius)"
         caster_density="$(arg caster_density)"
-        max_linear_acceleration="$(arg max_linear_acceleration)">
+        max_linear_acceleration="$(arg max_linear_acceleration)"
+        namespace="$(arg namespace)">
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </xacro:devol_drive>
 
@@ -91,28 +95,29 @@
             wheel_radius="$(arg wheel_radius)"
             max_linear_acceleration="$(arg max_linear_acceleration)"
             tf_prefix="$(arg tf_prefix)" 
+            namespace="$(arg namespace)" 
              />
 
         <gazebo>
             <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
                 <ros>
-                    <namespace>devol_drive</namespace>
-                    <remapping>~/odom:=devol_drive/odom</remapping>
-                    <remapping>~/cmd_vel:=devol_drive/cmd_vel</remapping>
+                    <namespace>${name}</namespace>
+                    <remapping>~/odom:=${namespace}/odom</remapping>
+                    <remapping>~/cmd_vel:=${namespace}/cmd_vel</remapping>
                     <remapping>/tf:=tf</remapping>
                     <remapping>/tf_static:=tf_static</remapping>
                     <remapping>/diagnostics:=diagnostics</remapping>
-                    <remapping>/dynamic_joint_states:=devol_drive/dynamic_joint_states</remapping>
-                    <remapping>joint_states:=devol_drive/joint_states</remapping>
-                    <remapping>~/reference:=devol_drive/cmd_vel</remapping>
-                    <remapping>~/odometry:=devol_drive/odom</remapping>
+                    <remapping>/dynamic_joint_states:=${namespace}/dynamic_joint_states</remapping>
+                    <remapping>joint_states:=${namespace}/joint_states</remapping>
+                    <remapping>~/reference:=${namespace}/cmd_vel</remapping>
+                    <remapping>~/odometry:=${namespace}/odom</remapping>
                 </ros>
 
                 <parameters>$(find devol_drive_description)/config/ros2_controllers.yaml</parameters>
             </plugin>
 
             <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
-                <topic>/devol_drive/dynamic_joint_states</topic>
+                <topic>${namespace}/dynamic_joint_states</topic>
             </plugin>
 
             <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
@@ -125,11 +130,11 @@
                 <odom_publish_frequency>30</odom_publish_frequency>
                 <max_wheel_torque>2.0</max_wheel_torque>
                 <max_wheel_acceleration>0.75</max_wheel_acceleration>
-                <topic>/devol_drive/cmd_vel</topic>
-                <odom_topic>/devol_drive/odom</odom_topic>
+                <topic>${namespace}/cmd_vel</topic>
+                <odom_topic>${namespace}/odom</odom_topic>
                 <frame_id>odom</frame_id>
                 <child_frame_id>a200_base_link</child_frame_id>
-                <tf_topic>/model/devol_drive/tf</tf_topic>
+                <tf_topic>/model/${name}/tf</tf_topic>
                 <publish_odom_tf>true</publish_odom_tf>
             </plugin>
         </gazebo>

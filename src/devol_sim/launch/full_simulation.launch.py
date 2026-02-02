@@ -20,9 +20,15 @@ def generate_launch_description():
         default_value='factory',
         description='Maze to load: basic_maze or Maze_ng'
     )
+    declare_namespace = DeclareLaunchArgument(
+        'namespace',
+        default_value='/devol_drive',
+        description='Namespace for topics'
+    )
     
     def launch_setup(context):
         maze_folder = context.perform_substitution(LaunchConfiguration('maze'))
+        namespace = context.perform_substitution(LaunchConfiguration('namespace'))
         world_file = os.path.join(gz_pkg_share, 'worlds', maze_folder, 'maze_world.sdf')
 
         # Poses CSV file
@@ -65,7 +71,10 @@ def generate_launch_description():
         bridge = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(devol_drive_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-            )
+            ),
+            launch_arguments={
+                'namespace': namespace
+            }.items()
         )
 
         system_bridge_cmd = Node(
@@ -109,7 +118,8 @@ def generate_launch_description():
                 {'max_angular_vel': 1.0},
                 {'x': float(robot_pose['x'])},
                 {'y': float(robot_pose['y'])},
-                {'yaw': float(robot_pose['yaw'])}
+                {'yaw': float(robot_pose['yaw'])},
+                {'namespace': namespace}
             ]
         )
 
@@ -145,5 +155,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         maze_arg,
+        declare_namespace,
         OpaqueFunction(function=launch_setup)
     ])

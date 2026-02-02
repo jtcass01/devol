@@ -49,9 +49,6 @@ def generate_launch_description():
                 f'{namespace}/sensors/lidar3d_0/scan'
                 '@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
 
-                f'{namespace}/sensors/lidar3d_0/points'
-                '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
-
                 # -----------------
                 # Camera (RGB)
                 # -----------------
@@ -67,9 +64,6 @@ def generate_launch_description():
                 f'{namespace}/sensors/camera_0/depth_image'
                 '@sensor_msgs/msg/Image[gz.msgs.Image',
 
-                # -----------------
-                # Camera Point Cloud
-                # -----------------
                 f'{namespace}/sensors/camera_0/points'
                 '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
             ],

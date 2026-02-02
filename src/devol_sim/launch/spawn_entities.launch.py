@@ -14,6 +14,7 @@ def generate_launch_description():
     gz_pkg_share = get_package_share_directory('devol_gazebo')
     urdf_package = "devol_drive_description"
     urdf_filename = "devol_drive.urdf.xacro"
+    namespace: str = '/devol_drive'
 
     pkg_share_description = FindPackageShare(urdf_package)
     urdf_path = PathJoinSubstitution(
@@ -45,9 +46,15 @@ def generate_launch_description():
         choices=["true", "false"],
         description="Use Gazebo simulation clock",
     )
+    declare_namespace = DeclareLaunchArgument(
+        'namespace',
+        default_value='/devol_drive',
+        description='Namespace for topics'
+    )
     
     def launch_setup(context):
         maze_folder = context.perform_substitution(LaunchConfiguration('maze'))
+        namespace = context.perform_substitution(LaunchConfiguration('namespace'))
 
         # Goal sphere SDF file
         goal_sphere_file = join(gz_pkg_share, 'sdf', 'goal_sphere.sdf')
@@ -73,7 +80,7 @@ def generate_launch_description():
             package="ros_gz_sim",
             executable="create",
             output="screen",
-            arguments=["-topic", '/a200_0000/robot_description', '-name', 'devol_drive', '-x', robot_pose['x'], '-y', robot_pose['y'], '-z', robot_pose['z'], '-Y', robot_pose['yaw'], '-allow_renaming', 'true'],
+            arguments=["-topic", f'{namespace}/robot_description', '-name', 'devol_drive', '-x', robot_pose['x'], '-y', robot_pose['y'], '-z', robot_pose['z'], '-Y', robot_pose['yaw'], '-allow_renaming', 'true'],
             parameters=[{"use_sim_time": use_sim_time}]
         )
 
@@ -118,7 +125,7 @@ def generate_launch_description():
         base_link_to_diff_drive_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0',  '0', '0',  '0', '0', 'devol_drive/a200_base_link', 'a200_base_link'],
+            arguments=['0', '0',  '0', '0',  '0', '0', f'{namespace}/a200_base_link', 'a200_base_link'],
             output='screen'
         )
 
@@ -139,14 +146,14 @@ def generate_launch_description():
         lidar2d_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'lidar2d_0_link', 'devol_drive/robot/base_link/lidar2d_0'],
+            arguments=['0', '0', '0', '0', '0', '0', 'lidar2d_0_link', f'{namespace}/robot/base_link/lidar2d_0'],
             output='screen'
         )
 
         lidar3d_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'lidar3d_0_link', 'devol_drive/robot/base_link/lidar3d_0'],
+            arguments=['0', '0', '0', '0', '0', '0', 'lidar3d_0_link', f'{namespace}/robot/base_link/lidar3d_0'],
             output='screen'
         )
 
@@ -154,14 +161,14 @@ def generate_launch_description():
         robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        namespace='a200_0000',
+        namespace=namespace,
         output='screen',
         parameters=[robot_description,
                     {"use_sim_time": use_sim_time}])
         
         # Map publisher
         map_publisher = Node(
-            package='diff_drive_sim',
+            package='devol_sim',
             executable='map_publisher',
             name='map_publisher',
             output='screen',
@@ -170,7 +177,7 @@ def generate_launch_description():
 
         # Goal points publisher
         goal_points_publisher = Node(
-            package='diff_drive_sim',
+            package='devol_sim',
             executable='goal_points_publisher',
             name='goal_points_publisher',
             output='screen',
@@ -194,6 +201,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         declare_use_sim_time_cmd,
+        declare_namespace,
         maze_arg,
         OpaqueFunction(function=launch_setup)
     ])

@@ -5,13 +5,12 @@
     wheel_separation
     wheel_radius
     max_linear_acceleration
-    tf_prefix">
+    tf_prefix
+    namespace:=/devol_drive">
 
     <!-- Gazebo Parameters -->
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
 
-    <xacro:devol_gazebo
-      tf_prefix="${tf_prefix}" 
-      />
+    <xacro:devol_gazebo tf_prefix="${tf_prefix}" namespace="${namespace}" />
   </xacro:macro>
 </robot>

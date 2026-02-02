@@ -6,7 +6,7 @@
     <xacro:include filename="$(find a200_description)/urdf/a200.gazebo.xacro"/>
     <xacro:include filename= "$(find realsense2_description)/urdf/_d435.urdf.xacro"/>
 
-    <xacro:macro name="a200" >
+    <xacro:macro name="a200" params="namespace:=/a200_0000" >
         <!-- Base link is the center of the robot's bottom plate -->
         <link name="a200_base_link">
             <visual>
@@ -515,7 +515,7 @@
             <origin rpy="3.14159 0 3.14159" xyz="0 0 0.022"/>
         </xacro:sensor_d435>
 
-        <xacro:a200_gazebo />
+        <xacro:a200_gazebo namespace="${namespace}"/>
 
     </xacro:macro>
 </robot>

@@ -38,10 +38,11 @@
         caster_radius:=0.1
         caster_density:=0.1
         max_linear_acceleration:=10
+        namespace:=/devol_drive
     ">
         <xacro:property name="caster_offset" value="${body_length/2 - caster_radius}"/>
 
-        <xacro:a200 />
+        <xacro:a200 namespace="${namespace}" />
 
         <xacro:devol 
             parent="${tf_prefix}top_plate_mount_ur" 
@@ -64,8 +65,7 @@
             output_recipe_filename="${output_recipe_filename}"
             initial_positions="${xacro.load_yaml((initial_positions_file))}"
             use_gazebo="${use_gazebo}"
-            force_abs_paths="${force_abs_paths}"
-            >
+            force_abs_paths="${force_abs_paths}" >
             <origin xyz="0 0 ${caster_offset}" rpy="0 0 0"/>
         </xacro:devol>
     </xacro:macro>
