@@ -13,9 +13,9 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     gz_pkg_share = get_package_share_directory('devol_gazebo')
     diff_drive_pkg_share = get_package_share_directory('diff_drive_description')
-    urdf_package = "diff_drive_description"
-    urdf_filename = "diff_drive.urdf.xacro"
-    sdf_filename = 'diff_drive.sdf' # work around for mapping issues.
+    urdf_package = "a200_description"
+    urdf_filename = "a200.urdf.xacro"
+    sdf_filename = 'a200.sdf' # work around for mapping issues.
     pkg_share_description = FindPackageShare(urdf_package)
     urdf_path = PathJoinSubstitution(
         [pkg_share_description, "urdf", urdf_filename]
@@ -31,7 +31,7 @@ def generate_launch_description():
 
     robot_description_content: ParameterValue = ParameterValue(Command([
         'xacro', ' ', urdf_model, ' ',
-        'tf_prefix:=diff_drive/'
+        'tf_prefix:=a200/'
     ]), value_type=str)
 
     robot_description = {'robot_description': robot_description_content,
@@ -74,7 +74,7 @@ def generate_launch_description():
             executable='create',
             arguments=[
                 '-file', vehicle_model_file,
-                '-name', 'diff_drive',
+                '-name', 'a200',
                 '-x', robot_pose['x'], 
                 '-y', robot_pose['y'], 
                 '-z', robot_pose['z'],
@@ -121,10 +121,10 @@ def generate_launch_description():
         )
 
         # Static transform publishers
-        body_link_to_diff_drive_tf = Node(
+        base_link_to_diff_drive_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0',  '0', '0',  '0', '0', 'diff_drive/body_link', 'body_link'],
+            arguments=['0', '0',  '0', '0',  '0', '0', 'diff_drive/base_link', 'base_link'],
             output='screen'
         )
 
@@ -145,7 +145,7 @@ def generate_launch_description():
         lidar_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'diff_drive/lidar', 'diff_drive/body_link/lidar_sensor'],
+            arguments=['0', '0', '0', '0', '0', '0', 'diff_drive/lidar', 'diff_drive/base_link/lidar_sensor'],
             output='screen'
         )
 
@@ -181,7 +181,7 @@ def generate_launch_description():
             spawn_goal2,
             spawn_goal3,
             odom_to_diff_drive_tf,
-            body_link_to_diff_drive_tf,
+            base_link_to_diff_drive_tf,
             maze_world_tf,
             lidar_tf,
             robot_state_publisher,
