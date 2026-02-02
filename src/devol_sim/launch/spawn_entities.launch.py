@@ -7,6 +7,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Comm
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
+from moveit_configs_utils import MoveItConfigsBuilder
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -14,7 +15,7 @@ def generate_launch_description():
     gz_pkg_share = get_package_share_directory('devol_gazebo')
     urdf_package = "devol_drive_description"
     urdf_filename = "devol_drive.urdf.xacro"
-    namespace: str = '/devol_drive'
+    moveit_package = "devol_moveit_config"
 
     pkg_share_description = FindPackageShare(urdf_package)
     urdf_path = PathJoinSubstitution(
@@ -33,7 +34,7 @@ def generate_launch_description():
 
     robot_description = {'robot_description': robot_description_content,
                          'use_sim_time': True}
-    
+
     # Declare maze selection argument
     maze_arg = DeclareLaunchArgument(
         'maze',
@@ -50,6 +51,12 @@ def generate_launch_description():
         'namespace',
         default_value='/devol_drive',
         description='Namespace for topics'
+    )
+    declare_publish_robot_description_semantic_cmd = DeclareLaunchArgument(
+        "publish_robot_description_semantic",
+        default_value="true",
+        choices=["true", "false"],
+        description="Publish the robot description semantic",
     )
     
     def launch_setup(context):
@@ -120,6 +127,30 @@ def generate_launch_description():
             ],
             output='screen'
         )
+
+        # MoveIt
+        moveit_config = (
+            MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
+            .to_moveit_configs()
+        )
+
+        start_move_group_cmd: Node = Node(
+            package="moveit_ros_move_group",
+            executable="move_group",
+            namespace=namespace,
+            output="screen",
+            parameters=[
+                moveit_config.to_dict(),
+                {
+                    "use_sim_time": use_sim_time,
+                    "robot_description": robot_description_content,
+                    "publish_robot_description_semantic": LaunchConfiguration(
+                        "publish_robot_description_semantic"
+                    ),
+                }
+            ]
+        )
+
 
         # Static transform publishers
         base_link_to_diff_drive_tf = Node(
@@ -195,6 +226,7 @@ def generate_launch_description():
             lidar2d_tf,
             lidar3d_tf,
             robot_state_publisher,
+            start_move_group_cmd,
             map_publisher,
             goal_points_publisher
         ]
@@ -202,6 +234,7 @@ def generate_launch_description():
     return LaunchDescription([
         declare_use_sim_time_cmd,
         declare_namespace,
+        declare_publish_robot_description_semantic_cmd,
         maze_arg,
         OpaqueFunction(function=launch_setup)
     ])

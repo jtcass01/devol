@@ -71,15 +71,15 @@ class DevolDriveDemoNode(Node):
         #     return False
 
         # 5. Close gripper
-        # try:
-        #     if await self._robot.set_gripper_position(GRIPPER_POSITION.CLOSE):
-        #         self._logger.info("Gripper closed successfully")
-        #     else:
-        #         self._logger.error("Failed to close gripper")
-        #         return False
-        # except Exception as e:
-        #     self._logger.error(f"Exception during gripper close: {e}")
-        #     return False
+        try:
+            if await self._robot.set_gripper_position(GRIPPER_POSITION.CLOSE):
+                self._logger.info("Gripper closed successfully")
+            else:
+                self._logger.error("Failed to close gripper")
+                return False
+        except Exception as e:
+            self._logger.error(f"Exception during gripper close: {e}")
+            return False
 
         # 6. Switch to velocity control and test
         try:
@@ -96,7 +96,7 @@ class DevolDriveDemoNode(Node):
 
         # 7. Execute velocity control
         try:
-            joint_velocities = [0.2, 0.0, 0.0, 0.0, 0.0, -0.2]
+            joint_velocities = [1.0, 1.0, 0.0, 0.0, 0.0, -0.2]
             if await self._robot.send_joint_velocities(joint_velocities):
                 self._logger.info("Joint velocity control executed successfully")
                 
