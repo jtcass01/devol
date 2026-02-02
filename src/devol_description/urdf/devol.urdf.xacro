@@ -3,7 +3,7 @@
   <xacro:arg name="name" default="devol"/>
   <xacro:arg name="tf_prefix" default="" />
   <xacro:arg name="ur_type" default="ur20"/>
-  <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
+  <xacro:arg name="joint_limit_params" default="$(find devol_description)/config/joint_limits.yaml"/>
   <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
   <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
   <xacro:arg name="visual_params" default="$(find ur_description)/config/$(arg ur_type)/visual_parameters.yaml"/>
@@ -18,6 +18,7 @@
   <xacro:arg name="input_recipe_filename" default="None" />
   <xacro:arg name="output_recipe_filename" default="None" />
   <xacro:arg name="use_gazebo" default="true" />
+  <xacro:arg name="namespace" default="/devol" />
 
   <!-- initial position for simulations (Mock Hardware, Gazebo, Ignition) -->
   <xacro:arg name="initial_positions_file" default="$(find devol_description)/config/initial_positions.yaml"/>
@@ -63,6 +64,17 @@
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
     <xacro:devol_gazebo
       tf_prefix="$(arg tf_prefix)" 
+      namespace="$(arg namespace)"
       />
+
+     <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(find devol_description)/config/ros2_controllers.yaml</parameters>
+        
+          <ros>
+            <namespace>devol</namespace>
+          </ros>
+      </plugin>
+    </gazebo>
   </xacro:if>
 </robot>

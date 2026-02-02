@@ -5,34 +5,15 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 -->
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <xacro:macro name="devol_gazebo" params="tf_prefix">
-
-    <!-- ros_control plugin -->
-    <gazebo>
-      <!-- <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-        <parameters>$(find devol_description)/config/ros2_controllers.yaml</parameters>
-      </plugin> -->
-
-      <plugin
-        filename="libgz-sim-detachable-joint-system.so"
-        name="gz::sim::systems::DetachableJoint">
-        <parent_link>${tf_prefix}wrist_3_link</parent_link>
-        <child_link>target_block_0</child_link>
-        <child_model>target_block_0</child_model>
-        <child_model_link>target_block_0</child_model_link>
-        <attach_topic>/${tf_prefix}devol_attach/attach</attach_topic>
-        <detach_topic>/${tf_prefix}devol_attach/detach</detach_topic>
-      </plugin>
-    </gazebo>
+  <xacro:macro name="devol_gazebo" params="tf_prefix namespace:=/devol">
 
     <!-- Camera -->
     <gazebo reference="${tf_prefix}_camera_color_frame">
-      <sensor type="camera" name="${tf_prefix}realsense_d405_camera">
-        <pose relative_to="${tf_prefix}_camera_color_frame">0 0 0 3.14159 0 0</pose>
-        <topic>/model/${tf_prefix}devol/color_raw</topic>
+      <sensor type="rgbd_camera" name="${tf_prefix}realsense_d405_camera">
+        <topic>${namespace}/sensors/camera_1</topic>
+        <gz_frame_id>${tf_prefix}_camera_color_frame</gz_frame_id>
 
         <camera>
-          <camera_info_topic>/model/${tf_prefix}devol/color_info</camera_info_topic>
           <horizontal_fov>1.518</horizontal_fov>
           <image>
             <width>1280</width>
@@ -46,35 +27,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         </camera>
 
         <always_on>1</always_on>
-        <visualize>1</visualize>
-        <update_rate>30</update_rate>
-
-      </sensor>
-    </gazebo>
-
-    <!-- Depth Camera  -->
-    <gazebo reference="${tf_prefix}_camera_depth_frame">
-
-      <sensor type="depth_camera" name="${tf_prefix}realsense_d405_depth_camera">
-        <topic>/model/${tf_prefix}devol/depth_raw</topic>
-        <pose relative_to="${tf_prefix}_camera_color_frame">0 0 0 3.14159 0 0</pose>
-
-        <camera>
-          <camera_info_topic>/model/${tf_prefix}devol/depth_info</camera_info_topic>
-          <horizontal_fov>1.518</horizontal_fov>
-          <image>
-            <width>1280</width>
-            <height>720</height>
-            <format>L16</format>
-          </image>
-          <clip>
-            <near>0.1</near>
-            <far>5.0</far>
-          </clip>
-        </camera>
-
-        <always_on>true</always_on>
-        <visualize>1</visualize>
+        <visualize>true</visualize>
         <update_rate>30</update_rate>
 
       </sensor>

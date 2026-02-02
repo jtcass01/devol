@@ -1,37 +1,84 @@
-# This config file is used by ros2_control
-controller_manager:
-  ros__parameters:
-    update_rate: 100  # Hz
-    use_sim_time: true
+devol_drive:
+  controller_manager:
+    ros__parameters:
+      update_rate: 20
+      use_sim_time: True
 
-    hand_controller:
-      type: parallel_gripper_action_controller/GripperActionController
+      joint_state_broadcaster.type: 'joint_state_broadcaster/JointStateBroadcaster'
 
+      platform_velocity_controller.type: 'diff_drive_controller/DiffDriveController'
 
-    ur_manipulator_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      hand_controller.type: 'parallel_gripper_action_controller/GripperActionController'
 
+      ur_manipulator_controller.type: 'joint_trajectory_controller/JointTrajectoryController'
 
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
+      ur_velocity_controller.type: 'velocity_controllers/JointGroupVelocityController'
 
-hand_controller:
-  ros__parameters:
-    joint: robotiq_85_left_knuckle_joint
-    use_sim_time: true
-ur_manipulator_controller:
-  ros__parameters:
-    joints:
-      - shoulder_pan_joint
-      - shoulder_lift_joint
-      - elbow_joint
-      - wrist_1_joint
-      - wrist_2_joint
-      - wrist_3_joint
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-    allow_nonzero_velocity_at_trajectory_end: true
-    use_sim_time: true
+  platform_velocity_controller:
+    ros__parameters:
+      use_sim_time: True
+      left_wheel_names: ['front_left_wheel_joint', 'rear_left_wheel_joint']
+      right_wheel_names: ['front_right_wheel_joint', 'rear_right_wheel_joint']
+      wheel_separation: 0.555
+      wheels_per_side: 1
+      wheel_radius: 0.1651
+      wheel_separation_multiplier: 1.875
+      left_wheel_radius_multiplier: 1.0
+      right_wheel_radius_multiplier: 1.0
+      publish_rate: 50.0
+      odom_frame_id: 'odom'
+      base_frame_id: 'base_link'
+      pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
+      twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
+      open_loop: False
+      enable_odom_tf: False
+      tf_frame_prefix_enable: False
+      cmd_vel_timeout: 0.5
+      use_stamped_vel: True
+      preserve_turning_radius: True
+      publish_limited_velocity: True
+      publish_wheel_data: True
+      linear.x.max_velocity: 1.0
+      linear.x.min_velocity: -1.0
+      linear.x.max_acceleration: 1.0
+      linear.x.max_jerk: nan
+      linear.x.min_jerk: nan
+      angular.z.max_velocity: 1.0
+      angular.z.min_velocity: -1.0
+      angular.z.max_acceleration: 1.0
+      angular.z.max_deceleration: -1.0
+      angular.z.max_jerk: nan
+      angular.z.min_jerk: nan
+
+  hand_controller:
+    ros__parameters:
+      joint: robotiq_85_left_knuckle_joint
+      use_sim_time: true
+
+  ur_manipulator_controller:
+    ros__parameters:
+      joints:
+        - shoulder_pan_joint
+        - shoulder_lift_joint
+        - elbow_joint
+        - wrist_1_joint
+        - wrist_2_joint
+        - wrist_3_joint
+      command_interfaces:
+        - position
+      state_interfaces:
+        - position
+        - velocity
+      allow_nonzero_velocity_at_trajectory_end: true
+      use_sim_time: true
+
+  ur_velocity_controller:
+    ros__parameters:
+      joints:
+        - shoulder_pan_joint
+        - shoulder_lift_joint
+        - elbow_joint
+        - wrist_1_joint
+        - wrist_2_joint
+        - wrist_3_joint
+
