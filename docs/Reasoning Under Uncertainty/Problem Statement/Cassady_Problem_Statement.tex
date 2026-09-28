@@ -1,0 +1,63 @@
+% ============================================================
+% Project Proposal -- 605.745 Reasoning Under Uncertainty
+% ============================================================
+% Build with:  .\build.ps1
+% ============================================================
+\documentclass[11pt]{article}
+\usepackage{jhu}
+
+% ------------------------------------------------------------
+% Fill these in
+% ------------------------------------------------------------
+\renewcommand{\jhuTitle}{Particle Filter vs. Extended Kalman Filter Localization for a Mobile Manipulator}
+\renewcommand{\jhuDocType}{Project Proposal}
+\renewcommand{\jhuAuthor}{Jacob Taylor Cassady}
+\renewcommand{\jhuCourse}{605.745: Reasoning Under Uncertainty}
+\renewcommand{\jhuRunningHead}{605.745 Final Project Proposal}
+
+\begin{document}
+
+\jhutitlepage
+% \jhucontents   % omitted: the proposal is one page, a contents page adds nothing
+
+\section{Problem Definition}
+The broad goal of this project is to develop and test localization algorithms for a mobile robot fitted with front- and rear-facing 2D LIDARs.
+Localization is the process of determining where an agent is in a given map.
+This capability is a prerequisite for a robotic system's planning pipeline.
+This project will perform a study comparing localization methods in a Gazebo/ROS~2 simulation environment leveraging \texttt{devol}, an existing repository on the author's public GitHub, which includes models for a Clearpath Husky A200 mobile platform carrying a UR3e arm and a Robotiq 2F-85 gripper.
+The robot will be in an open-source factory environment with a known occupancy map of obstacles.
+Its only information about its own pose comes from two imperfect sources: wheel odometry and LIDAR scans.
+
+The wheel odometry comes from Gazebo's built-in odometry plugin, which models drift and slip, so pose uncertainty accumulates without bound.
+The LIDAR range scans come from the ROS~2 LIDAR plugin; they are noisy and ambiguous in structured indoor environments, where one corridor segment of the factory produces nearly the same scan signature as other, distinct poses.
+Localization in this environment is therefore a genuinely uncertain inference problem. 
+The simulator's true model pose will be bridged into ROS~2 and used for two purposes: it drives the waypoint controller, so estimator error never alters the trajectory being scored, and it serves as ground truth for evaluation.
+
+\section{Framework Selection and Justification}
+
+The candidate framework is a \textbf{particle filter} (sequential Monte Carlo, bootstrap/SIR form)~\cite{gordon1993novel, arulampalam2002tutorial} implemented from scratch, following the Monte Carlo Localization formulation~\cite{dellaert1999monte, fox1999monte, thrun2005probabilistic}: the posterior over pose $(x, y, \theta)$ is a weighted sample set, propagated by an odometry motion model and re-weighted by a likelihood-field LIDAR measurement model against the known map, with low-variance resampling.
+The named alternative is an \textbf{extended Kalman filter} localizer~\cite{thrun2005probabilistic, moore2014generalized}, adapted from Introduction to Robotics classwork, that fuses the same odometry with a scan-matched pose observation.
+The two make opposite modeling commitments.
+The EKF assumes the posterior is a single Gaussian and linearizes the motion and measurement models about the current mean.
+The particle filter makes no distributional assumption and can represent a multimodal posterior which arises when a scan is consistent with several poses, when the initial pose is unknown, or when the robot is displaced without its knowledge.
+The concrete reason for preferring the particle filter in this domain is therefore a testable claim: it should hold its accuracy where the posterior is multimodal, while the EKF commits to one mode and cannot recover.
+Conversely, in benign runs with a known starting pose the EKF is expected to match or outperform the particle filter at a fraction of the computational cost, since its Gaussian assumption holds and it carries no sampling noise.
+
+\section{Evaluation Plan}
+
+Three estimators run on identical inputs: (1) dead reckoning from odometry alone, (2) an EKF, and (3) a particle filter. The EKF and particle filter receive the same odometry and LIDAR streams. Each estimator is evaluated over the same three-waypoint factory route for 20 trials with distinct random seeds against simulator ground truth using position RMSE, heading RMSE, waypoint position error, and per-step compute time.
+
+Two adversarial tests measure recovery time to below 0.25~m position error following (a) global localization from a uniform prior and (b) mid-run kidnapping via Gazebo teleportation. 
+Sensitivity analyses vary particle count, $N \in \{100, 500, 2000, 5000\}$, and injected odometry and LIDAR noise to evaluate the accuracy-compute trade-off and robustness to degraded evidence. 
+Results are reported as mean $\pm$ 95\% confidence interval across trials.
+
+The primary hypothesis is that the particle filter recovers in both adversarial scenarios where the EKF does not, and that the EKF matches or exceeds the particle filter's nominal-route accuracy at lower per-step compute time.
+
+\newpage
+\section{Acknowledgements}
+
+An initial draft of this proposal was generated with Anthropic's Claude and substantially rewritten by the author; Claude was also used to review the revised draft against the class rubric.
+
+\bibliography{ref}
+
+\end{document}
