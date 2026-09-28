@@ -16,31 +16,3 @@ If you are managing the packages on your own without the need for docker, you ca
 ```bash
 git clone https://github.com/jtcass01/devol.git
 ```
-
-### 1.2 Build and Start Docker container
-If you don't have docker compose, you can install it here: https://docs.docker.com/compose/install/.
-Once it is installed run the following command to build the docker container from the root directory of the repository.
-
-```bash
-. bin/docker/build_sim_container.sh && . bin/docker/start.sh
-```
-
-### 1.3 Enter the docker Container
-```bash
-. bin/docker/interactive.sh
-```
-
-### 1.4 Build the packages
-```bash
-. bin/build.sh
-```
-
-### 1.5 Source Devol packages
-```bash
-. install/setup.bash
-```
-
-### 1.6 Run full simulation. -- You should see the robot plan and execute pathing to three goal points.
-```bash
-. bin/run.sh
-```

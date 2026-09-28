@@ -1,5 +1,6 @@
-from geometry_msgs.msg import Twist, PoseStamped, Quaternion
-from numpy import ndarray, array, arctan2, pi, cos, sin, zeros
+from geometry_msgs.msg import Quaternion
+from numpy import ndarray, array, arctan2, cos, sin
+from typing import Tuple
 
 def quaternion_rotation_matrix(Q: Quaternion) -> ndarray:
     """
@@ -30,18 +31,44 @@ def quaternion_rotation_matrix(Q: Quaternion) -> ndarray:
         [r_31, r_32, r_33]
     ])
 
+def euler_to_quaternion(roll: float, pitch: float, yaw: float) -> Tuple[float, float, float, float]:
+    """Convert Euler angles (roll, pitch, yaw) to quaternion.
+    
+    Uses the ZYX intrinsic rotation convention (yaw-pitch-roll).
+    This is the most common convention for robotics applications.
+    
+    Args:
+        roll: Rotation around X-axis in radians
+        pitch: Rotation around Y-axis in radians  
+        yaw: Rotation around Z-axis in radians
+        
+    Returns:
+        Tuple of (x, y, z, w) representing the quaternion"""
+    # Compute half angles
+    cy = cos(yaw * 0.5)
+    sy = sin(yaw * 0.5)
+    cp = cos(pitch * 0.5)
+    sp = sin(pitch * 0.5)
+    cr = cos(roll * 0.5)
+    sr = sin(roll * 0.5)
+
+    # Compute quaternion components
+    w = cr * cp * cy + sr * sp * sy
+    x = sr * cp * cy - cr * sp * sy
+    y = cr * sp * cy + sr * cp * sy
+    z = cr * cp * sy - sr * sp * cy
+
+    return (x, y, z, w)
+
 
 def quaternion_to_euler(Q: Quaternion) -> ndarray:
-    """
-    Takes a quaternion and returns the roll, pitch yaw array.
+    """Takes a quaternion and returns the roll, pitch yaw array.
 
     Input
     :param Q0: A 4 element array containing the quaternion (q01,q11,q21,q31) 
 
     Output
-    :return: A 3 element array containing the roll,pitch, and yaw (alpha,beta,gamma) 
-
-    """
+    :return: A 3 element array containing the roll,pitch, and yaw (alpha,beta,gamma)"""
     R: ndarray = quaternion_rotation_matrix(Q)
 
     alpha: float = arctan2(R[2,1], R[2,2])

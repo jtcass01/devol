@@ -12,6 +12,10 @@ from visualization_msgs.msg import MarkerArray, Marker
 from ament_index_python.packages import get_package_share_directory
 import os
 import csv
+from devol_sim.utils import euler_to_quaternion
+from typing import Tuple
+
+from devol_sim.mobile_robot_goal import MobileRobotGoal
 
 
 class GoalPointsPublisher(Node):
@@ -19,11 +23,14 @@ class GoalPointsPublisher(Node):
         super().__init__('goal_points_publisher')
         
         # Declare parameter for maze folder
-        self.declare_parameter('maze', 'basic_maze')
+        self.declare_parameter('maze', 'factory')
+        self.declare_parameter('namespace', '/devol_drive')
+
         maze_folder = self.get_parameter('maze').value
+        self._namespace = self.get_parameter('namespace').get_parameter_value().string_value
         
         # Publisher for goal points as markers
-        self.publisher_ = self.create_publisher(MarkerArray, '/goal_points', 10)
+        self.publisher_ = self.create_publisher(MarkerArray, f'{self._namespace}/goal_points', 10)
         
         # Read goal positions from CSV file
         pkg_share = get_package_share_directory('devol_gazebo')
@@ -33,13 +40,11 @@ class GoalPointsPublisher(Node):
         with open(poses_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row['name'].startswith('goal_'):
-                    self.goal_positions.append({
-                        'name': row['name'],
-                        'x': float(row['x']),
-                        'y': float(row['y']),
-                        'z': float(row['z'])
-                    })
+                if row['name'].startswith('Goal '):
+                    self.goal_positions.append(
+                        MobileRobotGoal(name=row['name'], x=float(row['x']),
+                                        y=float(row['y']), z=float(row['z']),
+                                        yaw=float(row['yaw'])))
         
         # Publish at 1 Hz
         self.timer = self.create_timer(1.0, self.publish_goals)
@@ -47,28 +52,36 @@ class GoalPointsPublisher(Node):
         self.get_logger().info('Goal points publisher initialized')
         self.get_logger().info(f'Publishing {len(self.goal_positions)} goal points from poses.csv')
         for goal in self.goal_positions:
-            self.get_logger().info(f"  {goal['name']}: ({goal['x']}, {goal['y']}, {goal['z']})")
+            self.get_logger().info(str(goal))
     
     def publish_goals(self):
         """Publish goal points as a MarkerArray"""
         marker_array = MarkerArray()
         
         for i, goal in enumerate(self.goal_positions):
-            marker = Marker()
+            goal: MobileRobotGoal = goal
+            marker: Marker = Marker()
             marker.header = Header()
             marker.header.stamp = self.get_clock().now().to_msg()
             marker.header.frame_id = 'map'
             
-            marker.ns = 'goal_points'
+            marker.ns = f'{self._namespace}/goal_points'
             marker.id = i
             marker.type = Marker.SPHERE
             marker.action = Marker.ADD
             
             # Position
-            marker.pose.position.x = goal['x']
-            marker.pose.position.y = goal['y']
-            marker.pose.position.z = goal['z']
-            marker.pose.orientation.w = 1.0
+            marker.pose.position.x = goal.x
+            marker.pose.position.y = goal.y
+            marker.pose.position.z = goal.z
+            quat: Tuple[float, float, float, float] = \
+                euler_to_quaternion(0.0, 0.0, goal.yaw)
+            marker.pose.orientation.x = quat[0]
+            marker.pose.orientation.y = quat[1]
+            marker.pose.orientation.z = quat[2]
+            marker.pose.orientation.w = quat[3]
+
+            marker.text = goal.name
             
             # Scale
             marker.scale.x = 0.08

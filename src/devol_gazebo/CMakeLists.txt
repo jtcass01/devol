@@ -86,9 +86,20 @@ install(
   DESTINATION share/${PROJECT_NAME}/worlds
 )
 
+# Following 'install' directive ensures that the 'sdf' subfolder
+# will be copied to the 'share/devol_gazebo/sdf'
+# subfolder of the installation directory.
 install(
   DIRECTORY sdf/
   DESTINATION share/${PROJECT_NAME}/sdf
+)
+
+# Following 'install' directive ensures that the 'launch' subfolder
+# will be copied to the 'share/devol_gazebo/launch'
+# subfolder of the installation directory.
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
 )
 
 # Following directives are used when testing.
