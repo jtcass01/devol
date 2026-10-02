@@ -153,6 +153,30 @@ def test_start_in_collision_raises():
         RRTPlanner(checker).plan((4.0, 1.0, 0.0), (6.5, 4.5, 0.0))
 
 
+def test_unknown_cells_under_start_are_freed():
+    # octomap_server leaves the voxel at the cloud's sensor origin unknown,
+    # which is exactly where the robot spawns.
+    grid = corridor_world()
+    fill(grid, 1.45, 1.45, 1.6, 1.6, value=-1)
+    fill(grid, 6.0, 1.0, 6.2, 1.2, value=-1)        # unknown pocket elsewhere stays blocked
+    start, goal = (1.5, 1.5, 0.0), (6.5, 4.5, 0.0)
+
+    checker = FootprintCollisionChecker(grid, RES, (0.0, 0.0))
+    assert checker.is_collision(*start)
+    with pytest.raises(StartInCollision):
+        RRTPlanner(checker, PlannerConfig(free_unknown_at_start=False)).plan(start, goal)
+
+    checker = FootprintCollisionChecker(grid, RES, (0.0, 0.0))
+    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan(start, goal)
+    assert result.freed_start_cells == (grid[20:40, 20:40] < 0).sum() > 0
+    assert result.success
+    assert checker.is_collision(6.1, 1.1, 0.0)
+    # Occupied cells under the start are not freed.
+    grid[30, 30] = 100
+    with pytest.raises(StartInCollision):
+        RRTPlanner(FootprintCollisionChecker(grid, RES, (0.0, 0.0))).plan(start, goal)
+
+
 def test_straight_shot_in_open_space():
     checker = FootprintCollisionChecker(empty_grid(6, 6), RES, (0.0, 0.0))
     result = RRTPlanner(checker, PlannerConfig(seed=0)).plan((1.0, 1.0, 0.0), (5.0, 5.0, pi))

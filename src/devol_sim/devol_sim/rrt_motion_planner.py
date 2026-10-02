@@ -214,6 +214,8 @@ class RRTMotionPlanner(RCLPY_Node):
             self.get_logger().warning(f'Cannot plan to {goal.name}: {e}', throttle_duration_sec=5.0)
             return None
         self._last_result = result
+        if result.freed_start_cells:
+            self.get_logger().info(f'Treated {result.freed_start_cells} unknown map cells under the robot as free')
         if not result.success:
             self.get_logger().warning(
                 f'No path to {goal.name} after {result.iterations} iterations '

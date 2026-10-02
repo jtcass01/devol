@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from math import atan2, ceil, hypot, log, pi, sqrt
+from math import atan2, ceil, cos, hypot, log, pi, sin, sqrt
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -60,14 +60,10 @@ class FootprintCollisionChecker:
         self.n_rows, self.n_cols = grid.shape
 
         occupied = grid >= occupied_threshold
+        self.unknown = grid < 0
         if unknown_is_occupied:
-            occupied |= grid < 0
-        self.occupied = occupied
-
-        # Distance (m) from each cell centre to the nearest occupied cell centre,
-        # with everything outside the map counted as occupied.
-        padded = np.pad(~occupied, 1, constant_values=False)
-        self._clearance = distance_transform_edt(padded)[1:-1, 1:-1] * self.resolution
+            occupied |= self.unknown
+        self._set_occupied(occupied)
 
         self.half_length = 0.5 * length + padding
         self.half_width = 0.5 * width + padding
@@ -95,6 +91,37 @@ class FootprintCollisionChecker:
         self.translation_step = 0.5 * self.resolution
         reach = hypot(self.half_length + abs(center_offset), self.half_width)
         self.rotation_step = 0.5 * self.resolution / reach
+
+    def _set_occupied(self, occupied: np.ndarray) -> None:
+        self.occupied = occupied
+        # Distance (m) from each cell centre to the nearest occupied cell centre,
+        # with everything outside the map counted as occupied.
+        padded = np.pad(~occupied, 1, constant_values=False)
+        self._clearance = distance_transform_edt(padded)[1:-1, 1:-1] * self.resolution
+
+    def footprint_cells(self, x: float, y: float, theta: float) -> Tuple[np.ndarray, np.ndarray]:
+        """Row and column indices of the in-map cells the footprint at a pose covers."""
+        c, s = cos(theta), sin(theta)
+        bx, by = self._body_points
+        rows, cols, inside = self.world_to_cells(x + c * bx - s * by, y + s * bx + c * by)
+        cells = np.unique(rows[inside] * self.n_cols + cols[inside])
+        return cells // self.n_cols, cells % self.n_cols
+
+    def free_unknown_under(self, x: float, y: float, theta: float) -> int:
+        """Mark unknown cells under the footprint at this pose as free.
+
+        The robot is standing there, so those cells are free whatever the map
+        says. octomap_server never ray-casts the voxel at the cloud's sensor
+        origin, which leaves an unknown blob under the spawn point. Returns the
+        number of cells freed."""
+        rows, cols = self.footprint_cells(x, y, theta)
+        mask = self.unknown[rows, cols] & self.occupied[rows, cols]
+        if not mask.any():
+            return 0
+        occupied = self.occupied.copy()
+        occupied[rows[mask], cols[mask]] = False
+        self._set_occupied(occupied)
+        return int(mask.sum())
 
     # Grid helpers
     @property
@@ -189,6 +216,7 @@ class PlannerConfig:
     max_rewire_radius: float = 3.0   # m
     shortcut_attempts: int = 200
     require_goal_yaw: bool = True    # rotate to the goal yaw at the end of the path
+    free_unknown_at_start: bool = True  # unknown cells under the robot's start footprint are free
     seed: Optional[int] = None
 
 
@@ -201,6 +229,7 @@ class PlanResult:
     nodes: int = 0
     planning_time: float = 0.0
     first_solution_time: Optional[float] = None
+    freed_start_cells: int = 0       # unknown cells under the start footprint treated as free
     tree: Optional[Tuple[np.ndarray, np.ndarray]] = None   # (nodes N x 3, parents N)
 
     @property
@@ -326,6 +355,8 @@ class RRTPlanner:
         t0 = time.monotonic()
         result = PlanResult()
 
+        if cfg.free_unknown_at_start:
+            result.freed_start_cells = self.checker.free_unknown_under(*start)
         if self.checker.is_collision(*start):
             raise StartInCollision(f'start pose {start} is in collision')
         if self.checker.is_collision(*goal):
