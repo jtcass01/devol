@@ -27,6 +27,12 @@ def generate_launch_description():
         default_value='/devol_drive',
         description='Namespace for topics'
     )
+    declare_planner = DeclareLaunchArgument(
+        'planner',
+        default_value='rrt_star',
+        choices=['a_star', 'rrt', 'rrt_star'],
+        description='Local planner: a_star (padded C-space map) or rrt / rrt_star (robot footprint on the octomap projected_map)'
+    )
     declare_octomap_resolution = DeclareLaunchArgument(
         'octomap_resolution',
         default_value='0.05',
@@ -37,6 +43,7 @@ def generate_launch_description():
         maze_folder = context.perform_substitution(LaunchConfiguration('maze'))
         namespace = context.perform_substitution(LaunchConfiguration('namespace'))
         octomap_resolution = float(context.perform_substitution(LaunchConfiguration('octomap_resolution')))
+        planner = context.perform_substitution(LaunchConfiguration('planner'))
 
         world_file = os.path.join(gz_pkg_share, 'worlds', maze_folder, 'maze_world.sdf')
 
@@ -180,6 +187,27 @@ def generate_launch_description():
             }],
             arguments=['--ros-args', '--log-level', 'agent_motion_planner:=info']
         )
+
+        rrt_motion_planner: Node = Node(
+            package='devol_sim',
+            executable='rrt_motion_planner',
+            name='rrt_motion_planner',
+            output='screen',
+            parameters=[{
+                'publish_rate': 10.0,
+                'namespace': namespace,
+                'lookahead': 0.25,
+                'goal_tolerance': 0.1,
+                'intermediate_goal_tolerance': 0.4,
+                'map_source': 'octomap_3d',
+                'algorithm': planner if planner != 'a_star' else 'rrt_star',
+            }]
+        )
+
+        if planner == 'a_star':
+            planner_nodes = [map_padder, agent_motion_planner]
+        else:
+            planner_nodes = [rrt_motion_planner]
         
         # Map publisher
         pointcloud_publisher = Node(
@@ -219,8 +247,7 @@ def generate_launch_description():
             system_bridge_cmd,
             pid_controller,
             octomap_server,
-            map_padder,
-            agent_motion_planner,
+            *planner_nodes,
             pointcloud_publisher,
             goal_points_publisher,
             rviz
@@ -229,6 +256,7 @@ def generate_launch_description():
     return LaunchDescription([
         maze_arg,
         declare_namespace,
+        declare_planner,
         declare_octomap_resolution,
         OpaqueFunction(function=launch_setup)
     ])
