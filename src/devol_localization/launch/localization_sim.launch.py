@@ -78,7 +78,7 @@ def launch_setup(context):
         actions.append(ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o', os.path.expanduser(bag), '--use-sim-time',
                  '--qos-profile-overrides-path', os.path.join(share, 'config', 'bag_qos_overrides.yaml'),
-                 *RECORD_TOPICS],
+                 '--topics', *RECORD_TOPICS],   # Lyrical's rosbag2 takes topics only after --topics
             output='screen'))
 
     if arg('filters').lower() == 'true':

@@ -63,6 +63,11 @@ def run(args) -> int:
     todo = [r for r in study_configs() if args.scenarios == 'all' or r['scenario'] in args.scenarios.split(',')]
     if args.configs:
         todo = [r for r in todo if config_name(r) in args.configs.split(',')]
+    for scenario in {r['scenario'] for r in todo}:
+        bag = bags[scenario]
+        if bag and not (Path(bag).expanduser() / 'metadata.yaml').is_file():
+            print(f'{bag} is not a rosbag2 directory (no metadata.yaml); not running any trials', flush=True)
+            return 2
     failures = 0
     for r in todo:
         bag = bags[r['scenario']]
@@ -87,6 +92,10 @@ def run(args) -> int:
             if not (trial / 'summary.json').exists():
                 failures += 1
                 print('  no summary.json written', flush=True)
+                if failures == 1 and seed == args.first_seed and r is todo[0]:
+                    print('The first trial produced no results; stopping. Rerun with --verbose to see why.',
+                          flush=True)
+                    return 1
     analyze(args)
     return 1 if failures else 0
 

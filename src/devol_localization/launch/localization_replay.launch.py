@@ -26,6 +26,18 @@ STACK_ARGS = ['scenario', 'estimators', 'k', 'sigma_r', 'seed', 'num_particles',
               'viz_headless', 'video_dir', 'viz_window', 'maze', 'posterior_times']
 
 
+def check_bag(bag: str) -> None:
+    """Fails fast on a missing or empty bag instead of replaying nothing until a timeout."""
+    meta = os.path.join(bag, 'metadata.yaml')
+    if not os.path.isfile(meta):
+        raise RuntimeError(f'{bag} is not a rosbag2 directory (no metadata.yaml). If the recorder was killed, '
+                           f'run `ros2 bag reindex {bag}`.')
+    counts = [int(line.split(':', 1)[1]) for line in open(meta)
+              if line.strip().startswith('message_count:') and line.split(':', 1)[1].strip().isdigit()]
+    if counts and max(counts) == 0:
+        raise RuntimeError(f'{bag} contains no messages')
+
+
 def launch_setup(context):
     def arg(name):
         return context.perform_substitution(LaunchConfiguration(name))
@@ -34,6 +46,7 @@ def launch_setup(context):
     bag = os.path.expanduser(arg('bag'))
     if not bag:
         raise RuntimeError('bag:=<recorded bag directory> is required')
+    check_bag(bag)
 
     stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(share, 'launch', 'localization_stack.launch.py')),
