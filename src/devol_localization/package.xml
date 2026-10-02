@@ -3,8 +3,8 @@
 <package format="3">
   <name>devol_localization</name>
   <version>0.0.0</version>
-  <description>Localization estimators (particle filter, EKF) for the devol mobile manipulator.</description>
-  <maintainer email="jacobtaylorcassady@outlook.com">jtcass01</maintainer>
+  <description>Map-based localization for the devol mobile manipulator (EKF and particle filter).</description>
+  <maintainer email="jacobtaylorcassady@outlook.com">jakeadelic</maintainer>
   <license>TODO: License declaration</license>
 
   <exec_depend>rclpy</exec_depend>
@@ -18,6 +18,9 @@
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-scipy</exec_depend>
 
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
 
   <export>
