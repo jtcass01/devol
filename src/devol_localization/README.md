@@ -10,7 +10,7 @@ scoring, kidnapping, live views and the replay runner).
 |---|---|
 | `ekf_localization` | EKF: odometry prediction, scan-matched pose correction. `init_mode` tf / pose / global. Publishes `ekf_pose`, `ekf_compute_time_ms`. |
 | `pf_localization` | SIR Monte Carlo localization with augmented-MCL injection. Publishes `pf_pose`, `pf_particles`, `pf_compute_time_ms`. |
-| `noise_injector` | Seeded study noise: odometry increments perturbed with alpha1..4 = 0.05 k (per 0.1 m / 0.1 rad segment, so independent of the odometry rate), lidar ranges + N(0, sigma_r^2). Publishes `/devol_drive/noisy/{odom,scan}`. |
+| `noise_injector` | Seeded study noise: odometry increments perturbed with alpha1..4 = 0.05 k (per 0.1 m / 0.1 rad segment, so independent of the odometry rate; a segment under 1 cm gets pure-rotation noise, as in AMCL), lidar ranges + N(0, sigma_r^2). Publishes `/devol_drive/noisy/{odom,scan}`. |
 | `localization_evaluator` | Scores a trial against ground truth: position / heading RMSE, waypoint error, compute time, recovery time to < 0.25 m (global and kidnap). Dead reckoning from the noisy odometry is scored as a third estimator. Writes `trajectory.csv`, `compute.csv`, `summary.json`; for a test case also judges PASS/FAIL (`verdict.txt`) and can end the run at the last goal. |
 | `localization_viz` | Live Matplotlib view (no RViz): map, Gazebo pose vs estimate, lidar projected from the estimate, 2-sigma ellipse, every particle (`mode:=pf`), and error vs time against the filter's own 2-sigma bound. Optional MP4. |
 | `ground_truth_tf` | Publishes `map -> odom` from ground truth so the planner and controller drive on the true pose, as the protocol requires. |

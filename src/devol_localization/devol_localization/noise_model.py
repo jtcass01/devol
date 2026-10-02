@@ -10,6 +10,11 @@ into the recorded streams with a seeded generator (annotated outline, protocol s
   or segment_angle radians, whichever comes first) and each segment is perturbed once. Between
   segment boundaries the noisy odometry follows the true increments, so it is published at the
   input rate without jumps.
+  A segment that translates less than min_translation (1 cm; an in-place turn, where skid-steer
+  odometry still creeps a fraction of a millimetre) gets its noise spread as a pure rotation, as AMCL
+  does: rot1 = 0 and rot2 = rot1 + rot2 in the variances, with the mean motion unchanged. Otherwise the
+  direction of the creep is an arbitrary rot1 (e.g. a -0.1 rad turn decomposed into rot1 = -87 deg,
+  rot2 = +81 deg) and Table 5.6 injects ~0.5 m and ~20 deg of noise while the robot stands still.
 - Lidar: every finite range receives zero-mean Gaussian noise with standard deviation sigma_r.
 """
 
@@ -40,12 +45,17 @@ def odometry_delta(prev_pose: Sequence[float], pose: Sequence[float]):
 
 
 def sample_motion(rot1: float, trans: float, rot2: float, alphas: Sequence[float],
-                  rng: np.random.Generator):
-    """Draws a perturbed (rot1, trans, rot2), Probabilistic Robotics Table 5.6."""
+                  rng: np.random.Generator, min_translation: float = 0.0):
+    """Draws a perturbed (rot1, trans, rot2), Probabilistic Robotics Table 5.6.
+
+    Below min_translation the variances treat the motion as a pure rotation (rot1 = 0,
+    rot2 = rot1 + rot2); the mean is the given decomposition either way.
+    """
     a1, a2, a3, a4 = alphas
-    r1 = rot1 + rng.normal(0.0, np.sqrt(a1 * rot1 ** 2 + a2 * trans ** 2))
-    t = trans + rng.normal(0.0, np.sqrt(a3 * trans ** 2 + a4 * (rot1 ** 2 + rot2 ** 2)))
-    r2 = rot2 + rng.normal(0.0, np.sqrt(a1 * rot2 ** 2 + a2 * trans ** 2))
+    e1, e2 = (0.0, rot1 + rot2) if abs(trans) < min_translation else (rot1, rot2)
+    r1 = rot1 + rng.normal(0.0, np.sqrt(a1 * e1 ** 2 + a2 * trans ** 2))
+    t = trans + rng.normal(0.0, np.sqrt(a3 * trans ** 2 + a4 * (e1 ** 2 + e2 ** 2)))
+    r2 = rot2 + rng.normal(0.0, np.sqrt(a1 * e2 ** 2 + a2 * trans ** 2))
     return r1, t, r2
 
 
@@ -59,17 +69,19 @@ class OdometryNoiseInjector:
     """Turns a stream of true odometry poses into a noisy one."""
 
     def __init__(self, k: float, seed: Optional[int] = None, alpha_nominal: float = NOMINAL_ALPHA,
-                 segment_length: float = 0.1, segment_angle: float = 0.1) -> None:
+                 segment_length: float = 0.1, segment_angle: float = 0.1, min_translation: float = 0.01) -> None:
         """
         :param k: Noise scale; alpha1..4 = k * alpha_nominal. k = 0 passes odometry through.
         :param segment_length: Distance (m) after which an increment is perturbed.
         :param segment_angle: Rotation (rad) after which an increment is perturbed.
+        :param min_translation: Segments translating less than this (m) get pure-rotation noise.
         """
         self.alphas = (k * alpha_nominal,) * 4
         self.enabled: bool = k > 0.0
         self.rng = np.random.default_rng(seed)
         self.segment_length = segment_length
         self.segment_angle = segment_angle
+        self.min_translation = min_translation
         self._anchor_true: Optional[np.ndarray] = None   # true odom pose at the last boundary
         self._anchor_noisy: Optional[np.ndarray] = None  # noisy odom pose at the last boundary
 
@@ -89,8 +101,8 @@ class OdometryNoiseInjector:
             return pose.copy()
         rot1, trans, rot2 = odometry_delta(self._anchor_true, pose)
         if abs(trans) >= self.segment_length or abs(wrap_angle(rot1 + rot2)) >= self.segment_angle:
-            self._anchor_noisy = apply_motion(self._anchor_noisy, *sample_motion(rot1, trans, rot2, self.alphas,
-                                                                                 self.rng))
+            noisy = sample_motion(rot1, trans, rot2, self.alphas, self.rng, self.min_translation)
+            self._anchor_noisy = apply_motion(self._anchor_noisy, *noisy)
             self._anchor_true = pose.copy()
             return self._anchor_noisy.copy()
         # Inside a segment: follow the true increment from the last boundary.

@@ -41,6 +41,7 @@ class NoiseInjectorNode(Node):
         self.declare_parameter('seed', 0)
         self.declare_parameter('segment_length', 0.1)
         self.declare_parameter('segment_angle', 0.1)
+        self.declare_parameter('min_translation', 0.01)   # m; shorter segments get pure-rotation noise
 
         gp = self.get_parameter
         k = float(gp('k').value)
@@ -49,7 +50,8 @@ class NoiseInjectorNode(Node):
         odom_seq, scan_seq = np.random.SeedSequence(seed).spawn(2)
         self._odom_noise = OdometryNoiseInjector(k, seed=odom_seq, alpha_nominal=float(gp('alpha_nominal').value),
                                                  segment_length=float(gp('segment_length').value),
-                                                 segment_angle=float(gp('segment_angle').value))
+                                                 segment_angle=float(gp('segment_angle').value),
+                                                 min_translation=float(gp('min_translation').value))
         self._scan_rng = np.random.default_rng(scan_seq)
 
         self._odom_pub = self.create_publisher(Odometry, gp('odom_out').value, 50)

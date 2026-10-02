@@ -290,3 +290,32 @@ def test_test_cases_detect_a_still_running_sim(monkeypatch, tmp_path):
         (tmp_path / str(pid)).mkdir()
         (tmp_path / str(pid) / 'cmdline').write_bytes(b'\0'.join(a.encode() for a in argv) + b'\0')
     assert tc.running_sim_processes(str(tmp_path)) == ['100 /usr/bin/ruby3.3 /usr/bin/gz sim -s factory.sdf']
+
+
+def test_spin_segment_gets_rotation_noise_not_translation():
+    """Regression: the study_nominal bag at t = 56.405 s, mid-spin before Goal 2.
+
+    The true odometry moved 0.01 mm while turning -0.103 rad, which Table 5.6 decomposes as
+    rot1 = -87 deg, rot2 = +81 deg. With those in the variances, seed 2 made the noisy odometry jump
+    0.73 m and +92 deg in one message while the robot stood still, and the EKF diverged.
+    """
+    anchor = np.array([4.41548, 6.82295, -1.62016])
+    pose = np.array([4.41547, 6.82295, -1.72307])
+
+    def jumps(min_translation):
+        out = []
+        for seed in range(2000):
+            inj = OdometryNoiseInjector(1.0, seed=seed, min_translation=min_translation)
+            inj(anchor)
+            n = inj(pose)
+            out.append((np.hypot(*(n[:2] - anchor[:2])), abs(wrap_angle(n[2] - pose[2]))))
+        return np.array(out)
+    fixed, old = jumps(0.01), jumps(0.0)
+    # Pure rotation of 0.103 rad: translation std sqrt(alpha4) * 0.103 = 2.3 cm, heading std 1.3 deg.
+    assert np.std(fixed[:, 0]) < 0.03 and fixed[:, 0].max() < 0.12
+    assert np.degrees(fixed[:, 1].max()) < 6.0
+    assert old[:, 0].max() > 0.5 and np.degrees(old[:, 1].max()) > 30.0   # the bug this guards against
+    # The mean motion is unchanged: with zero noise the injector reproduces the true pose.
+    inj = OdometryNoiseInjector(1e-12, seed=0)
+    inj(anchor)
+    assert np.allclose(inj(pose), pose, atol=1e-6)
