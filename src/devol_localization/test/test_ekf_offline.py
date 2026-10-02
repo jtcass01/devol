@@ -39,6 +39,10 @@ def toy_grid() -> ndarray:
 
 def raycast(grid: ndarray, pose, rng=None, sigma: float = 0.0) -> ndarray:
     """Simulated 2D lidar ranges from the robot base pose."""
+    return raycast_at(grid, ORIGIN, pose, rng, sigma)
+
+
+def raycast_at(grid: ndarray, origin, pose, rng=None, sigma: float = 0.0) -> ndarray:
     c, s = cos(pose[2]), sin(pose[2])
     lx = pose[0] + c * LASER_POSE[0] - s * LASER_POSE[1]
     ly = pose[1] + s * LASER_POSE[0] + c * LASER_POSE[1]
@@ -46,8 +50,8 @@ def raycast(grid: ndarray, pose, rng=None, sigma: float = 0.0) -> ndarray:
     steps = arange(RANGE_MIN, RANGE_MAX, RES / 2)
     xs = lx + cos(angles)[:, None] * steps[None, :]
     ys = ly + sin(angles)[:, None] * steps[None, :]
-    cols = ((xs - ORIGIN[0]) / RES).astype(int)
-    rows = ((ys - ORIGIN[1]) / RES).astype(int)
+    cols = ((xs - origin[0]) / RES).astype(int)
+    rows = ((ys - origin[1]) / RES).astype(int)
     h, w = grid.shape
     inside = (cols >= 0) & (rows >= 0) & (cols < w) & (rows < h)
     hit = zeros(xs.shape, dtype=bool)
@@ -142,6 +146,47 @@ def test_scan_matcher_search_finds_large_heading_error():
     assert result is not None
     assert sqrt((result.pose[0] - truth[0]) ** 2 + (result.pose[1] - truth[1]) ** 2) < 0.03
     assert abs(wrap_angle(result.pose[2] - truth[2])) < 0.01
+
+
+def corridor_grid(pillar_spacing: float = 0.0) -> ndarray:
+    """30 m x 2 m corridor along x (ends out of lidar range), optionally lined with pillars."""
+    h, w = int(2.0 / RES), int(30.0 / RES)
+    g: ndarray = zeros((h, w), dtype=int8)
+    g[:2, :] = 100
+    g[-2:, :] = 100
+    if pillar_spacing > 0.0:
+        for x in arange(0.0, 29.0, pillar_spacing):
+            c = int(x / RES)
+            g[2:4, c:c + 2] = 100
+            g[-4:-2, c:c + 2] = 100
+    return g
+
+
+def test_corridor_is_not_rejected_as_ambiguous():
+    # Along a plain corridor the score is a ridge, not a second peak: fuse the match and let its
+    # covariance carry the along-corridor uncertainty instead of dropping the scan.
+    grid = corridor_grid()
+    origin = (-15.0, -1.0, 0.0)
+    matcher = ScanMatcher(DistanceField(grid, RES, origin))
+    truth = array([0.0, 0.1, 0.05])
+    pts = scan_to_points(raycast_at(grid, origin, truth), ANGLE_MIN, (ANGLE_MAX - ANGLE_MIN) / (N_BEAMS - 1),
+                         RANGE_MIN, RANGE_MAX, 4, LASER_POSE)
+    result = matcher.match(pts, truth + array([0.2, 0.05, 0.03]), half_xy=0.5, half_yaw=0.2)
+    assert result is not None
+    assert abs(result.pose[1] - truth[1]) < 0.03
+    assert abs(wrap_angle(result.pose[2] - truth[2])) < 0.01
+    assert result.covariance[0, 0] > 10.0 * result.covariance[1, 1]
+
+
+def test_repeated_structure_is_rejected_as_ambiguous():
+    # Pillars every 0.6 m make poses 0.6 m apart look the same: a distinct second peak.
+    grid = corridor_grid(pillar_spacing=0.6)
+    origin = (-15.0, -1.0, 0.0)
+    matcher = ScanMatcher(DistanceField(grid, RES, origin))
+    truth = array([0.33, 0.1, 0.0])
+    pts = scan_to_points(raycast_at(grid, origin, truth), ANGLE_MIN, (ANGLE_MAX - ANGLE_MIN) / (N_BEAMS - 1),
+                         RANGE_MIN, RANGE_MAX, 4, LASER_POSE)
+    assert matcher.match(pts, truth, half_xy=0.9, half_yaw=0.1) is None
 
 
 def run_trial(seed: int, range_sigma: float = 0.01, scan_every: int = 2, slip=(1.0, 1.0),

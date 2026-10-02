@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple
 
 from numpy import (ndarray, asarray, array, cos, sin, zeros, full, diag, isfinite, clip, exp,
-                   floor, minimum, gradient, int64, float64, sqrt, arange, argmax, unravel_index)
+                   floor, minimum, gradient, int64, float64, sqrt, arange, argmax, unravel_index,
+                   where, argsort, rint, linspace, eye)
 from numpy.linalg import solve, inv, LinAlgError
 from scipy.ndimage import distance_transform_edt
 
@@ -112,7 +113,8 @@ class ScanMatcher:
                  inlier_distance: float = 0.3, min_points: int = 30,
                  min_inlier_fraction: float = 0.5, covariance_scale: float = 20.0,
                  min_std: Tuple[float, float] = (0.05, 0.02), search_points: int = 60,
-                 max_ambiguity: float = 0.95) -> None:
+                 max_ambiguity: float = 0.95, peak_dip: float = 0.9,
+                 max_peak_checks: int = 200, max_std: float = 10.0) -> None:
         """
         :param inlier_distance: Endpoints farther than this from any obstacle are ignored.
         :param covariance_scale: Inflates the Gauss-Newton covariance, which is
@@ -121,6 +123,12 @@ class ScanMatcher:
         :param search_points: Endpoints used by the coarse correlative search.
         :param max_ambiguity: Reject a match when a distinct pose in the search window
                               scores at least this fraction of the best one.
+        :param peak_dip: A pose counts as distinct only if the search score drops below this
+                         fraction of its own score on the straight line to the best pose, so a
+                         ridge (a corridor) is not taken for a second peak.
+        :param max_peak_checks: Bound on the candidates checked for a dip.
+        :param max_std: Cap on the reported std (metres or radians) of a direction the scan
+                        does not constrain.
         """
         self.field: DistanceField = field
         self.max_iterations: int = max_iterations
@@ -131,6 +139,9 @@ class ScanMatcher:
         self.min_std: Tuple[float, float] = min_std
         self.search_points: int = search_points
         self.max_ambiguity: float = max_ambiguity
+        self.peak_dip: float = peak_dip
+        self.max_peak_checks: int = max_peak_checks
+        self.max_std: float = max_std
 
     def search(self, points: ndarray, prior: Sequence[float], half_xy: float,
                half_yaw: float, max_cells: int = 31, max_yaws: int = 61) -> Tuple[ndarray, float]:
@@ -173,11 +184,29 @@ class ScanMatcher:
         best: float = float(scores[k_best, j_best])
         pose: ndarray = array([prior[0] + dx[j_best], prior[1] + dy[j_best], wrap_angle(yaws[k_best])])
 
-        # Second peak: best score among poses well away from the winner.
+        # Second peak: best score among poses well away from the winner that the winner is not
+        # connected to by a ridge. Along a corridor the score falls off slowly in one direction;
+        # that is not a second hypothesis (the refinement covariance carries that direction's
+        # uncertainty), so a candidate only counts when the score dips on the way to it.
         far_xy: ndarray = ((dx - dx[j_best]) ** 2 + (dy - dy[j_best]) ** 2) > (2.0 * xy_step + 0.2) ** 2
         far_yaw: ndarray = abs(yaws - yaws[k_best]) > 2.0 * yaw_step + 0.05
         other: ndarray = far_yaw[:, None] | far_xy[None, :]
-        second: float = float(scores[other].max()) if other.any() else 0.0
+        grid: ndarray = scores.reshape(yaws.size, offsets.size, offsets.size)
+        start: ndarray = array([k_best, j_best // offsets.size, j_best % offsets.size])
+        flat_scores: ndarray = scores.ravel()
+        flat: ndarray = where(other.ravel())[0]
+        # Only candidates that could make the match ambiguous need the (slower) dip check.
+        close: ndarray = flat[flat_scores[flat] >= self.max_ambiguity * best]
+        rest: ndarray = flat[flat_scores[flat] < self.max_ambiguity * best]
+        second: float = float(flat_scores[rest].max()) if rest.size else 0.0
+        for idx in close[argsort(-flat_scores[close])][:self.max_peak_checks]:
+            k, j = divmod(int(idx), dx.size)
+            end: ndarray = array([k, j // offsets.size, j % offsets.size])
+            n: int = int(abs(end - start).max()) + 1
+            path: ndarray = rint(linspace(0.0, 1.0, n)[:, None] * (end - start) + start).astype(int64)
+            if grid[path[:, 0], path[:, 1], path[:, 2]].min() < self.peak_dip * scores[k, j]:
+                second = float(scores[k, j])
+                break
         return pose, (second / best if best > 0.0 else 1.0)
 
     def _residuals(self, pose: ndarray, pts: ndarray,
@@ -256,8 +285,11 @@ class ScanMatcher:
         Ji, di = J[inl], d[inl]
         sigma2: float = float((di ** 2).sum() / max(n_in - 3, 1))
         sigma2 = max(sigma2, (0.25 * self.field.resolution) ** 2)
+        # A direction the scan cannot observe (along a featureless corridor) has a singular
+        # information matrix; a weak prior caps its variance at max_std^2 instead of failing.
+        scale: float = sigma2 * self.covariance_scale
         try:
-            cov: ndarray = inv(Ji.T @ Ji) * sigma2 * self.covariance_scale
+            cov: ndarray = inv(Ji.T @ Ji + eye(3) * (scale / self.max_std ** 2)) * scale
         except LinAlgError:
             return None
         pos_floor, yaw_floor = self.min_std
