@@ -223,3 +223,73 @@ if __name__ == '__main__':
         print(f'{label}: dead reckoning RMSE {r["dr_rmse"]:.3f} m, EKF RMSE {r["rmse"]:.3f} m, '
               f'final {r["final"]:.3f} m, NEES {r["nees"]:.1f}, fused {r["stats"].fused}/{r["stats"].scans}, '
               f're-acquired {r["stats"].reacquired}')
+
+
+def spin_with_late_scans(stamped: bool, lag: float = 0.3, seed: int = 0):
+    """Spins in place at 3 rad/s while odometry over-counts the rotation by 25% (skid-steer slip
+    in fast turns), with scans delivered `lag` seconds after their stamps, as when the matcher
+    falls behind. Returns the yaw error (rad) once every scan has been processed."""
+    rng = default_rng(seed)
+    grid = toy_grid()
+    pipeline = EKFPipeline(PoseEKF(), ScanMatcher(DistanceField(grid, RES, ORIGIN)))
+    truth0 = array([4.5, 3.0, 0.4])
+    pipeline.ekf.reset(truth0, diag([0.03, 0.03, 0.02]) ** 2)
+
+    def turned(t):
+        return 3.0 * (min(max(t, 0.5), 2.0) - 0.5)
+
+    def truth_at(t):
+        return array([truth0[0], truth0[1], wrap_angle(truth0[2] + turned(t))])
+
+    events = [(k / 30.0, 0) for k in range(int(3.5 * 30))]
+    events += [(k / 20.0 + lag, 1) for k in range(int(3.0 * 20))]
+    events.sort()
+    for t, kind in events:
+        if kind == 0:
+            odom = (0.0, 0.0, wrap_angle(1.25 * turned(t)))
+            pipeline.on_odom(odom, t if stamped else None)
+        else:
+            stamp = t - lag
+            points = scan_points(raycast(grid, truth_at(stamp), rng, 0.01))
+            pipeline.on_scan(points, stamp if stamped else None)
+    return abs(wrap_angle(pipeline.ekf.x[2] - truth_at(events[-1][0])[2])), pipeline.stats
+
+
+def test_late_scans_are_fused_at_their_stamps():
+    # The Gazebo study diverged in a fast turn at Goal 2: odometry over-counted the turn and
+    # scans fused late against newer odometry pulled the heading the wrong way.
+    err, stats = spin_with_late_scans(stamped=True)
+    assert err < 0.02, (err, stats)
+    assert stats.fused == stats.scans and stats.rewound > 0.9 * stats.scans, stats
+    # Fused at arrival instead, the same scans lose lock.
+    err, stats = spin_with_late_scans(stamped=False)
+    assert err > 0.3 and stats.failed_in_row > 20, (err, stats)
+
+
+def test_scan_newer_than_odometry_waits_for_the_next_message():
+    grid = toy_grid()
+    truth = array([4.5, 3.0, 0.4])
+    pipeline = EKFPipeline(PoseEKF(), ScanMatcher(DistanceField(grid, RES, ORIGIN)))
+    pipeline.ekf.reset(truth, diag([0.05, 0.05, 0.02]) ** 2)
+    pipeline.on_odom((0.0, 0.0, 0.0), 1.0)
+    assert pipeline.on_scan(scan_points(raycast(grid, truth)), 1.02) is None
+    assert pipeline.stats.fused == 0
+    assert pipeline.on_odom((0.0, 0.0, 0.0), 1.033) is not None
+    assert pipeline.stats.fused == 1 and pipeline.stats.rewound == 1
+    # A scan far ahead of the odometry clock (mismatched clocks) is fused at once, not held.
+    assert pipeline.on_scan(scan_points(raycast(grid, truth)), 5.0) is not None
+
+
+def test_scan_older_than_history_is_dropped_and_time_reset_clears_it():
+    grid = toy_grid()
+    truth = array([4.5, 3.0, 0.4])
+    pipeline = EKFPipeline(PoseEKF(), ScanMatcher(DistanceField(grid, RES, ORIGIN)), history=1.0)
+    pipeline.ekf.reset(truth, diag([0.05, 0.05, 0.02]) ** 2)
+    for k in range(60):
+        pipeline.on_odom((0.0, 0.0, 0.0), k / 30.0)
+    assert pipeline.on_scan(scan_points(raycast(grid, truth)), 0.1) is None
+    assert pipeline.stats.stale == 1
+    # A bag loop restarts the clock: the history starts over instead of rewinding into the old run.
+    pipeline.on_odom((0.0, 0.0, 0.0), 0.0)
+    pipeline.on_odom((0.0, 0.0, 0.0), 0.033)
+    assert pipeline.on_scan(scan_points(raycast(grid, truth)), 0.02) is not None
