@@ -217,7 +217,7 @@ def test_unknown_cells_under_start_are_freed():
 
 def test_straight_shot_in_open_space():
     checker = FootprintCollisionChecker(empty_grid(6, 6), RES, (0.0, 0.0))
-    result = RRTPlanner(checker, PlannerConfig(seed=0)).plan((1.0, 1.0, 0.0), (5.0, 5.0, pi))
+    result = RRTPlanner(checker, PlannerConfig(seed=0, goal_approach_distance=0.0)).plan((1.0, 1.0, 0.0), (5.0, 5.0, pi))
     assert len(result.path) == 2
     assert result.cost == pytest.approx(hypot(4.0, 4.0))
 
@@ -268,7 +268,7 @@ def test_3d_drives_under_overhang_but_not_into_low_obstacle():
     assert not checker.is_collision(4.0, 3.0, 0.0)          # robot (<= 1.5 m tall) fits under it
     planner = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0))
     result = planner.plan((1.5, 3.0, 0.0), (6.5, 3.0, 0.0))
-    assert result.success and len(result.path) == 2         # straight across, under the beam
+    assert result.success and result.cost == pytest.approx(5.0)   # straight across, under the beam
 
     # The same beam lowered to table height blocks the arm, and a 20 cm curb blocks the base.
     for obstacle in (box_voxels(3.9, 4.1, 0.1, 5.9, 0.6, 0.7), box_voxels(3.9, 4.1, 0.1, 5.9, 0.1, 0.2)):
@@ -319,3 +319,21 @@ def test_factory_world_goals_3d():
         result = planner.plan(start, goal)
         assert result.success, f'no path {start} -> {goal}'
         assert not checker.poses_in_collision(dense_path_poses(checker, result.path))
+
+
+def test_path_ends_with_straight_run_along_goal_heading():
+    checker = FootprintCollisionChecker(corridor_world(), RES, (0.0, 0.0))
+    goal = (6.5, 4.5, pi / 2)
+    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan((1.5, 1.5, 0.0), goal)
+    assert result.success and result.path[-1] == goal
+    (x0, y0, _), (x1, y1, _) = result.path[-2:]
+    assert np.arctan2(y1 - y0, x1 - x0) == pytest.approx(goal[2], abs=1e-9)
+    assert hypot(x1 - x0, y1 - y0) == pytest.approx(1.0)
+    assert RRTPlanner(checker).path_valid(result.path)
+
+    # Lead-in shortened when the full 1 m would hit the wall behind the goal.
+    goal = (6.5, 1.1, -pi / 2)
+    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan((1.5, 4.5, 0.0), goal)
+    (x0, y0, _), (x1, y1, _) = result.path[-2:]
+    assert np.arctan2(y1 - y0, x1 - x0) == pytest.approx(goal[2], abs=1e-9)
+    assert not checker.poses_in_collision(dense_path_poses(checker, result.path))

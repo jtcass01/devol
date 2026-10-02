@@ -266,14 +266,16 @@ class BodyBox:
     z_max: float
 
 
-# Clearpath A200 + stowed UR5e + Robotiq gripper. The base box covers chassis,
-# wheels and bumpers (0.99 x 0.67 m, top plate ~0.36 m above ground). The arm
-# box is an estimate of the stowed arm envelope above the UR mount
-# (0.168 m ahead of base_link); confirm it against the arm's actual stow pose.
+# Clearpath A200 + stowed UR5e + Robotiq gripper, from TF at spawn in Gazebo
+# (base_link 0.199 m above ground, top plate ~0.43 m). Arm links span
+# x 0.165-0.265, y 0-0.342, z 0.59-1.48 m above ground; the boxes add the
+# link radii. The sensor arch box is from the 300 mm arch height and the
+# lidar at 0.72-0.76 m; its x/y extent is an estimate.
 # The base box starts 5 cm up so the floor's own voxel layer never counts.
 DEFAULT_BODY = [
-    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.40),
-    BodyBox(-0.10, 0.45, -0.25, 0.25, 0.40, 1.50),
+    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),   # chassis, wheels, top plate
+    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),       # 300 mm sensor arch + VLP-16
+    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),        # stowed UR5e + Robotiq, offset to +y
 ]
 
 
@@ -366,6 +368,7 @@ class PlannerConfig:
     shortcut_attempts: int = 200
     require_goal_yaw: bool = True    # rotate to the goal yaw at the end of the path
     free_unknown_at_start: bool = True  # unknown cells under the robot's start footprint are free
+    goal_approach_distance: float = 1.0  # final straight run along the goal heading (m); 0 disables
     seed: Optional[int] = None
 
 
@@ -395,6 +398,7 @@ class RRTPlanner:
         if self.config.algorithm not in ('rrt', 'rrt_star'):
             raise ValueError(f"algorithm must be 'rrt' or 'rrt_star', got {self.config.algorithm!r}")
         self._rng = np.random.default_rng(self.config.seed)
+        self._require_yaw = self.config.require_goal_yaw
         # Karaman & Frazzoli gamma* for d = 2 using the free area of the map
         # (the course code used the bounding box area and d = 2 for a 3D state).
         d = 2
@@ -415,6 +419,7 @@ class RRTPlanner:
         self._cost[0] = 0.0
         self._n = 1
         self._goal: Optional[Pose] = None
+        self._require_yaw = self.config.require_goal_yaw
         self._goal_parent = -1
 
     def _add_node(self, xy: np.ndarray, parent: int, cost: float) -> int:
@@ -462,7 +467,7 @@ class RRTPlanner:
             if not self._edge_free(node, np.array([gx, gy])):
                 return False
             heading = atan2(gy - self._xy[node, 1], gx - self._xy[node, 0])
-        if self.config.require_goal_yaw:
+        if self._require_yaw:
             return not self.checker.rotation_in_collision(gx, gy, heading, gyaw)
         return True
 
@@ -494,7 +499,7 @@ class RRTPlanner:
                 out = atan2(gy - iy, gx - ix)
                 if self.checker.rotation_in_collision(ix, iy, new_heading, out):
                     return False
-            if self.config.require_goal_yaw and self.checker.rotation_in_collision(gx, gy, out, gyaw):
+            if self._require_yaw and self.checker.rotation_in_collision(gx, gy, out, gyaw):
                 return False
         return True
 
@@ -511,8 +516,18 @@ class RRTPlanner:
         if self.checker.is_collision(*goal):
             raise GoalInCollision(f'goal pose {goal} is in collision')
 
+        # Plan to a lead-in pose behind the goal, then drive straight along the
+        # goal heading. A waypoint follower then arrives already facing the goal
+        # yaw instead of having to turn on the spot at the goal.
+        final_goal = goal
+        approach = self._approach_pose(goal) if cfg.goal_approach_distance > 0.0 else None
+        if approach is not None:
+            goal = approach
+
         capacity = cfg.max_iterations + 2
         self._reset(start, capacity)
+        if approach is not None:
+            self._require_yaw = True   # the turn onto the lead-in must be checked
         self._goal = goal
         goal_xy = np.array(goal[:2])
         best_goal_parent = -1
@@ -609,11 +624,29 @@ class RRTPlanner:
 
         if best_goal_parent >= 0:
             raw = self._reconstruct(best_goal_parent, goal)
+            path = self.shortcut(raw, goal)
+            if approach is not None:
+                raw = raw + [final_goal]
+                path = path + [final_goal]
             result.raw_path = raw
-            result.path = self.shortcut(raw, goal)
+            result.path = path
             result.cost = path_length(result.path)
         result.planning_time = time.monotonic() - t0
         return result
+
+    def _approach_pose(self, goal: Pose) -> Optional[Pose]:
+        """Lead-in pose goal_approach_distance behind the goal along its heading,
+        shortened (halving) until the pose and the straight run in are free."""
+        d = self.config.goal_approach_distance
+        gx, gy, gyaw = goal
+        c, s = cos(gyaw), sin(gyaw)
+        while d >= 2.0 * self.checker.translation_step:
+            px, py = gx - d * c, gy - d * s
+            if not self.checker.is_collision(px, py, gyaw) and \
+                    not self.checker.segment_in_collision(px, py, gx, gy, gyaw):
+                return (px, py, gyaw)
+            d *= 0.5
+        return None
 
     def _reconstruct(self, goal_parent: int, goal: Pose) -> List[Pose]:
         chain = []
@@ -640,7 +673,7 @@ class RRTPlanner:
             if self.checker.segment_in_collision(x0, y0, x1, y1, seg):
                 return False
             heading = seg
-        if self.config.require_goal_yaw:
+        if self._require_yaw:
             x, y, yaw = path[-1]
             return not self.checker.rotation_in_collision(x, y, heading, yaw)
         return True

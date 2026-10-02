@@ -13,7 +13,7 @@ checks the robot's body against octomap_server's map:
 """
 from __future__ import annotations
 
-from math import hypot
+from math import atan2, hypot
 from threading import Event, Lock, Thread
 from typing import List, Optional, Tuple
 
@@ -32,7 +32,7 @@ from devol_sim.mobile_robot_goal import MobileRobotGoal
 from devol_sim.rrt_planner import (DEFAULT_BODY, FootprintCollisionChecker, GoalInCollision,
                                    MultiFootprintChecker, PlannerConfig, PlanResult, RRTPlanner,
                                    StartInCollision, body_checker_from_voxels, body_from_flat,
-                                   densify)
+                                   densify, wrap_to_pi)
 from devol_sim.utils import euler_to_quaternion, quaternion_to_euler
 
 __author__ = "Jacob Taylor Cassady"
@@ -77,6 +77,9 @@ class RRTMotionPlanner(RCLPY_Node):
         self.declare_parameter('shortcut_attempts', 200)
         self.declare_parameter('require_goal_yaw', True)
         self.declare_parameter('waypoint_spacing', 0.5)
+        self.declare_parameter('goal_approach_distance', 1.0)
+        self.declare_parameter('corner_tolerance', 0.1)
+        self.declare_parameter('turn_in_place_threshold', 0.35)
 
         p = lambda name: self.get_parameter(name).value  # noqa: E731
         self._publish_rate = float(p('publish_rate'))
@@ -107,8 +110,11 @@ class RRTMotionPlanner(RCLPY_Node):
                                      max_planning_time=float(p('max_planning_time')),
                                      patience=int(p('patience')),
                                      shortcut_attempts=int(p('shortcut_attempts')),
-                                     require_goal_yaw=bool(p('require_goal_yaw')))
+                                     require_goal_yaw=bool(p('require_goal_yaw')),
+                                     goal_approach_distance=float(p('goal_approach_distance')))
         self._waypoint_spacing = float(p('waypoint_spacing'))
+        self._corner_tolerance = float(p('corner_tolerance'))
+        self._turn_in_place_threshold = float(p('turn_in_place_threshold'))
 
         # TF
         self._tf_buffer = tf2_ros.Buffer()
@@ -308,13 +314,38 @@ class RRTMotionPlanner(RCLPY_Node):
             self.publish_path(self._path)
 
         if self._path_index < len(self._path):
-            wx, wy, wyaw = self._path[self._path_index]
+            wx, wy, _ = self._path[self._path_index]
             is_last = self._path_index == len(self._path) - 1
-            tolerance = self._goal_tolerance if is_last else self._intermediate_goal_tolerance
-            if hypot(wx - x, wy - y) <= tolerance and not is_last:
-                self._path_index += 1
+            if is_last:
+                tolerance = self._goal_tolerance
+            elif self.is_corner(self._path_index):
+                tolerance = self._corner_tolerance
             else:
-                self.send_goal_pose(self.world_shift_trailer_hitch(wx, wy, yaw), wyaw)
+                tolerance = self._intermediate_goal_tolerance
+            dist = hypot(wx - x, wy - y)
+            if dist <= tolerance and not is_last:
+                self._path_index += 1
+                return
+            # The plan turns in place at corners; do the same before driving off,
+            # otherwise the follower swings wide or cuts the corner.
+            heading = atan2(wy - y, wx - x)
+            if dist > self._intermediate_goal_tolerance and \
+                    abs(wrap_to_pi(heading - yaw)) > self._turn_in_place_threshold:
+                self.send_goal_pose(self.world_shift_trailer_hitch(x, y, yaw), heading)
+            else:
+                # Hold the heading of the segment being driven. Asking for the next
+                # segment's heading here makes diffdrive_pid's yaw term cancel its
+                # steering term short of the waypoint (the robot stalls).
+                px, py, _ = self._path[self._path_index - 1]
+                self.send_goal_pose(self.world_shift_trailer_hitch(wx, wy, yaw), atan2(wy - py, wx - px))
+
+    def is_corner(self, i: int) -> bool:
+        """Does the path turn by more than turn_in_place_threshold at waypoint i?"""
+        if i <= 0 or i >= len(self._path) - 1:
+            return False
+        (x0, y0, _), (x1, y1, _), (x2, y2, _) = self._path[i - 1:i + 2]
+        turn = wrap_to_pi(atan2(y2 - y1, x2 - x1) - atan2(y1 - y0, x1 - x0))
+        return abs(turn) > self._turn_in_place_threshold
 
     def visualization_loop(self):
         from matplotlib.patches import Polygon
