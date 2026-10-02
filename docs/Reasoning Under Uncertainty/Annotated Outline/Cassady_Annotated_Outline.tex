@@ -66,14 +66,14 @@ This section will present the quantitative findings from the simulated trials us
 \end{itemize}
 
 \subsection{Preliminary Results}\label{sec:Preliminary-Results}
-\noindent\textit{All numbers in this subsection are preliminary. The 20-seed table covers only the nominal operating point; its EKF rows and the sensitivity sweep over $N$, $k$ and $\sigma_r$ are still running. Results marked ``offline synthetic'' come from a 2D test map with simulated odometry and LIDAR, not Gazebo.}
+\noindent\textit{All numbers in this subsection are preliminary. The 20-seed table is being re-run after a fix to the odometry noise injector, and the sensitivity sweep over $N$, $k$ and $\sigma_r$ is still running. Results marked ``offline synthetic'' come from a 2D test map with simulated odometry and LIDAR, not Gazebo.}
 
 \paragraph{Core comparison (Gazebo, 20 seeds).}
-Table~\ref{tab:core-ci} reports 20 seeded Gazebo trials per row at the nominal operating point: $N = 2000$ particles, injected odometry noise $k = 1$ ($\alpha_{1..4} = 0.05$) and LIDAR range noise $\sigma_r = 0.03$~m, with the RRT* planner driving the three-waypoint route on ground truth. The EKF rows are being re-run after a fix to how the EKF timestamps its updates, which addresses divergences seen on 2 of the 20 nominal seeds during a fast, roughly $180^\circ$ in-place turn at the second goal; until then the table shows the PF and dead reckoning only, and the single-run test cases below give the EKF's behaviour. On the nominal route the PF averaged 0.25~m position error against dead reckoning's 4.7~m, at a 4.6~ms median update. Under kidnapping it returned within 0.25~m in 16 of 20 trials (95\% interval 0.56--0.94) after a mean of 7.8~s. Starting from a uniform prior over the map, it globally localized in 11 of 20 trials (0.32--0.77), taking 55~s on average, so 2000 particles are not enough for reliable global localization in this map; the $N$ sweep will show how the success rate grows with particle count.
+Table~\ref{tab:core-ci} will report 20 seeded Gazebo trials per row at the nominal operating point: $N = 2000$ particles, injected odometry noise $k = 1$ ($\alpha_{1..4} = 0.05$) and LIDAR range noise $\sigma_r = 0.03$~m, with the RRT* planner driving the three-waypoint route on ground truth. A first 20-seed run is superseded: the odometry noise injector turned in-place spins into spurious jumps of about 0.7~m and $90^\circ$, corrupting the inputs of every estimator. The injector has been fixed and the nominal, kidnap and global-localization scenarios are being re-run for all estimators.
 
 \begin{table}[H]
 \centering
-\caption{Core results, Gazebo, 20 seeds per row ($N=2000$, $k=1$, $\sigma_r=0.03$~m). Mean $\pm$ 95\% CI; recovery is to within 0.25~m, with its 95\% Clopper--Pearson interval. Preliminary; EKF rows pending a re-run.}
+\caption{Core results, Gazebo, 20 seeds per row ($N=2000$, $k=1$, $\sigma_r=0.03$~m). Mean $\pm$ 95\% CI; recovery is to within 0.25~m, with its 95\% Clopper--Pearson interval. Pending the re-run with the corrected noise injector.}
 \label{tab:core-ci}
 \footnotesize
 \setlength{\tabcolsep}{3.5pt}
@@ -81,16 +81,16 @@ Table~\ref{tab:core-ci} reports 20 seeded Gazebo trials per row at the nominal o
 \hline
 Scenario & Estimator & Pos.\ RMSE (m) & Head.\ RMSE ($^\circ$) & Waypoint err.\ (m) & Update (ms) & Recovered & Recovery (s) \\
 \hline
-Nominal & EKF & \multicolumn{6}{c}{pending re-run with the EKF timestamp fix} \\
-        & PF  & $0.253 \pm 0.072$ & $5.66 \pm 2.97$ & $0.133 \pm 0.041$ & $4.63 \pm 0.07$ & -- & -- \\
-        & Dead reckoning & $4.666 \pm 0.495$ & $32.28 \pm 4.92$ & $5.987 \pm 0.597$ & -- & -- & -- \\
+Nominal & EKF & \multicolumn{6}{c}{pending re-run} \\
+        & PF  & \multicolumn{6}{c}{pending re-run} \\
+        & Dead reckoning & \multicolumn{6}{c}{pending re-run} \\
 \hline
-Kidnap  & EKF & \multicolumn{6}{c}{pending re-run with the EKF timestamp fix} \\
-        & PF  & $1.660 \pm 0.281$ & $16.27 \pm 3.54$ & $2.856 \pm 0.473$ & $4.85 \pm 0.10$ & 16/20 [0.56, 0.94] & $7.8 \pm 1.9$ \\
+Kidnap  & EKF & \multicolumn{6}{c}{pending re-run} \\
+        & PF  & \multicolumn{6}{c}{pending re-run} \\
 \hline
-Global  & EKF & \multicolumn{6}{c}{pending re-run with the EKF timestamp fix} \\
-        & PF  & $2.019 \pm 1.289$ & $33.70 \pm 19.52$ & $2.426 \pm 1.859$ & $5.07 \pm 0.11$ & 11/20 [0.32, 0.77] & $54.9 \pm 3.7$ \\
-        & Dead reckoning & $4.666 \pm 0.495$ & -- & -- & -- & 0/20 [0.00, 0.17] & -- \\
+Global  & EKF & \multicolumn{6}{c}{pending re-run} \\
+        & PF  & \multicolumn{6}{c}{pending re-run} \\
+        & Dead reckoning & \multicolumn{6}{c}{pending re-run} \\
 \hline
 \end{tabular}
 \end{table}
@@ -172,7 +172,7 @@ Before the Gazebo runs, the evaluation pipeline was exercised on a synthetic 2D 
 
 
 \paragraph{Still to come.}
-The 20-seed EKF rows and the one-factor-at-a-time sweep over $N$, $k$ and $\sigma_r$ will be added here.
+The 20-seed results and the one-factor-at-a-time sweep over $N$, $k$ and $\sigma_r$ will be added here.
 
 \section{Conclusion}\label{Conclusion}
 The final section will synthesize the experimental results to definitively answer whether the primary hypothesis holds true: that the Particle Filter recovers in both adversarial scenarios where the EKF does not, and that the EKF matches or exceeds nominal-route accuracy at lower per-step compute time. It will discuss the practical implications of these findings for the robotic system's downstream waypoint controller and planning pipeline. Lastly, it will propose future work, such as mitigating the noted implementation asymmetry or extending the evaluation to dynamic obstacles within the factory.
