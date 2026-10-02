@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ekf_localization = devol_localization.ekf_localization:main',
+            'pf_localization = devol_localization.pf_localization_node:main',
         ],
     },
 )
