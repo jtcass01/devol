@@ -65,7 +65,11 @@ def run(args) -> int:
         todo = [r for r in todo if config_name(r) in args.configs.split(',')]
     for scenario in {r['scenario'] for r in todo}:
         bag = bags[scenario]
-        if bag and not (Path(bag).expanduser() / 'metadata.yaml').is_file():
+        d = Path(bag).expanduser() if bag else None
+        if d and not (d / 'metadata.yaml').is_file() and any(d.glob('*.mcap')):
+            print(f'{bag} has no metadata.yaml (recorder stopped before closing); reindexing', flush=True)
+            subprocess.run(['ros2', 'bag', 'reindex', str(d), '-s', 'mcap'], check=False)
+        if d and not (d / 'metadata.yaml').is_file():
             print(f'{bag} is not a rosbag2 directory (no metadata.yaml); not running any trials', flush=True)
             return 2
     failures = 0

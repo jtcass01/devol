@@ -205,8 +205,12 @@ def clopper_pearson(successes: int, n: int, confidence: float = 0.95) -> Tuple[f
 # ------------------------------------------------------------------ test cases
 
 def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names: Sequence[str] = (),
-                    threshold: float = RECOVERY_THRESHOLD) -> Tuple[bool, List[str]]:
+                    threshold: float = RECOVERY_THRESHOLD,
+                    timed_out: str = '') -> Tuple[bool, List[str]]:
     """PASS/FAIL of the verification test cases, with one report line per check.
+
+    `timed_out` (e.g. 'max_duration 400 s reached') fails either case: the robot never reached the
+    last waypoint, so the route the case defines was not completed.
 
     1, nominal route: the EKF and the PF are within `threshold` of ground truth at every waypoint,
        and dead reckoning's mean waypoint error is larger than every filter waypoint error.
@@ -215,6 +219,9 @@ def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names
     """
     lines: List[str] = []
     ok = True
+    if timed_out:
+        lines.append(f'FAIL route: the robot did not reach the last waypoint ({timed_out})')
+        ok = False
 
     def wp_text(errs):
         names = list(waypoint_names) + [f'waypoint {i + 1}' for i in range(len(waypoint_names), len(errs))]

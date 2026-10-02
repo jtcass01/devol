@@ -4,6 +4,7 @@ No ROS needed: `python3 -m pytest test/test_study_tools.py`.
 """
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -159,6 +160,10 @@ def test_test_case_verdicts():
     ok, lines = judge_test_case(2, kid)
     assert ok and lines[-1].startswith('INFO ekf: did not recover')
     assert not judge_test_case(2, {'pf': EstimatorScore()})[0]
+    # A run cut off by max_duration before the last goal fails even if every other check passes.
+    for case, scores in ((1, good), (2, kid)):
+        ok, lines = judge_test_case(case, scores, timed_out='max_duration 400 s reached')
+        assert not ok and lines[0].startswith('FAIL route')
 
 
 def test_video_falls_back_to_opencv(tmp_path, monkeypatch):
@@ -175,3 +180,22 @@ def test_video_falls_back_to_opencv(tmp_path, monkeypatch):
     rec.finish()
     fig.close()
     assert cv2.VideoCapture(str(tmp_path / 'v.mp4')).get(cv2.CAP_PROP_FRAME_COUNT) == 3
+
+
+def test_replay_reindexes_a_bag_without_metadata(tmp_path):
+    import importlib.util
+    pytest.importorskip('launch_ros')   # the launch file imports launch + launch_ros
+    spec = importlib.util.spec_from_file_location(
+        'replay', Path(__file__).resolve().parents[1] / 'launch' / 'localization_replay.launch.py')
+    replay = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(replay)
+    (tmp_path / 'bag_0.mcap').write_bytes(b'')
+    calls = []
+
+    def reindex(d):
+        calls.append(d)
+        (Path(d) / 'metadata.yaml').write_text('rosbag2_bagfile_information:\n  message_count: 12\n')
+    replay.check_bag(str(tmp_path), reindex=reindex)
+    assert calls == [str(tmp_path)]
+    with pytest.raises(RuntimeError):
+        replay.check_bag(str(tmp_path / 'missing'), reindex=reindex)

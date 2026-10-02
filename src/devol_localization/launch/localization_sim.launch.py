@@ -1,7 +1,7 @@
 """Live Gazebo run of the localization study: sim + ground truth + filters + live views (+ bag, kidnap).
 
   ros2 launch devol_localization localization_sim.launch.py                       # nominal, EKF + PF windows
-  ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap      # teleport at kidnap_time
+  ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap      # teleport 10 s after Goal 1
   ros2 launch devol_localization localization_sim.launch.py scenario:=global
   ros2 launch devol_localization localization_sim.launch.py record_bag:=~/loc_bags/nominal filters:=false
 
@@ -10,7 +10,8 @@ What it adds to devol_sim's motion_planner_sim.launch.py:
 - ground_truth_tf, which publishes map -> odom from ground truth so the planner and controller drive on
   the true pose (the protocol: estimator error never changes the trajectory). The sim is started with
   map_odom_tf:=none so the static map -> odom placeholder is not published as well;
-- kidnapper when scenario:=kidnap: teleports the robot to kidnap_target at kidnap_time s of sim time;
+- kidnapper when scenario:=kidnap: teleports the robot to kidnap_target kidnap_time s after it reaches
+  Goal 1 (kidnap_trigger:=time counts from the start instead; that can fire before Goal 1);
 - ros2 bag record of the raw streams (record_bag), for replaying every study configuration offline;
 - localization_stack.launch.py (filters, noise, scorer, views) unless filters:=false.
 
@@ -79,7 +80,10 @@ def launch_setup(context):
             cmd=['ros2', 'bag', 'record', '-o', os.path.expanduser(bag), '--use-sim-time',
                  '--qos-profile-overrides-path', os.path.join(share, 'config', 'bag_qos_overrides.yaml'),
                  '--topics', *RECORD_TOPICS],   # Lyrical's rosbag2 takes topics only after --topics
-            output='screen'))
+            output='screen',
+            # On Ctrl-C launch escalates SIGINT -> SIGTERM -> SIGKILL after 5 s each by default, which can kill
+            # the recorder before it writes metadata.yaml. Give it time to close the bag.
+            sigterm_timeout='30', sigkill_timeout='30'))
 
     if arg('filters').lower() == 'true':
         actions.append(IncludeLaunchDescription(
@@ -95,9 +99,9 @@ def generate_launch_description():
         ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
         ('filters', 'true', 'Run the estimators, scorer and views live'),
         ('record_bag', '', 'Record the raw streams to this bag directory for offline replay'),
-        ('kidnap_trigger', 'time', 'scenario:=kidnap: time (kidnap_time s after start) or after_waypoint '
-                                   '(kidnap_time s after reaching Goal 1)'),
-        ('kidnap_time', '30.0', 'scenario:=kidnap: delay in sim seconds before the teleport'),
+        ('kidnap_trigger', 'after_waypoint', 'scenario:=kidnap: after_waypoint (kidnap_time s after reaching '
+                                             'Goal 1) or time (kidnap_time s after start)'),
+        ('kidnap_time', '10.0', 'scenario:=kidnap: delay in sim seconds before the teleport'),
         ('kidnap_target', '5.45,2.03,0.0', 'scenario:=kidnap: x,y,yaw to teleport to (default Goal 2)'),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
         ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf'),

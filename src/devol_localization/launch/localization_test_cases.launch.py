@@ -5,7 +5,7 @@
 
 Both start the factory sim headless with the controller on ground truth, the EKF and the PF at the
 nominal study point (N = 2000, k = 1, sigma_r = 0.03 m, seed 0) and a live window per filter. The run
-ends by itself a few seconds after the robot reaches Goal 3 (or at max_duration), then prints the
+ends by itself a few seconds after the robot reaches Goal 3 (or FAILs at max_duration), then prints the
 verdict and leaves results, the two view videos, a final screenshot of each, and the intermediate
 posterior figures (PF particles + EKF 2-sigma ellipse at the same instant) in output_dir.
 

@@ -11,7 +11,9 @@ trial replay the nominal bag with scenario:=global; for kidnapping replay a bag 
 scenario:=kidnap and use scenario:=kidnap here too.
 """
 
+import glob
 import os
+import subprocess
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -26,12 +28,19 @@ STACK_ARGS = ['scenario', 'estimators', 'k', 'sigma_r', 'seed', 'num_particles',
               'viz_headless', 'video_dir', 'viz_window', 'maze', 'posterior_times']
 
 
-def check_bag(bag: str) -> None:
-    """Fails fast on a missing or empty bag instead of replaying nothing until a timeout."""
+def check_bag(bag: str, reindex=None) -> None:
+    """Fails fast on a missing or empty bag instead of replaying nothing until a timeout.
+
+    A recorder stopped before it could close leaves .mcap files without metadata.yaml; those are
+    reindexed once (`ros2 bag reindex <bag> -s mcap`) before giving up.
+    """
     meta = os.path.join(bag, 'metadata.yaml')
+    if not os.path.isfile(meta) and glob.glob(os.path.join(bag, '*.mcap')):
+        print(f'[localization_replay] {bag} has no metadata.yaml; running ros2 bag reindex', flush=True)
+        (reindex or (lambda d: subprocess.run(['ros2', 'bag', 'reindex', d, '-s', 'mcap'], check=False)))(bag)
     if not os.path.isfile(meta):
-        raise RuntimeError(f'{bag} is not a rosbag2 directory (no metadata.yaml). If the recorder was killed, '
-                           f'run `ros2 bag reindex {bag}`.')
+        raise RuntimeError(f'{bag} is not a rosbag2 directory (no metadata.yaml, and reindexing did not '
+                           f'create one). Try `ros2 bag reindex {bag} -s mcap`.')
     counts = [int(line.split(':', 1)[1]) for line in open(meta)
               if line.strip().startswith('message_count:') and line.split(':', 1)[1].strip().isdigit()]
     if counts and max(counts) == 0:

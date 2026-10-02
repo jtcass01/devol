@@ -97,6 +97,7 @@ class LocalizationEvaluator(Node):
         self._goal_time: Optional[float] = None
         self.finished = False
         self.finish_reason = ''
+        self.timed_out = False
 
         ns = str(gp('namespace').value).rstrip('/')
         self.create_subscription(Odometry, gp('ground_truth_topic').value, self._gt_cb, 100)
@@ -131,6 +132,7 @@ class LocalizationEvaluator(Node):
             self.finished, self.finish_reason = True, 'reached the last waypoint'
         elif max_duration > 0.0 and t - t0 >= max_duration:
             self.finished, self.finish_reason = True, f'max_duration {max_duration:g} s reached'
+            self.timed_out = True
 
     def _odom_cb(self, msg: Odometry) -> None:
         p = msg.pose.pose
@@ -194,7 +196,8 @@ class LocalizationEvaluator(Node):
             passed, lines = False, ['FAIL no ground truth received (is the ground-truth bridge running?)']
         else:
             passed, lines = judge_test_case(self._test_case, scores, self._config.get('waypoint_names', ()),
-                                            float(self.get_parameter('recovery_threshold').value))
+                                            float(self.get_parameter('recovery_threshold').value),
+                                            timed_out=self.finish_reason if self.timed_out else '')
         title = {1: 'Test case 1: nominal three-waypoint route', 2: 'Test case 2: kidnapping'}[self._test_case]
         reason = f'; {self.finish_reason}' if self.finish_reason else ''
         report = '\n'.join([f'===== {title}: {"PASS" if passed else "FAIL"} =====', *lines,

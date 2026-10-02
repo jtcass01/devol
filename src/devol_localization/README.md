@@ -27,7 +27,8 @@ Prerequisite: the sim fixes from the WSL machine (odom -> `a200_base_link` on `/
 only replaces `map -> odom`; the planner still needs `odom -> base` on `/tf`.
 
 Verification test cases, preconfigured, with the EKF and PF views updating live. Each run stops by
-itself a few seconds after the robot reaches Goal 3, prints PASS/FAIL, and leaves `verdict.txt`,
+itself a few seconds after the robot reaches Goal 3 (or FAILs after 400 s of sim time without
+getting there), prints PASS/FAIL, and leaves `verdict.txt`,
 `summary.json`, `ekf.mp4`/`pf.mp4` and final `ekf.png`/`pf.png` screenshots in `~/loc_results/test_case_<n>`:
 
 ```bash
@@ -43,7 +44,7 @@ Live run with both views (what the filters see, as they run):
 ```bash
 ros2 launch devol_localization localization_sim.launch.py                       # nominal route
 ros2 launch devol_localization localization_sim.launch.py scenario:=global      # PF uniform, EKF map-wide Gaussian
-ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap kidnap_time:=30 kidnap_target:=5.45,2.03,0.0
+ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap       # onto Goal 2, 10 s after Goal 1
 # extra: output_dir:=~/loc_results/live  video_dir:=~/loc_results/live  viz_headless:=true  num_particles:=500
 ```
 
@@ -53,7 +54,8 @@ The protocol records each route once and replays it through every configuration:
 # 1. Record (filters off; the controller drives on ground truth)
 ros2 launch devol_localization localization_sim.launch.py filters:=false record_bag:=~/loc_bags/nominal
 ros2 launch devol_localization localization_sim.launch.py filters:=false scenario:=kidnap record_bag:=~/loc_bags/kidnap
-# stop each with Ctrl-C once the robot has reached Goal 3
+# stop each with Ctrl-C once the robot has reached Goal 3, then wait for the recorder to close the bag
+# (localization_replay reindexes a bag left without metadata.yaml)
 
 # 2. One replayed trial, with the views
 ros2 launch devol_localization localization_replay.launch.py bag:=~/loc_bags/nominal viz:=true \
