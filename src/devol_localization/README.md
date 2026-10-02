@@ -68,5 +68,5 @@ ros2 run devol_localization localization_study analyze --out ~/loc_results/study
 ## Offline tests
 
 ```bash
-python3 -m pytest src/devol_localization/test
+cd src/devol_localization && python3 -m pytest test   # no ROS needed; from the repo root it needs install/setup.bash sourced
 ```
