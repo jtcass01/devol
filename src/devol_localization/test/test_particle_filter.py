@@ -85,6 +85,22 @@ def noisy_odometry(truth, rng, frac=0.05):
     return odom
 
 
+def skid_steer_odometry(truth, rng, yaw_scale, dist_scale=0.05, drift=0.03):
+    """Biased odometry like the Gazebo skid-steer base: rotation mis-scaled by
+    yaw_scale, distance by dist_scale, and heading drift while driving."""
+    odom = [truth[0].copy()]
+    for a, b in zip(truth[:-1], truth[1:]):
+        r1, t, r2 = odometry_delta(a, b)
+        r1 *= 1 + yaw_scale
+        r2 *= 1 + yaw_scale
+        t *= 1 + dist_scale
+        r2 += rng.normal(0, drift * abs(t)) + 0.5 * drift * t * np.sign(yaw_scale)
+        x, y, th = odom[-1]
+        h = th + r1
+        odom.append(np.array([x + t * np.cos(h), y + t * np.sin(h), wrap_angle(h + r2)]))
+    return odom
+
+
 def run(pf, grid, truth, odom, range_sigma=0.01, rng=None, kidnap_at=None):
     """Filter the whole trajectory; return per-step position and yaw errors.
 
@@ -173,6 +189,25 @@ def test_tracking_beats_dead_reckoning(world):
     assert pf_rmse < dr_rmse
 
 
+@pytest.mark.parametrize('yaw_scale', [-0.3, 0.3])
+def test_tracks_through_skid_steer_odometry_error(world, yaw_scale):
+    """Regression for the Gazebo divergence: odometry rotation off by 30%.
+    The original defaults (alphas 0.05, sigma_hit 0.2, 60 beams, no injection)
+    collapsed onto a wrong heading here; the current defaults must track."""
+    grid, field = world
+    rng = np.random.default_rng(11)
+    truth = trajectory()
+    odom = skid_steer_odometry(truth, rng, yaw_scale)
+    pf = ParticleFilter(PFParams(num_particles=500), field, seed=11)
+    pf.init_gaussian(truth[0], 0.25, 0.2)
+    errs, yaw_errs = run(pf, grid, truth, odom, rng=rng)
+    dr_final = np.hypot(*(odom[-1][:2] - truth[-1][:2]))
+    print(f'yaw_scale {yaw_scale:+.1f}: PF mean {errs.mean():.3f} m, final {errs[-1]:.3f} m, '
+          f'max yaw {np.degrees(yaw_errs.max()):.1f} deg; odometry final {dr_final:.2f} m')
+    assert errs.mean() < 0.15
+    assert errs[-1] < 0.15
+
+
 def test_global_localization_converges(world):
     """Uniform prior, plain SIR. Success depends on a particle landing near the
     true pose, so it is a rate, not a guarantee: on this map 20000 particles
@@ -183,7 +218,8 @@ def test_global_localization_converges(world):
     for seed in range(3):
         rng = np.random.default_rng(seed)
         odom = noisy_odometry(truth, rng, frac=0.05)
-        pf = ParticleFilter(PFParams(num_particles=20000), field, seed=seed)
+        pf = ParticleFilter(PFParams(num_particles=20000, alpha_slow=0.0, alpha_fast=0.0),
+                            field, seed=seed)
         pf.init_uniform()
         errs, _ = run(pf, grid, truth, odom, rng=rng)
         converged = np.flatnonzero(errs < 0.25)
@@ -201,7 +237,7 @@ def test_kidnapping_recovery_with_injection(world):
     kidnap_step = 30
     jump = np.array([3.0, 3.0, 0.0])   # filter confidently ~4 m off after the kidnap
 
-    params = PFParams(num_particles=2000, alpha_slow=0.001, alpha_fast=0.1)
+    params = PFParams(num_particles=2000)   # injection is on by default
     pf = ParticleFilter(params, field, seed=7)
     pf.init_gaussian(truth[0], 0.2, 0.1)
     errs, _ = run(pf, grid, truth, odom, rng=rng, kidnap_at=(kidnap_step, jump))
@@ -219,7 +255,7 @@ def test_plain_sir_does_not_recover_from_kidnapping(world):
     rng = np.random.default_rng(7)
     truth = trajectory()
     odom = noisy_odometry(truth, rng, frac=0.05)
-    pf = ParticleFilter(PFParams(num_particles=2000), field, seed=7)
+    pf = ParticleFilter(PFParams(num_particles=2000, alpha_slow=0.0, alpha_fast=0.0), field, seed=7)
     pf.init_gaussian(truth[0], 0.2, 0.1)
     errs, _ = run(pf, grid, truth, odom, rng=rng, kidnap_at=(30, np.array([3.0, 3.0, 0.0])))
     assert np.all(errs[-20:] > 0.25)

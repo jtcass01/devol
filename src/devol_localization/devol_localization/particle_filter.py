@@ -94,21 +94,25 @@ class PFParams:
     num_particles: int = 500
     # Odometry motion noise (Thrun's alpha1..alpha4), std-dev form:
     # rot std = a1*|rot| + a2*|trans|, trans std = a3*|trans| + a4*(|rot1|+|rot2|).
-    alpha1: float = 0.05
-    alpha2: float = 0.05
-    alpha3: float = 0.05
+    # Sized for skid-steer odometry, whose yaw can be off by ~30% while
+    # turning: too little rotation noise lets the particle cloud fall behind
+    # the true heading and collapse (particle depletion).
+    alpha1: float = 0.3
+    alpha2: float = 0.1
+    alpha3: float = 0.1
     alpha4: float = 0.05
-    # Likelihood field model.
-    sigma_hit: float = 0.2
+    # Likelihood field model. Fewer beams and a wider sigma keep the
+    # likelihood from being overconfident when the scan and map disagree.
+    sigma_hit: float = 0.3
     z_hit: float = 0.9
     z_rand: float = 0.1
-    max_beams: int = 60
+    max_beams: int = 30
     # Resample when N_eff < resample_threshold * N.
     resample_threshold: float = 0.5
-    # Augmented MCL random-particle injection (table 8.3). 0 disables it and
-    # leaves plain SIR; enable (e.g. 0.001 / 0.1) for kidnapping recovery.
-    alpha_slow: float = 0.0
-    alpha_fast: float = 0.0
+    # Augmented MCL random-particle injection (table 8.3), used to recover
+    # from divergence and kidnapping. Set both to 0 for plain SIR.
+    alpha_slow: float = 0.001
+    alpha_fast: float = 0.1
 
 
 class ParticleFilter:

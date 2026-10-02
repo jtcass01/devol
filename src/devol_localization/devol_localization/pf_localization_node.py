@@ -26,6 +26,7 @@ from typing import Optional
 
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.duration import Duration
@@ -89,18 +90,18 @@ class PFLocalizationNode(Node):
 
         # Filter
         self.declare_parameter('num_particles', 500)
-        self.declare_parameter('alpha1', 0.05)
-        self.declare_parameter('alpha2', 0.05)
-        self.declare_parameter('alpha3', 0.05)
+        self.declare_parameter('alpha1', 0.3)
+        self.declare_parameter('alpha2', 0.1)
+        self.declare_parameter('alpha3', 0.1)
         self.declare_parameter('alpha4', 0.05)
-        self.declare_parameter('sigma_hit', 0.2)
+        self.declare_parameter('sigma_hit', 0.3)
         self.declare_parameter('z_hit', 0.9)
         self.declare_parameter('z_rand', 0.1)
-        self.declare_parameter('max_beams', 60)
+        self.declare_parameter('max_beams', 30)
         self.declare_parameter('likelihood_max_dist', 2.0)
         self.declare_parameter('resample_threshold', 0.5)
-        self.declare_parameter('alpha_slow', 0.0)
-        self.declare_parameter('alpha_fast', 0.0)
+        self.declare_parameter('alpha_slow', 0.001)
+        self.declare_parameter('alpha_fast', 0.1)
         self.declare_parameter('update_min_d', 0.05)
         self.declare_parameter('update_min_a', 0.05)
         self.declare_parameter('seed', -1)
@@ -352,7 +353,7 @@ def main(args=None):
     node = PFLocalizationNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
