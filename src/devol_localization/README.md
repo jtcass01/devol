@@ -43,7 +43,7 @@ Live run with both views (what the filters see, as they run):
 
 ```bash
 ros2 launch devol_localization localization_sim.launch.py                       # nominal route
-ros2 launch devol_localization localization_sim.launch.py scenario:=global      # PF uniform, EKF map-wide Gaussian
+ros2 launch devol_localization localization_sim.launch.py scenario:=global      # PF uniform, EKF map-wide Gaussian at a seeded random pose
 ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap       # onto Goal 2, 10 s after Goal 1
 # extra: output_dir:=~/loc_results/live  video_dir:=~/loc_results/live  viz_headless:=true  num_particles:=500
 ```

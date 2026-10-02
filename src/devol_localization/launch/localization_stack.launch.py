@@ -11,8 +11,9 @@ it starts no simulator and no bag itself. Data flow:
       -> localization_viz (one window per filter)
 
 scenario sets how the filters start: nominal and kidnap start both filters at the robot's spawn
-pose from the world's poses.csv; global starts the PF uniform over the free space and the EKF at
-the free-space centroid with a covariance spanning the map. The kidnap itself happens in the
+pose from the world's poses.csv; global starts the PF uniform over the free space and the EKF at a
+seeded random free-space pose with a covariance spanning the map (not the centroid: in the factory
+that is the spawn pose, which would start the EKF on the truth). The kidnap itself happens in the
 simulator (kidnapper node, see localization_sim.launch.py), so a replayed kidnap bag needs no
 extra node here.
 """
@@ -85,7 +86,10 @@ def launch_setup(context):
                      'seed': seed}])]
 
     if 'ekf' in estimators:
-        ekf_init = {'init_mode': 'global'} if scenario == 'global' else {
+        # Seeded per trial: the factory's free-space centroid is the spawn pose, so a centroid start
+        # would begin on the truth.
+        ekf_init = {'init_mode': 'global', 'global_init_mean': 'random', 'global_init_seed': seed} \
+            if scenario == 'global' else {
             'init_mode': 'pose', 'initial_pose': list(start)}
         nodes.append(Node(
             package='devol_localization', executable='ekf_localization', name='ekf_localization', output='screen',

@@ -199,3 +199,78 @@ def test_replay_reindexes_a_bag_without_metadata(tmp_path):
     assert calls == [str(tmp_path)]
     with pytest.raises(RuntimeError):
         replay.check_bag(str(tmp_path / 'missing'), reindex=reindex)
+
+
+def test_ekf_global_start_is_not_the_spawn_pose():
+    from devol_localization.ekf_core import global_initial_state
+    # Free space symmetric about the spawn pose, as in the factory (centroid within 0.1 m of (0, 0)).
+    g = np.arange(-5.0, 5.0, 0.1) + 0.05
+    free = np.array([(x, y) for x in g for y in g])
+    x, P = global_initial_state(free, mean='centroid')
+    assert np.allclose(x, 0.0, atol=1e-9)          # why 'centroid' is not a global test here
+    starts = [global_initial_state(free, np.random.default_rng(s))[0] for s in range(20)]
+    assert np.allclose(starts[3], global_initial_state(free, np.random.default_rng(3))[0])   # reproducible
+    assert len({tuple(np.round(s, 6)) for s in starts}) == 20
+    assert np.median([np.hypot(*s[:2]) for s in starts]) > 1.5    # mostly outside the 1.5 m match window
+    assert all(np.any(np.all(np.isclose(free, s[:2]), axis=1)) for s in starts)
+    x, P = global_initial_state(free, np.random.default_rng(0))
+    assert np.all(np.linalg.eigvalsh(P) > 0) and P[0, 0] >= np.var(free[:, 0])
+    assert np.isclose(P[2, 2], (2 * np.pi) ** 2 / 12)
+
+
+def _load_stack(monkeypatch):
+    """Loads localization_stack.launch.py with stand-ins for the ROS launch modules."""
+    import importlib.util
+    import sys
+    import types
+
+    class Rec:
+        def __init__(self, *a, **k):
+            self.a, self.k = a, k
+
+    src = Path(__file__).resolve().parents[2]
+    shares = {'devol_gazebo': src / 'devol_gazebo', 'devol_localization': src / 'devol_localization'}
+    mods = {
+        'launch': {'LaunchDescription': Rec},
+        'launch.actions': {n: type(n, (Rec,), {}) for n in
+                           ('DeclareLaunchArgument', 'EmitEvent', 'OpaqueFunction', 'RegisterEventHandler')},
+        'launch.event_handlers': {'OnProcessExit': Rec},
+        'launch.events': {'Shutdown': Rec},
+        'launch.substitutions': {'LaunchConfiguration': type('LaunchConfiguration', (Rec,), {})},
+        'launch_ros': {}, 'launch_ros.actions': {'Node': type('Node', (Rec,), {})},
+        'ament_index_python': {},
+        'ament_index_python.packages': {'get_package_share_directory': lambda p: str(shares[p])},
+    }
+    for name, attrs in mods.items():
+        m = types.ModuleType(name)
+        m.__dict__.update(attrs)
+        monkeypatch.setitem(sys.modules, name, m)
+    spec = importlib.util.spec_from_file_location(
+        'stack', Path(__file__).resolve().parents[1] / 'launch' / 'localization_stack.launch.py')
+    stack = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(stack)
+    return stack
+
+
+@pytest.mark.parametrize('scenario', ['nominal', 'global', 'kidnap'])
+def test_stack_sets_filter_init_per_scenario(monkeypatch, scenario):
+    stack = _load_stack(monkeypatch)
+    values = {name: default for name, (default, _) in stack.ARGS.items()}
+    values.update(scenario=scenario, seed='7', viz='false')
+
+    class Context:
+        def perform_substitution(self, lc):
+            return values[lc.a[0]]
+    params = {}
+    for action in stack.launch_setup(Context()):
+        if type(action).__name__ == 'Node':
+            params[action.k['executable']] = {k: v for p in action.k['parameters'] if isinstance(p, dict)
+                                              for k, v in p.items()}
+    ekf, pf = params['ekf_localization'], params['pf_localization']
+    if scenario == 'global':
+        assert ekf['init_mode'] == 'global' and ekf['global_init_mean'] == 'random' and ekf['global_init_seed'] == 7
+        assert pf['init_mode'] == 'global' and pf['seed'] == 7
+        assert 'initial_pose' not in ekf and 'initial_x' not in pf
+    else:
+        assert ekf['init_mode'] == 'pose' and ekf['initial_pose'] == [0.0, 0.0, 0.0]
+        assert pf['init_mode'] == 'pose' and (pf['initial_x'], pf['initial_y']) == (0.0, 0.0)

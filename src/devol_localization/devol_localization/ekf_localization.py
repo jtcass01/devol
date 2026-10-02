@@ -20,7 +20,8 @@ from threading import Lock
 from time import perf_counter
 from typing import Optional, Tuple
 
-from numpy import ndarray, array, asarray, arctan2, column_stack, cos, cov, sin, diag, int8, pi, zeros
+from numpy import ndarray, array, asarray, arctan2, column_stack, cos, sin, diag, int8, zeros
+from numpy.random import default_rng
 
 from rclpy import init as rclpy_init, try_shutdown as rclpy_try_shutdown, spin as rclpy_spin
 from rclpy.executors import ExternalShutdownException
@@ -34,7 +35,7 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float64
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster, TransformException
 
-from devol_localization.ekf_core import PoseEKF, wrap_angle, CHI2_3DOF_99
+from devol_localization.ekf_core import PoseEKF, global_initial_state, wrap_angle, CHI2_3DOF_99
 from devol_localization.ekf_pipeline import EKFPipeline
 from devol_localization.scan_matcher import DistanceField, ScanMatcher, scan_to_points
 
@@ -90,6 +91,10 @@ class EKFLocalization(Node):
         # test: a single Gaussian spanning the map).
         self.declare_parameter('init_mode', '')
         self.declare_parameter('initial_pose', [0.0, 0.0, 0.0])
+        # init_mode global: 'random' draws the mean from the free space and the heading uniformly
+        # (seeded by global_init_seed); 'centroid' uses the free-space centroid and heading 0.
+        self.declare_parameter('global_init_mean', 'random')
+        self.declare_parameter('global_init_seed', 0)
         self.declare_parameter('initial_std', [0.1, 0.1, 0.05])
         # Odometry motion model; variances per unit of motion (see ekf_core.PoseEKF).
         self.declare_parameter('odom_alphas', [0.02, 0.01, 0.01, 0.002])
@@ -120,7 +125,7 @@ class EKFLocalization(Node):
             'tf' if self.get_parameter('initial_pose_from_tf').value else 'pose')
         if self._init_mode not in ('tf', 'pose', 'global'):
             raise ValueError(f'init_mode must be tf, pose or global, got {self._init_mode}')
-        self._free_space: Optional[Tuple[ndarray, ndarray]] = None
+        self._free_space: Optional[ndarray] = None
         self._initial_pose: Tuple[float, float, float] = tuple(self.get_parameter('initial_pose').value)
         self._initial_std: ndarray = asarray(self.get_parameter('initial_std').value, dtype=float)
         self._laser_pose: Tuple[float, float, float] = tuple(self.get_parameter('laser_pose').value)
@@ -188,7 +193,7 @@ class EKFLocalization(Node):
         if rows.size:
             xy = column_stack((info.origin.position.x + (cols + 0.5) * info.resolution,
                                info.origin.position.y + (rows + 0.5) * info.resolution))
-            free_space = (xy.mean(axis=0), cov(xy.T))
+            free_space = xy
         with self._lock:
             first: bool = self._pipeline.matcher is None
             self._pipeline.matcher = matcher
@@ -245,14 +250,12 @@ class EKFLocalization(Node):
             if self._free_space is None:
                 self.get_logger().info('Waiting for the map to initialize globally', throttle_duration_sec=5.0)
                 return False
-            mean, xy_cov = self._free_space
-            P = zeros((3, 3))
-            P[:2, :2] = xy_cov
-            P[2, 2] = (2.0 * pi) ** 2 / 12.0   # uniform heading
-            self._ekf.reset((float(mean[0]), float(mean[1]), 0.0), P)
-            self.get_logger().info(f'Filter initialized globally at the free-space centroid '
-                                   f'x={mean[0]:.2f} y={mean[1]:.2f}, std x={P[0, 0] ** 0.5:.1f} m '
-                                   f'y={P[1, 1] ** 0.5:.1f} m')
+            how = self._str('global_init_mean')
+            rng = default_rng(int(self.get_parameter('global_init_seed').value))
+            x, P = global_initial_state(self._free_space, rng, mean=how)
+            self._ekf.reset((float(x[0]), float(x[1]), float(x[2])), P)
+            self.get_logger().info(f'Filter initialized globally ({how}) at x={x[0]:.2f} y={x[1]:.2f} '
+                                   f'yaw={x[2]:.2f}, std x={P[0, 0] ** 0.5:.1f} m y={P[1, 1] ** 0.5:.1f} m')
             return True
         if self._init_mode == 'tf':
             try:
