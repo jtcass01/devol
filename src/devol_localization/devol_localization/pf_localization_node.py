@@ -28,6 +28,7 @@ import numpy as np
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from rclpy.duration import Duration
 from geometry_msgs.msg import Pose, PoseArray, PoseWithCovarianceStamped, TransformStamped
@@ -159,7 +160,11 @@ class PFLocalizationNode(Node):
         self._pose_pub = self.create_publisher(PoseWithCovarianceStamped, gp('pose_topic').value, 10)
         self._particles_pub = self.create_publisher(PoseArray, gp('particles_topic').value, 1)
         self._compute_pub = self.create_publisher(Float64, gp('compute_time_topic').value, 10)
-        self.create_subscription(OccupancyGrid, gp('map_topic').value, self._map_cb, 1)
+        # Latched map: transient_local gets the last map even if it was published once
+        # before this node started (octomap_server latches its projected map).
+        map_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(OccupancyGrid, gp('map_topic').value, self._map_cb, map_qos)
         self.create_subscription(Odometry, gp('odom_topic').value, self._odom_cb, 50)
         self.create_subscription(LaserScan, gp('scan_topic').value, self._scan_cb, 5)
         self.create_subscription(PoseWithCovarianceStamped, gp('initialpose_topic').value,
