@@ -55,7 +55,7 @@ sudo apt install -y \
   python3-numpy python3-scipy python3-matplotlib python3-opencv ffmpeg
 ```
 
-`ffmpeg` is only needed to save the live views as MP4 files.
+`ffmpeg` is optional: the live views are saved as MP4 with ffmpeg when it is installed, and with OpenCV otherwise.
 
 ## 3. Get the code and build
 
@@ -126,38 +126,40 @@ ros2 launch devol_localization pf_localization.launch.py     # publishes /devol_
 
 ## 7. Test cases
 
-Both test cases run through `localization_sim.launch.py`, which starts the simulation above with the
-Gazebo GUI and RViz off, drives the robot on Gazebo's ground-truth pose (so estimator error never
-changes the route), runs both filters, and opens one live Matplotlib view per filter. Each view shows
-the map, the ground-truth pose against the estimate, the lidar scan drawn from the estimate, the 2σ
-covariance ellipse (EKF) or the particle cloud (PF), and position error over time against the filter's
-own 2σ bound.
+Both test cases have a preconfigured launch file. Each one starts the factory simulation headless,
+drives the robot on Gazebo's ground-truth pose (so estimator error never changes the route), runs the
+EKF and the PF at the study's nominal settings (2,000 particles, odometry noise k = 1, lidar noise
+σ = 0.03 m, seed 0), and opens one live Matplotlib window per filter. Each window shows the map, the
+ground-truth pose against the estimate, the lidar scan drawn from the estimate, the 2σ covariance
+ellipse (EKF) or the particle cloud (PF), and position error over time against the filter's own 2σ
+bound.
 
-Each run writes its results to `output_dir`:
+```bash
+ros2 launch devol_localization localization_test_cases.launch.py test_case:=1   # nominal route
+ros2 launch devol_localization localization_test_cases.launch.py test_case:=2   # kidnapped robot
+```
 
-- `summary.json`: the run's configuration and, for the EKF, the PF and an odometry-only baseline, the
-  position and heading RMSE, the error at each waypoint, the compute time per update, and (kidnap only)
-  the time to recover to within 0.25 m of the true pose.
-- `trajectory.csv` and `compute.csv`: the per-update estimates and timings behind those numbers.
-- `ekf.mp4` and `pf.mp4` when `video_dir` is set.
+There is nothing to stop by hand. The run ends a few seconds after the robot reaches Goal 3 (or after
+400 s of simulation time), prints a PASS/FAIL report, and leaves these files in
+`~/loc_results/test_case_<n>`:
 
-Stop each run with Ctrl-C once the robot has reached Goal 3, when the console prints
-`Successfully reached goal: Goal 3: Drive`.
+- `verdict.txt`: the PASS/FAIL report, one line per check.
+- `summary.json`: for the EKF, the PF and an odometry-only (dead reckoning) baseline, the position and
+  heading RMSE, the error at each waypoint, the compute time per update, and (test case 2) the time to
+  recover to within 0.25 m of the true pose. `trajectory.csv` and `compute.csv` hold the per-update data.
+- `ekf.mp4`, `pf.mp4` and `ekf.png`, `pf.png`: a video and a final screenshot of each live view.
+  Videos use ffmpeg when it is installed and fall back to OpenCV otherwise.
+- `posterior_t<sim time>.png`: the intermediate posterior (PF particles and EKF 2σ ellipse at the same
+  instant), saved at 15 s and 45 s, and for test case 2 also 1, 5 and 15 s after the kidnap.
 
-> **Placeholder.** A dedicated test-case launch file with automatic pass/fail checks is still being
-> written. Until it lands, run the commands below and compare `summary.json` with the expected outputs
-> by hand. The launch file name and the exact pass thresholds will be filled in here.
-> `TODO(test-case launch): <launch file and arguments>`
+Useful arguments: `output_dir` (results folder), `viz:=false` (no windows), `record_video:=false`,
+`gz_gui:=true` (show Gazebo), `num_particles`, `seed`, `max_duration`, and for test case 2
+`kidnap_delay` (default 10 s).
 
 ### Test case 1: nominal route
 
-```bash
-ros2 launch devol_localization localization_sim.launch.py scenario:=nominal \
-  output_dir:=~/loc_results/tc1_nominal video_dir:=~/loc_results/tc1_nominal
-```
-
 The robot starts at (0.0, 0.0) and drives to the three goals. The expected outputs are the goal poses
-from `poses.csv`, derived independently of either filter:
+from `src/devol_gazebo/worlds/factory/poses.csv`, derived independently of either filter:
 
 | Goal | x (m) | y (m) | yaw (rad) |
 |---|---|---|---|
@@ -165,23 +167,18 @@ from `poses.csv`, derived independently of either filter:
 | Goal 2: Place | 5.45 | 2.03 | 0.0 |
 | Goal 3: Drive | 1.87 | −8.06 | −1.5708 |
 
-Each filter's estimate at each goal should lie within the waypoint radius (0.5 m) of these poses, while
-odometry alone drifts by metres over the route. `TODO(test-case launch): final pass threshold.`
+**PASS** when the EKF and the PF are both within 0.25 m of the ground-truth pose at every goal, and
+dead reckoning from odometry alone is worse than both.
 
 ### Test case 2: kidnapped robot
 
-```bash
-ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap \
-  kidnap_time:=30 kidnap_target:=5.45,2.03,0.0 \
-  output_dir:=~/loc_results/tc2_kidnap video_dir:=~/loc_results/tc2_kidnap
-```
+10 s after the robot reaches Goal 1, it is teleported onto the Goal 2 pose (5.45 m, 2.03 m, 0.0 rad)
+without the filters being told, then the planner drives on to Goal 3. The expected output is that
+teleport pose.
 
-After 30 s of simulation time the robot is teleported to (5.45 m, 2.03 m, 0.0 rad), the Goal 2 pose,
-without telling the filters. The expected output is that teleport pose: after the kidnap, a filter
-passes if its estimate returns to within 0.25 m of the true pose, and `summary.json` reports how long
-that took. Offline, the PF recovers (its random-particle injection re-seeds the true pose) and the EKF,
-which keeps a single Gaussian, is not expected to. `TODO(test-case launch): final pass threshold and
-time limit.`
+**PASS** when the PF returns to within 0.25 m of the true pose, and stays there, within 60 s of the
+kidnap. The EKF's outcome is reported either way: it keeps a single Gaussian with no re-seeding, so it
+is not expected to recover, and that contrast is part of the study.
 
 ## 8. Full study (optional)
 
