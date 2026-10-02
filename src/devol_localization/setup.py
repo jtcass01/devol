@@ -25,6 +25,12 @@ setup(
         'console_scripts': [
             'ekf_localization = devol_localization.ekf_localization:main',
             'pf_localization = devol_localization.pf_localization_node:main',
+            'noise_injector = devol_localization.noise_injector:main',
+            'ground_truth_tf = devol_localization.ground_truth_tf:main',
+            'kidnapper = devol_localization.kidnapper:main',
+            'localization_evaluator = devol_localization.localization_evaluator:main',
+            'localization_viz = devol_localization.localization_viz:main',
+            'localization_study = devol_localization.localization_study:main',
         ],
     },
 )

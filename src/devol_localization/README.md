@@ -1,0 +1,60 @@
+# devol_localization
+
+EKF and particle-filter localization for the devol mobile manipulator, plus the tooling for the
+PF-vs-EKF trade study in `docs/Reasoning Under Uncertainty/` (noise injection, ground truth,
+scoring, kidnapping, live views and the replay runner).
+
+## Nodes
+
+| Executable | What it does |
+|---|---|
+| `ekf_localization` | EKF: odometry prediction, scan-matched pose correction. `init_mode` tf / pose / global. Publishes `ekf_pose`, `ekf_compute_time_ms`. |
+| `pf_localization` | SIR Monte Carlo localization with augmented-MCL injection. Publishes `pf_pose`, `pf_particles`, `pf_compute_time_ms`. |
+| `noise_injector` | Seeded study noise: odometry increments perturbed with alpha1..4 = 0.05 k (per 0.1 m / 0.1 rad segment, so independent of the odometry rate), lidar ranges + N(0, sigma_r^2). Publishes `/devol_drive/noisy/{odom,scan}`. |
+| `localization_evaluator` | Scores a trial against ground truth: position / heading RMSE, waypoint error, compute time, recovery time to < 0.25 m (global and kidnap). Dead reckoning from the noisy odometry is scored as a third estimator. Writes `trajectory.csv`, `compute.csv`, `summary.json`. |
+| `localization_viz` | Live Matplotlib view (no RViz): map, Gazebo pose vs estimate, lidar projected from the estimate, 2-sigma ellipse, every particle (`mode:=pf`), and error vs time against the filter's own 2-sigma bound. Optional MP4. |
+| `ground_truth_tf` | Publishes `map -> odom` from ground truth so the planner and controller drive on the true pose, as the protocol requires. |
+| `kidnapper` | Teleports the robot in Gazebo (`/world/maze_world/set_pose`) at a set sim time without telling the estimators. |
+| `localization_study` | `run`: replays the bags through every configuration and seed of the protocol. `analyze`: mean +/- 95% CI tables, Clopper-Pearson recovery rates and the sensitivity figure. |
+
+Ground truth comes from a Gazebo `OdometryPublisher` added to the A200 (`a200.gazebo.xacro`), bridged
+as `/devol_drive/ground_truth/odom` (world frame, which equals `map`).
+
+## Running the tests in Gazebo
+
+Prerequisite: the sim fixes from the WSL machine (odom -> `a200_base_link` on `/tf` via the bridged
+`/model/devol_drive/tf`, the `a200_base_link` alias, the wheel-slip calibration). `ground_truth_tf`
+only replaces `map -> odom`; the planner still needs `odom -> base` on `/tf`.
+
+Live run with both views (what the filters see, as they run):
+
+```bash
+ros2 launch devol_localization localization_sim.launch.py                       # nominal route
+ros2 launch devol_localization localization_sim.launch.py scenario:=global      # PF uniform, EKF map-wide Gaussian
+ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap kidnap_time:=30 kidnap_target:=5.45,2.03,0.0
+# extra: output_dir:=~/loc_results/live  video_dir:=~/loc_results/live  viz_headless:=true  num_particles:=500
+```
+
+The protocol records each route once and replays it through every configuration:
+
+```bash
+# 1. Record (filters off; the controller drives on ground truth)
+ros2 launch devol_localization localization_sim.launch.py filters:=false record_bag:=~/loc_bags/nominal
+ros2 launch devol_localization localization_sim.launch.py filters:=false scenario:=kidnap record_bag:=~/loc_bags/kidnap
+# stop each with Ctrl-C once the robot has reached Goal 3
+
+# 2. One replayed trial, with the views
+ros2 launch devol_localization localization_replay.launch.py bag:=~/loc_bags/nominal viz:=true \
+    k:=1 sigma_r:=0.03 num_particles:=2000 seed:=0 output_dir:=~/loc_results/check
+
+# 3. The whole study (9 sweep configurations + global + kidnap, 20 seeds each), then the tables
+ros2 run devol_localization localization_study run --bag ~/loc_bags/nominal --kidnap-bag ~/loc_bags/kidnap \
+    --out ~/loc_results/study
+ros2 run devol_localization localization_study analyze --out ~/loc_results/study
+```
+
+## Offline tests
+
+```bash
+python3 -m pytest src/devol_localization/test
+```
