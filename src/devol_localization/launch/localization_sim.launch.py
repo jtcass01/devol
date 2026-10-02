@@ -29,7 +29,8 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 STACK_ARGS = ['scenario', 'estimators', 'k', 'sigma_r', 'seed', 'num_particles', 'output_dir', 'viz',
-              'viz_headless', 'video_dir', 'viz_window', 'maze']
+              'viz_headless', 'video_dir', 'viz_window', 'maze', 'test_case', 'finish_on_goal', 'max_duration',
+              'posterior_times', 'posterior_after_kidnap']
 
 RECORD_TOPICS = [
     '/clock',
@@ -69,7 +70,8 @@ def launch_setup(context):
         target = [float(v) for v in arg('kidnap_target').split(',')]
         actions.append(Node(
             package='devol_localization', executable='kidnapper', name='kidnapper', output='screen',
-            parameters=[{'use_sim_time': True, 'kidnap_time': float(arg('kidnap_time')), 'target': target}]))
+            parameters=[{'use_sim_time': True, 'kidnap_time': float(arg('kidnap_time')), 'target': target,
+                         'trigger': arg('kidnap_trigger')}]))
 
     bag = arg('record_bag')
     if bag:
@@ -93,7 +95,9 @@ def generate_launch_description():
         ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
         ('filters', 'true', 'Run the estimators, scorer and views live'),
         ('record_bag', '', 'Record the raw streams to this bag directory for offline replay'),
-        ('kidnap_time', '30.0', 'scenario:=kidnap: sim seconds after start to teleport the robot'),
+        ('kidnap_trigger', 'time', 'scenario:=kidnap: time (kidnap_time s after start) or after_waypoint '
+                                   '(kidnap_time s after reaching Goal 1)'),
+        ('kidnap_time', '30.0', 'scenario:=kidnap: delay in sim seconds before the teleport'),
         ('kidnap_target', '5.45,2.03,0.0', 'scenario:=kidnap: x,y,yaw to teleport to (default Goal 2)'),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
         ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf'),
@@ -106,6 +110,11 @@ def generate_launch_description():
         ('viz_headless', 'false', 'Render the views off screen (with video_dir)'),
         ('video_dir', '', 'Write <estimator>.mp4 views here'),
         ('viz_window', '16.0', 'Side of the robot-following map view in m; 0 = whole map'),
+        ('test_case', '0', 'Judge test case 1 or 2 and print PASS/FAIL (needs output_dir); 0 = off'),
+        ('finish_on_goal', 'false', 'End the launch once the robot reaches the last waypoint (needs output_dir)'),
+        ('max_duration', '0.0', 'With finish_on_goal: end after this many sim seconds anyway; 0 = never'),
+        ('posterior_times', '', 'Sim seconds to save PF-particles + EKF-covariance figures (needs output_dir)'),
+        ('posterior_after_kidnap', '1,5,15', 'Also save them this many s after a kidnap'),
     ]
     return LaunchDescription(
         [DeclareLaunchArgument(n, default_value=d, description=desc) for n, d, desc in args]

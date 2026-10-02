@@ -142,3 +142,36 @@ def test_figure_renders_offscreen(tmp_path):
         fig.save(str(tmp_path / f'{mode}.png'))
         fig.close()
         assert (tmp_path / f'{mode}.png').stat().st_size > 10000
+
+
+def test_test_case_verdicts():
+    from devol_localization.metrics import EstimatorScore, judge_test_case
+    good = {'ekf': EstimatorScore(waypoint_errors=[0.05, 0.1, 0.08], pos_rmse=0.07),
+            'pf': EstimatorScore(waypoint_errors=[0.1, 0.2, 0.12], pos_rmse=0.13),
+            'dead_reckoning': EstimatorScore(waypoint_errors=[0.5, 3.0, 6.0])}
+    ok, lines = judge_test_case(1, good, ['Goal 1', 'Goal 2', 'Goal 3'])
+    assert ok and len(lines) == 3
+    bad = dict(good, pf=EstimatorScore(waypoint_errors=[0.1, float('nan'), 0.3], pos_rmse=0.2))
+    ok, lines = judge_test_case(1, bad, ['Goal 1', 'Goal 2', 'Goal 3'])
+    assert not ok and 'not reached' in lines[1]
+    kid = {'pf': EstimatorScore(event_time=40.0, recovered=True, recovery_time=9.3),
+           'ekf': EstimatorScore(event_time=40.0, recovered=False, final_pos_err=7.0)}
+    ok, lines = judge_test_case(2, kid)
+    assert ok and lines[-1].startswith('INFO ekf: did not recover')
+    assert not judge_test_case(2, {'pf': EstimatorScore()})[0]
+
+
+def test_video_falls_back_to_opencv(tmp_path, monkeypatch):
+    pytest.importorskip('matplotlib')
+    cv2 = pytest.importorskip('cv2')
+    from matplotlib.animation import writers
+    from devol_localization.viz_core import LocalizationFigure, VideoRecorder
+    monkeypatch.setattr(writers, 'is_available', lambda name: False)
+    fig = LocalizationFigure('pf', interactive=False)
+    rec = VideoRecorder(fig.fig, str(tmp_path / 'v.mp4'), 5.0)
+    assert rec.backend == 'opencv'
+    for _ in range(3):
+        rec.grab()
+    rec.finish()
+    fig.close()
+    assert cv2.VideoCapture(str(tmp_path / 'v.mp4')).get(cv2.CAP_PROP_FRAME_COUNT) == 3

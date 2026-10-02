@@ -61,6 +61,8 @@ def run(args) -> int:
     out = Path(args.out).expanduser()
     bags = {'nominal': args.bag, 'global': args.bag, 'kidnap': args.kidnap_bag}
     todo = [r for r in study_configs() if args.scenarios == 'all' or r['scenario'] in args.scenarios.split(',')]
+    if args.configs:
+        todo = [r for r in todo if config_name(r) in args.configs.split(',')]
     failures = 0
     for r in todo:
         bag = bags[r['scenario']]
@@ -222,6 +224,7 @@ def main(argv=None) -> int:
     r.add_argument('--rate', type=float, default=1.0)
     r.add_argument('--maze', default='factory')
     r.add_argument('--scenarios', default='all', help='all, or a comma list of nominal,global,kidnap')
+    r.add_argument('--configs', default='', help='comma list of configuration names to run, e.g. N2000_k1_s0.03')
     r.add_argument('--timeout', type=float, default=900.0, help='seconds per trial')
     r.add_argument('--force', action='store_true', help='re-run trials that already have a summary')
     r.add_argument('--verbose', action='store_true')

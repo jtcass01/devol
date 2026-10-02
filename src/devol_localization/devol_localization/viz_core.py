@@ -237,3 +237,111 @@ class LocalizationFigure:
 
     def close(self) -> None:
         self._plt.close(self.fig)
+
+
+class VideoRecorder:
+    """Writes the figure's frames to an MP4 with ffmpeg, or OpenCV's mp4v codec when ffmpeg is missing.
+
+    A missing encoder never stops the live view: with neither available, recording is skipped and
+    `backend` is None.
+    """
+
+    def __init__(self, fig, path: str, fps: float) -> None:
+        self.fig = fig
+        self.path = path
+        self.backend: Optional[str] = None
+        self._writer = None
+        self._size = None
+        from matplotlib.animation import writers
+        if writers.is_available('ffmpeg'):
+            from matplotlib.animation import FFMpegWriter
+            self._writer = FFMpegWriter(fps=fps, bitrate=4000)
+            self._writer.setup(fig, path, dpi=100)
+            self.backend = 'ffmpeg'
+            return
+        try:
+            import cv2
+        except ImportError:
+            return
+        self._cv2 = cv2
+        self._fps = fps
+        self.backend = 'opencv'
+
+    def grab(self) -> None:
+        if self.backend == 'ffmpeg':
+            self._writer.grab_frame()
+        elif self.backend == 'opencv':
+            self.fig.canvas.draw()
+            rgba = np.asarray(self.fig.canvas.buffer_rgba())
+            frame = self._cv2.cvtColor(rgba, self._cv2.COLOR_RGBA2BGR)
+            if self._writer is None:
+                self._size = (frame.shape[1], frame.shape[0])
+                self._writer = self._cv2.VideoWriter(self.path, self._cv2.VideoWriter_fourcc(*'mp4v'),
+                                                     self._fps, self._size)
+            elif (frame.shape[1], frame.shape[0]) != self._size:   # window resized
+                frame = self._cv2.resize(frame, self._size)
+            self._writer.write(frame)
+
+    def finish(self) -> None:
+        if self._writer is None:
+            return
+        if self.backend == 'ffmpeg':
+            self._writer.finish()
+        else:
+            self._writer.release()
+        self._writer = None
+
+
+def posterior_figure(grid, resolution: float, origin: Sequence[float], truth, ekf_pose, ekf_cov, pf_pose, pf_cov,
+                     particles, scan_points=None, stamp: float = 0.0, window: float = 8.0, title: str = ''):
+    """One frame comparing the two posteriors at the same instant: the PF's particle set and the EKF's
+    single Gaussian (2-sigma ellipse), with ground truth. Returns a Matplotlib figure (Agg)."""
+    from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
+
+    fig = Figure(figsize=(7.5, 6.6), facecolor='white')
+    ax = fig.add_subplot(1, 1, 1)
+    h, w = np.asarray(grid).shape
+    ax.imshow(map_image(grid), origin='lower', interpolation='nearest', zorder=1,
+              extent=(origin[0], origin[0] + w * resolution, origin[1], origin[1] + h * resolution))
+    handles = []
+    if particles is not None and len(particles):
+        p = np.asarray(particles)
+        ax.quiver(p[:, 0], p[:, 1], np.cos(p[:, 2]), np.sin(p[:, 2]), color=COLOR_PF, alpha=0.35, zorder=4,
+                  angles='xy', scale_units='xy', scale=1.0 / 0.25, width=0.002, headwidth=3)
+        handles.append(Line2D([], [], color=COLOR_PF, marker='>', ls='', alpha=0.6,
+                              label=f'PF particles ({len(p)})'))
+    if scan_points is not None and len(scan_points):
+        ax.scatter(scan_points[:, 0], scan_points[:, 1], s=4, color=COLOR_SCAN, linewidths=0, zorder=3)
+        handles.append(Line2D([], [], color=COLOR_SCAN, marker='o', ls='', ms=3, label='lidar from ground truth'))
+    for pose, cov, color, label in ((pf_pose, pf_cov, COLOR_PF, 'PF'), (ekf_pose, ekf_cov, COLOR_EKF, 'EKF')):
+        if pose is None:
+            continue
+        if cov is not None:
+            e = ellipse_points(pose, np.asarray(cov)[:2, :2])
+            ax.plot(e[:, 0], e[:, 1], color=color, lw=2.0, zorder=6)
+        b, n = transform_points(pose, FOOTPRINT), transform_points(pose, NOSE)
+        ax.plot(b[:, 0], b[:, 1], color=color, lw=2.0, ls='--', zorder=7)
+        ax.plot(n[:, 0], n[:, 1], color=color, lw=2.0, zorder=7)
+        err = '' if truth is None else f', error {np.hypot(pose[0] - truth[0], pose[1] - truth[1]):.2f} m'
+        handles.append(Line2D([], [], color=color, lw=2.0, label=f'{label} mean and 2σ ellipse{err}'))
+    if truth is not None:
+        b, n = transform_points(truth, FOOTPRINT), transform_points(truth, NOSE)
+        ax.plot(b[:, 0], b[:, 1], color=COLOR_TRUTH, lw=2.5, zorder=8)
+        ax.plot(n[:, 0], n[:, 1], color=COLOR_TRUTH, lw=2.5, zorder=8)
+        handles.append(Line2D([], [], color=COLOR_TRUTH, lw=2.5, label='Gazebo ground truth'))
+    # Frame the truth and both estimates (each with window/2 of margin), within the map.
+    poses = [q for q in (truth, ekf_pose, pf_pose) if q is not None]
+    if window > 0.0 and poses:
+        xy = np.asarray([q[:2] for q in poses])
+        lo, hi = xy.min(axis=0) - window / 2, xy.max(axis=0) + window / 2
+        extent = (origin[0], origin[0] + w * resolution, origin[1], origin[1] + h * resolution)
+        ax.set_xlim(max(lo[0], extent[0]), min(hi[0], extent[1]))
+        ax.set_ylim(max(lo[1], extent[2]), min(hi[1], extent[3]))
+    ax.set_aspect('equal')
+    ax.set_xlabel('x (m)', color=TEXT_SECONDARY)
+    ax.set_ylabel('y (m)', color=TEXT_SECONDARY)
+    ax.legend(handles=handles, loc='upper left', fontsize=8, framealpha=0.9)
+    ax.set_title(title or f'Posteriors at t = {stamp:.1f} s', color=TEXT_PRIMARY, loc='left', fontsize=11)
+    fig.tight_layout()
+    return fig

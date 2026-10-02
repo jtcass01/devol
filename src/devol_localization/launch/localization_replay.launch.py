@@ -23,7 +23,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 STACK_ARGS = ['scenario', 'estimators', 'k', 'sigma_r', 'seed', 'num_particles', 'output_dir', 'viz',
-              'viz_headless', 'video_dir', 'viz_window', 'maze']
+              'viz_headless', 'video_dir', 'viz_window', 'maze', 'posterior_times']
 
 
 def launch_setup(context):
@@ -70,6 +70,7 @@ def generate_launch_description():
         ('video_dir', '', 'Write <estimator>.mp4 views here'),
         ('viz_window', '16.0', 'Side of the robot-following map view in m; 0 = whole map'),
         ('maze', 'factory', 'World the bag was recorded in (spawn pose, waypoints)'),
+        ('posterior_times', '', 'Sim seconds to save PF-particles + EKF-covariance figures (needs output_dir)'),
     ]
     return LaunchDescription(
         [DeclareLaunchArgument(n, default_value=d, description=desc) for n, d, desc in args]

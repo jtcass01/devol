@@ -12,7 +12,8 @@ Inputs (defaults for mode ekf; pf swaps ekf for pf)
   particles_topic    /devol_drive/pf_particles            geometry_msgs/PoseArray (pf only)
   compute_topic      /devol_drive/ekf_compute_time_ms     std_msgs/Float64
 
-Set video_file to also write an MP4 (needs ffmpeg), and headless:=true to only write the video.
+Set video_file to also write an MP4 (ffmpeg, else OpenCV; without either the view still runs), and
+snapshot_file to save the last frame as a PNG on exit. headless:=true only writes the files.
 Drawing runs in the main thread between executor spins.
 """
 
@@ -33,7 +34,7 @@ from std_msgs.msg import Float64
 
 from devol_localization.pose2d import (covariance_3x3, transform_points, wrap_angle,
                                        yaw_from_quaternion)
-from devol_localization.viz_core import LocalizationFigure, VizState
+from devol_localization.viz_core import LocalizationFigure, VideoRecorder, VizState
 
 __author__ = "Jacob Taylor Cassady"
 __email__ = "jcassad1@jh.edu"
@@ -63,6 +64,7 @@ class LocalizationViz(Node):
         self.declare_parameter('history', 0.0)        # seconds of error plot; 0 = whole run
         self.declare_parameter('headless', False)
         self.declare_parameter('video_file', '')
+        self.declare_parameter('snapshot_file', '')
         self.declare_parameter('title', '')
 
         gp = self.get_parameter
@@ -74,14 +76,19 @@ class LocalizationViz(Node):
         self.figure = LocalizationFigure(mode, title=str(gp('title').value), window=float(gp('window').value),
                                          history=float(gp('history').value), interactive=not headless)
         self.headless = headless
-        self._writer = None
+        self._snapshot = str(gp('snapshot_file').value)
+        self._writer: Optional[VideoRecorder] = None
         video = str(gp('video_file').value)
+        for path in (video, self._snapshot):
+            if path:
+                os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         if video:
-            from matplotlib.animation import FFMpegWriter
-            os.makedirs(os.path.dirname(os.path.abspath(video)), exist_ok=True)
-            self._writer = FFMpegWriter(fps=self.rate_hz, bitrate=4000)
-            self._writer.setup(self.figure.fig, video, dpi=100)
-            self.get_logger().info(f'Writing video to {video}')
+            self._writer = VideoRecorder(self.figure.fig, video, self.rate_hz)
+            if self._writer.backend is None:
+                self.get_logger().warning('Neither ffmpeg nor OpenCV is available; not recording video')
+                self._writer = None
+            else:
+                self.get_logger().info(f'Writing video to {video} ({self._writer.backend})')
 
         self._truth: Optional[np.ndarray] = None
         self._estimate: Optional[np.ndarray] = None
@@ -165,12 +172,15 @@ class LocalizationViz(Node):
             compute_ms=self._compute_ms, status=status))
         self.figure.draw()
         if self._writer is not None:
-            self._writer.grab_frame()
+            self._writer.grab()
 
     def close(self) -> None:
         if self._writer is not None:
             self._writer.finish()
             self._writer = None
+        if self._snapshot:
+            self.figure.save(self._snapshot)
+            self.get_logger().info(f'Saved {self._snapshot}')
         self.figure.close()
 
 

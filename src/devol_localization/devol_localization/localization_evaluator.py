@@ -15,6 +15,11 @@ Outputs, written to output_dir on shutdown and every write_period seconds:
 
 The scenario sets the recovery event: 'global' scores recovery from the first ground-truth sample,
 'kidnap' from the first teleport seen in the ground truth, 'nominal' scores no recovery.
+
+With test_case 1 or 2 the node also judges that verification test (metrics.judge_test_case), prints
+PASS/FAIL and writes verdict.txt. With finish_on_goal it ends the trial by itself: settle_time s after
+the ground truth reaches the last waypoint, or at max_duration s of sim time, it writes the results
+and exits, which the launch files turn into a shutdown of the whole run.
 """
 
 import csv
@@ -31,7 +36,8 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
 
-from devol_localization.metrics import (detect_jump, score_estimator, write_summary, write_trajectory_csv)
+from devol_localization.metrics import (detect_jump, judge_test_case, score_estimator, write_summary,
+                                        write_trajectory_csv)
 from devol_localization.pose2d import compose, covariance_3x3, relative, yaw_from_quaternion
 
 __author__ = "Jacob Taylor Cassady"
@@ -62,6 +68,11 @@ class LocalizationEvaluator(Node):
         self.declare_parameter('kidnap_jump', 1.0)
         self.declare_parameter('config_json', '{}')
         self.declare_parameter('write_period', 15.0)
+        self.declare_parameter('test_case', 0)                  # 0 none, 1 nominal route, 2 kidnapping
+        self.declare_parameter('finish_on_goal', False)
+        self.declare_parameter('finish_radius', 0.5)
+        self.declare_parameter('settle_time', 3.0)
+        self.declare_parameter('max_duration', 0.0)             # sim seconds; 0 = no limit
 
         gp = self.get_parameter
         self._out = Path(str(gp('output_dir').value)).expanduser()
@@ -81,6 +92,11 @@ class LocalizationEvaluator(Node):
         self._poses: Dict[str, List[List[float]]] = {GROUND_TRUTH: [], DEAD_RECKONING: []}
         self._compute: Dict[str, List[List[float]]] = {}
         self._odom0: Optional[np.ndarray] = None
+        self._test_case = int(gp('test_case').value)
+        self._finish_on_goal = bool(gp('finish_on_goal').value)
+        self._goal_time: Optional[float] = None
+        self.finished = False
+        self.finish_reason = ''
 
         ns = str(gp('namespace').value).rstrip('/')
         self.create_subscription(Odometry, gp('ground_truth_topic').value, self._gt_cb, 100)
@@ -98,8 +114,23 @@ class LocalizationEvaluator(Node):
     # ------------------------------------------------------------ callbacks
     def _gt_cb(self, msg: Odometry) -> None:
         p = msg.pose.pose
-        self._poses[GROUND_TRUTH].append([stamp_seconds(msg.header.stamp), p.position.x, p.position.y,
+        t = stamp_seconds(msg.header.stamp)
+        self._poses[GROUND_TRUTH].append([t, p.position.x, p.position.y,
                                           yaw_from_quaternion(p.orientation), 0.0, 0.0, 0.0])
+        if not self._finish_on_goal or self.finished:
+            return
+        gp = self.get_parameter
+        t0 = self._poses[GROUND_TRUTH][0][0]
+        max_duration = float(gp('max_duration').value)
+        if self._waypoints and self._goal_time is None:
+            gx, gy = self._waypoints[-1]
+            if np.hypot(p.position.x - gx, p.position.y - gy) <= float(gp('finish_radius').value):
+                self._goal_time = t
+                self.get_logger().info(f'Reached the last waypoint at t = {t:.1f} s')
+        if self._goal_time is not None and t - self._goal_time >= float(gp('settle_time').value):
+            self.finished, self.finish_reason = True, 'reached the last waypoint'
+        elif max_duration > 0.0 and t - t0 >= max_duration:
+            self.finished, self.finish_reason = True, f'max_duration {max_duration:g} s reached'
 
     def _odom_cb(self, msg: Odometry) -> None:
         p = msg.pose.pose
@@ -119,7 +150,7 @@ class LocalizationEvaluator(Node):
         self._compute[name].append([self.get_clock().now().nanoseconds * 1e-9, float(msg.data)])
 
     # --------------------------------------------------------------- output
-    def write(self) -> None:
+    def write(self) -> dict:
         rows = [[r[0], name, *r[1:]] for name, samples in self._poses.items() for r in samples]
         write_trajectory_csv(self._out / 'trajectory.csv', rows)
         with open(self._out / 'compute.csv', 'w', newline='') as f:
@@ -131,7 +162,7 @@ class LocalizationEvaluator(Node):
 
         gt = np.asarray(self._poses[GROUND_TRUTH], dtype=float).reshape(-1, 7)
         if gt.shape[0] < 2:
-            return
+            return {}
         gt_t, gt_poses = gt[:, 0], gt[:, 1:4]
         event: Optional[float] = None
         if self._scenario == 'global':
@@ -152,19 +183,40 @@ class LocalizationEvaluator(Node):
                 timeout=float(self.get_parameter('recovery_timeout').value),
                 waypoint_radius=float(self.get_parameter('waypoint_radius').value))
         write_summary(self._out / 'summary.json', self._config, scores)
+        return scores
+
+    def verdict(self) -> Optional[bool]:
+        """Writes the final results and, for a test case, prints and saves its PASS/FAIL report."""
+        scores = self.write()
+        if not self._test_case:
+            return None
+        if not scores:
+            passed, lines = False, ['FAIL no ground truth received (is the ground-truth bridge running?)']
+        else:
+            passed, lines = judge_test_case(self._test_case, scores, self._config.get('waypoint_names', ()),
+                                            float(self.get_parameter('recovery_threshold').value))
+        title = {1: 'Test case 1: nominal three-waypoint route', 2: 'Test case 2: kidnapping'}[self._test_case]
+        reason = f'; {self.finish_reason}' if self.finish_reason else ''
+        report = '\n'.join([f'===== {title}: {"PASS" if passed else "FAIL"} =====', *lines,
+                            f'(results in {self._out}{reason})'])
+        (self._out / 'verdict.txt').write_text(report + '\n')
+        print('\n' + report + '\n', flush=True)
+        return passed
 
 
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = LocalizationEvaluator()
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not node.finished:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        if node.finished:
+            node.get_logger().info(f'Trial finished: {node.finish_reason}')
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.write()
         s = (node._out / 'summary.json')
-        if s.exists():
+        if node.verdict() is None and s.exists():
             for name, m in json.loads(s.read_text())['estimators'].items():
                 print(f'[localization_evaluator] {name}: pos RMSE {m["pos_rmse"]} m, yaw RMSE {m["yaw_rmse"]} rad, '
                       f'recovered {m["recovered"]} after {m["recovery_time"]} s', flush=True)

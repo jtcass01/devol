@@ -30,6 +30,7 @@ setup(
             'kidnapper = devol_localization.kidnapper:main',
             'localization_evaluator = devol_localization.localization_evaluator:main',
             'localization_viz = devol_localization.localization_viz:main',
+            'posterior_snapshot = devol_localization.posterior_snapshot:main',
             'localization_study = devol_localization.localization_study:main',
         ],
     },

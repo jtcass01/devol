@@ -200,3 +200,66 @@ def clopper_pearson(successes: int, n: int, confidence: float = 0.95) -> Tuple[f
     lo = 0.0 if successes == 0 else float(beta.ppf(a / 2, successes, n - successes + 1))
     hi = 1.0 if successes == n else float(beta.ppf(1 - a / 2, successes + 1, n - successes))
     return lo, hi
+
+
+# ------------------------------------------------------------------ test cases
+
+def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names: Sequence[str] = (),
+                    threshold: float = RECOVERY_THRESHOLD) -> Tuple[bool, List[str]]:
+    """PASS/FAIL of the verification test cases, with one report line per check.
+
+    1, nominal route: the EKF and the PF are within `threshold` of ground truth at every waypoint,
+       and dead reckoning's mean waypoint error is larger than every filter waypoint error.
+    2, kidnapping: the teleport is seen in the ground truth and the PF falls back below `threshold`
+       for good before the recovery timeout. The EKF's outcome is reported but not judged.
+    """
+    lines: List[str] = []
+    ok = True
+
+    def wp_text(errs):
+        names = list(waypoint_names) + [f'waypoint {i + 1}' for i in range(len(waypoint_names), len(errs))]
+        return ', '.join(f'{n}: {"not reached" if not np.isfinite(e) else f"{e:.3f} m"}' for n, e in zip(names, errs))
+
+    if case == 1:
+        worst = 0.0
+        for name in ('ekf', 'pf'):
+            s = scores.get(name)
+            if s is None or not s.waypoint_errors:
+                lines.append(f'FAIL {name}: no waypoint errors (estimator not running or route not driven)')
+                ok = False
+                continue
+            errs = np.asarray(s.waypoint_errors, dtype=float)
+            good = bool(np.all(np.isfinite(errs)) and np.all(errs < threshold))
+            worst = max(worst, float(np.nanmax(errs)) if np.isfinite(errs).any() else np.inf)
+            ok &= good
+            lines.append(f'{"PASS" if good else "FAIL"} {name}: every waypoint within {threshold} m '
+                         f'({wp_text(errs)}); position RMSE {s.pos_rmse:.3f} m')
+        dr = scores.get('dead_reckoning')
+        if dr is not None and dr.waypoint_errors:
+            dr_mean = float(np.nanmean(dr.waypoint_errors))
+            good = dr_mean > worst
+            ok &= good
+            lines.append(f'{"PASS" if good else "FAIL"} dead reckoning worse than both filters: mean waypoint '
+                         f'error {dr_mean:.3f} m vs worst filter {worst:.3f} m')
+        else:
+            ok = False
+            lines.append('FAIL dead reckoning: no waypoint errors')
+    elif case == 2:
+        pf = scores.get('pf')
+        event = pf.event_time if pf is not None else None
+        if event is None:
+            lines.append('FAIL kidnap: no teleport found in the ground truth')
+            return False, lines
+        lines.append(f'kidnap seen at t = {event:.2f} s')
+        good = bool(pf.recovered)
+        ok &= good
+        lines.append(f'{"PASS" if good else "FAIL"} pf: ' + (
+            f'back within {threshold} m {pf.recovery_time:.1f} s after the kidnap' if good
+            else f'did not return within {threshold} m (final error {pf.final_pos_err:.2f} m)'))
+        ekf = scores.get('ekf')
+        if ekf is not None:
+            lines.append('INFO ekf: ' + (f'recovered after {ekf.recovery_time:.1f} s' if ekf.recovered
+                                         else f'did not recover (final error {ekf.final_pos_err:.2f} m)'))
+    else:
+        raise ValueError(f'unknown test case {case}')
+    return ok, lines
