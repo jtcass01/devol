@@ -281,7 +281,8 @@ def test_stack_sets_filter_init_per_scenario(monkeypatch, scenario):
 def test_test_cases_detect_a_still_running_sim(monkeypatch, tmp_path):
     tc = _load_launch(monkeypatch, 'localization_test_cases.launch.py')
     running = [['/usr/bin/ruby3.3', '/usr/bin/gz', 'sim', '-s', 'factory.sdf'], ['gz', 'sim', '-g'],
-               ['/opt/ros/lyrical/lib/ros_gz_bridge/parameter_bridge', '--ros-args'], ['gz-sim-server']]
+               ['/opt/ros/lyrical/lib/ros_gz_bridge/parameter_bridge', '--ros-args'], ['gz-sim-server'],
+               ['/opt/ros/lyrical/opt/gz_sim_vendor/libexec/gz/sim10/gz-sim-main', '-s', 'factory.sdf']]
     harmless = [['bash', '-c', 'pkill -f "gz sim"'], ['gz', 'topic', '-l'], ['python3', 'gz', 'sim'], []]
     assert all(tc.is_sim_process(a) for a in running)
     assert not any(tc.is_sim_process(a) for a in harmless)

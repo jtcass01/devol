@@ -129,7 +129,8 @@ class LocalizationEvaluator(Node):
         if not gt and max_start > 0.0 and t > max_start:
             self.get_logger().warning(
                 f'Ignoring ground truth at t = {t:.1f} s: a new sim starts near 0 s, so this is probably a '
-                f'previous Gazebo still shutting down. Stop it (pkill -f "gz sim"; pkill -f parameter_bridge).',
+                'previous Gazebo still shutting down. Stop it '
+                '(pkill -f gz-sim; pkill -f "gz sim"; pkill -f parameter_bridge).',
                 throttle_duration_sec=5.0)
             return
         if gt and t < gt[-1][0] - 1.0:

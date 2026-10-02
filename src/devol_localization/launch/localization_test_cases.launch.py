@@ -32,7 +32,8 @@ def is_sim_process(argv):
     """True for a Gazebo server (`gz sim ...`, run directly or through ruby) or a ros_gz parameter_bridge.
 
     Matches on the program and its first arguments, not on the whole command line, so a shell whose
-    script merely mentions `gz sim` (or pkill -f "gz sim") is not mistaken for a running sim.
+    script merely mentions `gz sim` (or pkill -f "gz sim") is not mistaken for a running sim. The Jetty
+    server shows up as `.../gz_sim_vendor/libexec/gz/sim10/gz-sim-main`.
     """
     args = list(argv)
     if not args:
@@ -76,7 +77,9 @@ def launch_setup(context):
             raise RuntimeError(
                 'A Gazebo sim or ros_gz bridge from an earlier run is still running, and its clock and ground '
                 'truth would be scored as this run:\n  ' + '\n  '.join(stale) +
-                '\nWait for it to exit or stop it (pkill -f "gz sim"; pkill -f parameter_bridge), then relaunch. '
+                '\nThis launch aborts rather than waits. Stop them with\n  pkill -f gz-sim; pkill -f "gz sim"; '
+                'pkill -f parameter_bridge\nconfirm `pgrep -af "gz-sim|gz sim|parameter_bridge"` prints nothing, '
+                'then relaunch. '
                 '(check_running_sim:=false skips this check.)')
     out = os.path.expanduser(arg('output_dir') or f'~/loc_results/test_case_{case}')
     sim_args = {
