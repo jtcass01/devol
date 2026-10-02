@@ -5,8 +5,9 @@ from math import hypot, pi
 import numpy as np
 import pytest
 
-from devol_sim.rrt_planner import (FootprintCollisionChecker, PlannerConfig, RRTPlanner,
-                                   StartInCollision, densify, path_length)
+from devol_sim.rrt_planner import (DEFAULT_BODY, FootprintCollisionChecker, PlannerConfig,
+                                   RRTPlanner, StartInCollision, body_checker_from_voxels, densify,
+                                   layer_grids_from_voxels, path_length)
 
 RES = 0.05
 FACTORY_PCD = os.path.join(os.path.dirname(__file__), '..', '..', 'devol_gazebo', 'worlds',
@@ -35,6 +36,43 @@ def projected_grid_from_pcd(path, resolution=RES, min_z=0.1, max_z=5.0):
     keep = (pts[:, 2] >= min_z) & (pts[:, 2] <= max_z)
     grid[rows[keep], cols[keep]] = 100
     return grid, origin
+
+
+def voxels_from_pcd(path, resolution=RES, min_z=0.1, max_z=5.0):
+    """Approximates octomap_server's occupied leaves for a static cloud
+    (finest leaves only, filtered to occupancy_min_z..occupancy_max_z)."""
+    pts = np.loadtxt(path, skiprows=11)
+    keys = np.unique(np.floor(pts / resolution).astype(int), axis=0)
+    centers = (keys + 0.5) * resolution
+    keep = (centers[:, 2] + resolution / 2 > min_z) & (centers[:, 2] - resolution / 2 < max_z)
+    return centers[keep]
+
+
+def exact_3d_collision(voxel_keys, body, pose, padding=0.05, step=RES / 4):
+    """Independent reference: sample each padded 3D body box densely and look the
+    points up in a dense 3D array of finest-voxel keys."""
+    occ, k0 = voxel_keys
+    x, y, th = pose
+    c, s = np.cos(th), np.sin(th)
+    for b in body:
+        xs = np.arange(b.x_min - padding, b.x_max + padding + 1e-9, step)
+        ys = np.arange(b.y_min - padding, b.y_max + padding + 1e-9, step)
+        zs = np.arange(b.z_min + 1e-6, b.z_max + padding, step)
+        bx, by, bz = np.meshgrid(xs, ys, zs, indexing='ij')
+        wx, wy = x + c * bx - s * by, y + s * bx + c * by
+        keys = np.floor(np.stack([wx.ravel(), wy.ravel(), bz.ravel()], 1) / RES).astype(int) - k0
+        inside = np.all((keys >= 0) & (keys < occ.shape), axis=1)
+        if occ[tuple(keys[inside].T)].any():
+            return True
+    return False
+
+
+def voxel_key_array(voxels):
+    keys = np.floor(voxels / RES).astype(int)
+    k0 = keys.min(0)
+    occ = np.zeros(keys.max(0) - k0 + 1, dtype=bool)
+    occ[tuple((keys - k0).T)] = True
+    return occ, k0
 
 
 def dense_path_poses(checker, path):
@@ -196,3 +234,88 @@ def test_factory_world_goals():
         assert result.success, f'no path {start} -> {goal}'
         assert not checker.poses_in_collision(dense_path_poses(checker, result.path))
         assert path_length(result.path) >= hypot(goal[0] - start[0], goal[1] - start[1]) - 1e-6
+
+
+# 3D (octomap voxels)
+def box_voxels(x0, x1, y0, y1, z0, z1, res=RES):
+    xs = np.arange(x0 + res / 2, x1, res)
+    ys = np.arange(y0 + res / 2, y1, res)
+    zs = np.arange(z0 + res / 2, z1, res)
+    return np.stack(np.meshgrid(xs, ys, zs, indexing='ij'), -1).reshape(-1, 3)
+
+
+def walled_room_voxels(width=8.0, height=6.0, wall_top=2.0):
+    return np.vstack([box_voxels(0, width, 0, 0.1, 0.1, wall_top),
+                      box_voxels(0, width, height - 0.1, height, 0.1, wall_top),
+                      box_voxels(0, 0.1, 0, height, 0.1, wall_top),
+                      box_voxels(width - 0.1, width, 0, height, 0.1, wall_top)])
+
+
+def test_pruned_leaves_fill_all_their_cells():
+    # One 0.2 m leaf (a pruned 4x4x4 block) and one finest leaf.
+    centers = np.array([[1.1, 1.1, 0.3], [2.025, 2.025, 1.025]])
+    grids, origin = layer_grids_from_voxels(centers, [0.2, 0.05], RES, [(0.05, 0.4), (0.4, 1.5)])
+    low, high = grids
+    assert origin == (1.0, 1.0)
+    assert (low == 100).sum() == 16 and (high == 100).sum() == 1   # the big leaf tops out at 0.4 m
+    assert low[0:4, 0:4].all() and high[20, 20] == 100 and low[20, 20] == 0
+
+
+def test_3d_drives_under_overhang_but_not_into_low_obstacle():
+    room = walled_room_voxels()
+    beam = box_voxels(3.9, 4.1, 0.1, 5.9, 1.8, 2.0)        # overhead beam across the room at 1.8-2.0 m
+    checker = body_checker_from_voxels(np.vstack([room, beam]), RES, RES, margin=0.0)
+    assert not checker.is_collision(4.0, 3.0, 0.0)          # robot (<= 1.5 m tall) fits under it
+    planner = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0))
+    result = planner.plan((1.5, 3.0, 0.0), (6.5, 3.0, 0.0))
+    assert result.success and len(result.path) == 2         # straight across, under the beam
+
+    # The same beam lowered to table height blocks the arm, and a 20 cm curb blocks the base.
+    for obstacle in (box_voxels(3.9, 4.1, 0.1, 5.9, 0.6, 0.7), box_voxels(3.9, 4.1, 0.1, 5.9, 0.1, 0.2)):
+        checker = body_checker_from_voxels(np.vstack([room, obstacle]), RES, RES, margin=0.0)
+        assert checker.is_collision(4.0, 3.0, 0.0)
+        result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=1.0)).plan(
+            (1.5, 3.0, 0.0), (6.5, 3.0, 0.0))
+        assert not result.success
+
+
+def test_arm_box_overhangs_under_a_table():
+    # A table top at 0.6-0.7 m reaching 0.3 m in from the wall: the base (0.40 m
+    # tall) fits under it but the arm box does not.
+    room = walled_room_voxels()
+    table = box_voxels(0.1, 8.0, 0.1, 0.4, 0.6, 0.7)
+    checker = body_checker_from_voxels(np.vstack([room, table]), RES, RES, margin=0.0)
+    base_only = body_checker_from_voxels(np.vstack([room, table]), RES, RES, body=DEFAULT_BODY[:1], margin=0.0)
+    pose = (4.0, 0.57, 0.0)                     # padded base reaches 0.185 m, under the table
+    assert not base_only.is_collision(*pose)
+    assert checker.is_collision(*pose)           # the arm box (padded to 0.27 m) hits the table top
+    assert not checker.is_collision(4.0, 0.75, 0.0)
+
+
+@pytest.mark.skipif(not os.path.exists(FACTORY_PCD), reason='factory static_world.pcd not found')
+def test_factory_3d_check_matches_exact_voxel_test():
+    voxels = voxels_from_pcd(FACTORY_PCD)
+    checker = body_checker_from_voxels(voxels, RES, RES)
+    voxel_keys = voxel_key_array(voxels)
+    rng = np.random.default_rng(1)
+    (x0, x1), (y0, y1) = checker.x_bounds, checker.y_bounds
+    poses = np.column_stack([rng.uniform(x0 + 1.5, x1 - 1.5, 300), rng.uniform(y0 + 1.5, y1 - 1.5, 300),
+                             rng.uniform(-pi, pi, 300)])
+    hits = 0
+    for pose in poses:
+        expected = exact_3d_collision(voxel_keys, DEFAULT_BODY, pose)
+        hits += expected
+        assert checker.is_collision(*pose) == expected, pose
+    assert 0 < hits < len(poses)
+
+
+@pytest.mark.skipif(not os.path.exists(FACTORY_PCD), reason='factory static_world.pcd not found')
+def test_factory_world_goals_3d():
+    voxels = voxels_from_pcd(FACTORY_PCD)
+    checker = body_checker_from_voxels(voxels, RES, RES)
+    waypoints = [(0.0, 0.0, 0.0), (-4.7, 9.2, 3.14159), (5.45, 2.03, 0.0), (1.87, -8.06, -1.5708)]
+    for start, goal in zip(waypoints[:-1], waypoints[1:]):
+        planner = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0))
+        result = planner.plan(start, goal)
+        assert result.success, f'no path {start} -> {goal}'
+        assert not checker.poses_in_collision(dense_path_poses(checker, result.path))

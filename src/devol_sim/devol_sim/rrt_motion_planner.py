@@ -2,9 +2,14 @@
 """RRT / RRT* drop-in replacement for agent_motion_planner.
 
 Same interfaces as agent_motion_planner (goal_points in, goal_pose out, robot
-pose from TF), but plans on octomap_server's un-inflated projected_map and
-collision checks the robot's actual rectangular footprint instead of a point
-robot on the padded C-space map.
+pose from TF). Instead of a point robot on the padded C-space map, it collision
+checks the robot's body against octomap_server's map:
+
+* map_source 'octomap_3d' (default): the occupied voxels from
+  occupied_cells_vis_array, checked against a stack of body boxes (base, arm),
+  each against the voxels in its own height band.
+* map_source 'projected_map': the 2D projected_map, checked against one
+  rectangular footprint.
 """
 from __future__ import annotations
 
@@ -24,8 +29,10 @@ from rclpy.qos import QoSProfile
 from visualization_msgs.msg import Marker, MarkerArray
 
 from devol_sim.mobile_robot_goal import MobileRobotGoal
-from devol_sim.rrt_planner import (FootprintCollisionChecker, GoalInCollision, PlannerConfig,
-                                   PlanResult, RRTPlanner, StartInCollision, densify)
+from devol_sim.rrt_planner import (DEFAULT_BODY, FootprintCollisionChecker, GoalInCollision,
+                                   MultiFootprintChecker, PlannerConfig, PlanResult, RRTPlanner,
+                                   StartInCollision, body_checker_from_voxels, body_from_flat,
+                                   densify)
 from devol_sim.utils import euler_to_quaternion, quaternion_to_euler
 
 __author__ = "Jacob Taylor Cassady"
@@ -45,7 +52,14 @@ class RRTMotionPlanner(RCLPY_Node):
         self.declare_parameter('intermediate_goal_tolerance', 0.15)
         self.declare_parameter('tf_to_frame', 'map')
         self.declare_parameter('tf_from_frame', 'a200_base_link')
-        # Map and footprint (A200 overall size from a200_description: chassis
+        # Map source
+        self.declare_parameter('map_source', 'octomap_3d')
+        # 3D: robot body as boxes, 6 values each (x_min x_max y_min y_max z_min z_max)
+        # in base_footprint with z = 0 on the ground. Empty = DEFAULT_BODY.
+        self.declare_parameter('voxel_topic', 'occupied_cells_vis_array')
+        self.declare_parameter('body_boxes', [0.0])
+        self.declare_parameter('ground_z', 0.0)
+        # 2D: footprint (A200 overall size from a200_description: chassis
         # 0.9874 m long, wheels at +-0.2775 m and 0.1 m wide)
         self.declare_parameter('map_topic', 'projected_map')
         self.declare_parameter('unknown_is_occupied', True)
@@ -73,11 +87,18 @@ class RRTMotionPlanner(RCLPY_Node):
         self._intermediate_goal_tolerance = float(p('intermediate_goal_tolerance'))
         self._to_frame = str(p('tf_to_frame'))
         self._from_frame = f'{self._namespace[1:]}/{p("tf_from_frame")}'
+        self._map_source = str(p('map_source'))
+        if self._map_source not in ('octomap_3d', 'projected_map'):
+            raise ValueError(f"map_source must be 'octomap_3d' or 'projected_map', got {self._map_source!r}")
+        boxes = [float(v) for v in p('body_boxes')]
+        self._body = body_from_flat(boxes) if len(boxes) > 1 else DEFAULT_BODY
+        self._ground_z = float(p('ground_z'))
         self._unknown_is_occupied = bool(p('unknown_is_occupied'))
+        self._padding = float(p('footprint_padding'))
         self._footprint = dict(length=float(p('footprint_length')),
                                width=float(p('footprint_width')),
-                               padding=float(p('footprint_padding')),
-                               center_offset=float(p('footprint_offset')))
+                               padding=self._padding,
+                               offset=(float(p('footprint_offset')), 0.0))
         self._config = PlannerConfig(algorithm=str(p('algorithm')),
                                      step_size=float(p('step_size')),
                                      goal_bias=float(p('goal_bias')),
@@ -95,12 +116,15 @@ class RRTMotionPlanner(RCLPY_Node):
 
         # I/O
         qos_profile = QoSProfile(depth=10)
-        map_topic = str(p('map_topic'))
+        map_topic = str(p('voxel_topic') if self._map_source == 'octomap_3d' else p('map_topic'))
         if not map_topic.startswith('/'):
             map_topic = f'{self._namespace}/{map_topic}'
         self._goal_pub = self.create_publisher(PoseStamped, f'{self._namespace}/goal_pose', qos_profile)
         self._path_pub = self.create_publisher(Path, f'{self._namespace}/rrt_path', qos_profile)
-        self._map_sub = self.create_subscription(OccupancyGrid, map_topic, self.map_received, 10)
+        if self._map_source == 'octomap_3d':
+            self._map_sub = self.create_subscription(MarkerArray, map_topic, self.voxels_received, 10)
+        else:
+            self._map_sub = self.create_subscription(OccupancyGrid, map_topic, self.map_received, 10)
         self._goals_sub = self.create_subscription(MarkerArray, f'{self._namespace}/goal_points',
                                                    self.goal_points_received, 10)
 
@@ -122,7 +146,8 @@ class RRTMotionPlanner(RCLPY_Node):
             self._viz_thread.start()
 
         self.timer = self.create_timer(1.0 / self._publish_rate, self.plan_to_goals)
-        self.get_logger().info(f'RRTMotionPlanner ({self._config.algorithm}) started, map: {map_topic}')
+        self.get_logger().info(f'RRTMotionPlanner ({self._config.algorithm}, {self._map_source}) started, '
+                               f'map: {map_topic}')
 
     def stop(self):
         self._stop_event.set()
@@ -130,6 +155,31 @@ class RRTMotionPlanner(RCLPY_Node):
             self._viz_thread.join()
 
     # Callbacks
+    def voxels_received(self, msg: MarkerArray) -> None:
+        """octomap_server's occupied_cells_vis_array: one CUBE_LIST marker per
+        tree depth, scale = leaf size at that depth, points = leaf centres."""
+        markers = [m for m in msg.markers if m.action == Marker.ADD and len(m.points) > 0]
+        if not markers:
+            return
+        # The map is republished with every cloud insertion; skip unchanged ones
+        # cheaply (converting every point is the expensive part).
+        key = tuple((round(m.scale.x, 6), len(m.points),
+                     m.points[0].x, m.points[0].y, m.points[0].z,
+                     m.points[-1].x, m.points[-1].y, m.points[-1].z) for m in markers)
+        if key == self._map_key:
+            return
+        centers = np.concatenate([np.array([(q.x, q.y, q.z) for q in m.points]) for m in markers])
+        sizes = np.concatenate([np.full(len(m.points), m.scale.x) for m in markers])
+        resolution = float(min(m.scale.x for m in markers))
+        checker = body_checker_from_voxels(centers, sizes, resolution, self._body,
+                                           ground_z=self._ground_z, padding=self._padding)
+        with self._lock:
+            self._checker = checker
+            self._map_key = key
+        part = checker.parts[0]
+        self.get_logger().info(f'3D map updated: {len(centers)} occupied voxels, '
+                               f'{part.n_cols}x{part.n_rows} @ {resolution:.3f} m, {len(checker.parts)} body boxes')
+
     def map_received(self, msg: OccupancyGrid) -> None:
         info = msg.info
         data = np.asarray(msg.data, dtype=np.int8)
@@ -277,8 +327,13 @@ class RRTMotionPlanner(RCLPY_Node):
                 pause(0.1)
                 continue
             ax.clear()
+            parts = checker.parts if isinstance(checker, MultiFootprintChecker) else [checker]
             (x0, x1), (y0, y1) = checker.x_bounds, checker.y_bounds
-            ax.imshow(checker.occupied, cmap='gray_r', origin='lower', extent=(x0, x1, y0, y1))
+            # Darker = blocks a lower body box (the base); lighter = only the upper boxes.
+            shade = np.zeros(parts[0].occupied.shape)
+            for k, part in reversed(list(enumerate(parts))):
+                shade[part.occupied] = 1.0 - 0.5 * k / max(1, len(parts) - 1)
+            ax.imshow(shade, cmap='gray_r', origin='lower', extent=(x0, x1, y0, y1), vmin=0, vmax=1)
             result = self._last_result
             if result is not None and result.tree is not None:
                 nodes, parents = result.tree
@@ -290,11 +345,13 @@ class RRTMotionPlanner(RCLPY_Node):
                 ax.plot(path[:, 0], path[:, 1], 'b.-', label='Path')
             if self._robot_pose is not None:
                 rx, ry, ryaw = self._robot_pose
-                hl, hw, off = checker.half_length, checker.half_width, checker.center_offset
                 c, s = np.cos(ryaw), np.sin(ryaw)
-                corners = [(off + a * hl, b * hw) for a, b in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
-                ax.add_patch(Polygon([(rx + c * u - s * v, ry + s * u + c * v) for u, v in corners],
-                                     fill=False, color='r', label='Robot'))
+                for part in parts:
+                    hl, hw = part.half_length, part.half_width
+                    corners = [(part.offset_x + a * hl, part.offset_y + b * hw)
+                               for a, b in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
+                    ax.add_patch(Polygon([(rx + c * u - s * v, ry + s * u + c * v) for u, v in corners],
+                                         fill=False, color='r'))
             for goal in self._goals:
                 ax.plot(goal.x, goal.y, 'gs', markersize=8)
             ax.set_title(f'{self._config.algorithm} planner')

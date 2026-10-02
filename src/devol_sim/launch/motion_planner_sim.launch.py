@@ -199,7 +199,7 @@ def generate_launch_description():
                 'lookahead': 0.25,
                 'goal_tolerance': 0.1,
                 'intermediate_goal_tolerance': 0.4,
-                'map_topic': 'projected_map',
+                'map_source': 'octomap_3d',
                 'algorithm': planner if planner != 'a_star' else 'rrt_star',
             }]
         )

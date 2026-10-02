@@ -51,7 +51,7 @@ class FootprintCollisionChecker:
                  length: float = 0.99,
                  width: float = 0.67,
                  padding: float = 0.05,
-                 center_offset: float = 0.0,
+                 offset: Tuple[float, float] = (0.0, 0.0),
                  occupied_threshold: int = 50,
                  unknown_is_occupied: bool = True):
         self.resolution = float(resolution)
@@ -67,7 +67,7 @@ class FootprintCollisionChecker:
 
         self.half_length = 0.5 * length + padding
         self.half_width = 0.5 * width + padding
-        self.center_offset = center_offset  # footprint centre ahead of base_link (m)
+        self.offset_x, self.offset_y = float(offset[0]), float(offset[1])  # footprint centre in base_link (m)
 
         # Circle radii about the footprint centre. A cell is a square, so its
         # centre may sit up to half a diagonal from an occupied area.
@@ -82,14 +82,16 @@ class FootprintCollisionChecker:
         step = 0.5 * self.resolution
         nx = int(ceil(2.0 * self.half_length / step)) + 1
         ny = int(ceil(2.0 * self.half_width / step)) + 1
-        xs = np.linspace(-self.half_length, self.half_length, nx) + center_offset
-        ys = np.linspace(-self.half_width, self.half_width, ny)
+        xs = np.linspace(-self.half_length, self.half_length, nx) + self.offset_x
+        ys = np.linspace(-self.half_width, self.half_width, ny) + self.offset_y
         bx, by = np.meshgrid(xs, ys)
         self._body_points = np.stack([bx.ravel(), by.ravel()])  # 2 x M
 
         # Step sizes that keep every footprint point moving <= half a cell.
         self.translation_step = 0.5 * self.resolution
-        reach = hypot(self.half_length + abs(center_offset), self.half_width)
+        reach = hypot(self.half_length + abs(self.offset_x), self.half_width + abs(self.offset_y))
+        # A footprint centre is within this distance of base_link at any heading.
+        self._offset_norm = hypot(self.offset_x, self.offset_y)
         self.rotation_step = 0.5 * self.resolution / reach
 
     def _set_occupied(self, occupied: np.ndarray) -> None:
@@ -154,8 +156,9 @@ class FootprintCollisionChecker:
         poses = np.atleast_2d(np.asarray(poses, dtype=float))
         if poses.size == 0:
             return False
-        cx = poses[:, 0] + self.center_offset * np.cos(poses[:, 2])
-        cy = poses[:, 1] + self.center_offset * np.sin(poses[:, 2])
+        c, s = np.cos(poses[:, 2]), np.sin(poses[:, 2])
+        cx = poses[:, 0] + self.offset_x * c - self.offset_y * s
+        cy = poses[:, 1] + self.offset_x * s + self.offset_y * c
         clear = self.clearance(cx, cy)
 
         # Cheap circle tests on the distance transform first.
@@ -202,6 +205,152 @@ class FootprintCollisionChecker:
     def free_area(self) -> float:
         return float((~self.occupied).sum()) * self.resolution ** 2
 
+    def surely_blocked(self, x: float, y: float) -> bool:
+        """True if base_link at (x, y) collides at every heading (cheap sample rejection)."""
+        return self.clearance([x], [y])[0] < self.inscribed_radius - self._offset_norm
+
+
+class MultiFootprintChecker:
+    """A robot body made of several footprints, each checked against its own grid.
+
+    Used for the 3D check: each part is one box of the robot body, tested
+    against the octomap voxels that fall in that box's height band (see
+    body_checker_from_voxels). The interface matches FootprintCollisionChecker.
+    """
+
+    def __init__(self, parts: List[FootprintCollisionChecker]):
+        if not parts:
+            raise ValueError('need at least one footprint')
+        self.parts = parts
+        self.translation_step = min(p.translation_step for p in parts)
+        self.rotation_step = min(p.rotation_step for p in parts)
+
+    @property
+    def x_bounds(self) -> Tuple[float, float]:
+        return self.parts[0].x_bounds
+
+    @property
+    def y_bounds(self) -> Tuple[float, float]:
+        return self.parts[0].y_bounds
+
+    def is_collision(self, x: float, y: float, theta: float) -> bool:
+        return self.poses_in_collision(np.array([[x, y, theta]]))
+
+    def poses_in_collision(self, poses: np.ndarray) -> bool:
+        return any(p.poses_in_collision(poses) for p in self.parts)
+
+    segment_poses = FootprintCollisionChecker.segment_poses
+    rotation_poses = FootprintCollisionChecker.rotation_poses
+    segment_in_collision = FootprintCollisionChecker.segment_in_collision
+    rotation_in_collision = FootprintCollisionChecker.rotation_in_collision
+
+    def surely_blocked(self, x: float, y: float) -> bool:
+        return any(p.surely_blocked(x, y) for p in self.parts)
+
+    def free_area(self) -> float:
+        # Area where the lowest (largest) part fits, for the RRT* radius.
+        return min(p.free_area() for p in self.parts)
+
+    def free_unknown_under(self, x: float, y: float, theta: float) -> int:
+        return sum(p.free_unknown_under(x, y, theta) for p in self.parts)
+
+
+@dataclass
+class BodyBox:
+    """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+
+
+# Clearpath A200 + stowed UR5e + Robotiq gripper. The base box covers chassis,
+# wheels and bumpers (0.99 x 0.67 m, top plate ~0.36 m above ground). The arm
+# box is an estimate of the stowed arm envelope above the UR mount
+# (0.168 m ahead of base_link); confirm it against the arm's actual stow pose.
+# The base box starts 5 cm up so the floor's own voxel layer never counts.
+DEFAULT_BODY = [
+    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.40),
+    BodyBox(-0.10, 0.45, -0.25, 0.25, 0.40, 1.50),
+]
+
+
+def body_from_flat(values: List[float]) -> List[BodyBox]:
+    """Six numbers per box: x_min, x_max, y_min, y_max, z_min, z_max."""
+    if len(values) == 0 or len(values) % 6:
+        raise ValueError('body boxes need 6 values each (x_min x_max y_min y_max z_min z_max)')
+    return [BodyBox(*map(float, values[i:i + 6])) for i in range(0, len(values), 6)]
+
+
+def layer_grids_from_voxels(centers: np.ndarray,
+                            sizes: np.ndarray,
+                            resolution: float,
+                            z_bands: List[Tuple[float, float]],
+                            margin: float = 0.0):
+    """Rasterise occupied octomap voxels into one 2D grid per height band.
+
+    centers: N x 3 voxel centres; sizes: N edge lengths (octomap prunes uniform
+    regions into larger leaves, so a leaf can span several finest cells).
+    A cell of band k is occupied if any voxel overlaps that cell's column
+    between z_bands[k][0] and z_bands[k][1].
+    Returns (grids, origin) with grids as int8 arrays (100 occupied, 0 free).
+    """
+    centers = np.asarray(centers, dtype=float).reshape(-1, 3)
+    sizes = np.broadcast_to(np.asarray(sizes, dtype=float), (len(centers),))
+    half = 0.5 * sizes[:, None]
+    lo = centers - half
+    hi = centers + half
+    eps = 1e-6 * resolution
+    origin = (np.floor((lo[:, 0].min() - margin) / resolution) * resolution,
+              np.floor((lo[:, 1].min() - margin) / resolution) * resolution)
+    n_cols = int(np.ceil((hi[:, 0].max() + margin - origin[0]) / resolution - eps))
+    n_rows = int(np.ceil((hi[:, 1].max() + margin - origin[1]) / resolution - eps))
+
+    c0 = np.floor((lo[:, 0] - origin[0]) / resolution + eps).astype(np.int64)
+    c1 = np.ceil((hi[:, 0] - origin[0]) / resolution - eps).astype(np.int64)
+    r0 = np.floor((lo[:, 1] - origin[1]) / resolution + eps).astype(np.int64)
+    r1 = np.ceil((hi[:, 1] - origin[1]) / resolution - eps).astype(np.int64)
+
+    grids = []
+    for z_lo, z_hi in z_bands:
+        grid = np.zeros((n_rows, n_cols), dtype=np.int8)
+        sel = np.nonzero((hi[:, 2] > z_lo) & (lo[:, 2] < z_hi))[0]
+        single = sel[(c1[sel] - c0[sel] == 1) & (r1[sel] - r0[sel] == 1)]
+        grid[r0[single], c0[single]] = 100
+        for i in np.setdiff1d(sel, single):
+            grid[r0[i]:r1[i], c0[i]:c1[i]] = 100
+        grids.append(grid)
+    return grids, origin
+
+
+def body_checker_from_voxels(centers: np.ndarray,
+                             sizes: np.ndarray,
+                             resolution: float,
+                             body: Optional[List[BodyBox]] = None,
+                             ground_z: float = 0.0,
+                             padding: float = 0.05,
+                             margin: float = 1.0) -> MultiFootprintChecker:
+    """3D collision checker: each body box against the voxels in its height band.
+
+    For a robot on flat ground at height ground_z that only yaws, this is the
+    same as testing the 3D boxes against the voxels, but each pose costs a
+    handful of 2D lookups. Unobserved space is free (the octomap only reports
+    occupied leaves); the map is bounded by the voxel extents plus `margin`.
+    """
+    body = body or DEFAULT_BODY
+    # Pad upward only: padding downward would pull floor voxels into the lowest band.
+    bands = [(ground_z + b.z_min, ground_z + b.z_max + padding) for b in body]
+    grids, origin = layer_grids_from_voxels(centers, sizes, resolution, bands, margin)
+    parts = [FootprintCollisionChecker(grid, resolution, origin,
+                                       length=b.x_max - b.x_min, width=b.y_max - b.y_min,
+                                       padding=padding,
+                                       offset=(0.5 * (b.x_min + b.x_max), 0.5 * (b.y_min + b.y_max)),
+                                       unknown_is_occupied=False)
+             for b, grid in zip(body, grids)]
+    return MultiFootprintChecker(parts)
+
 
 @dataclass
 class PlannerConfig:
@@ -240,7 +389,7 @@ class PlanResult:
 class RRTPlanner:
     """RRT / RRT* over (x, y) with turn-in-place + straight-line edges."""
 
-    def __init__(self, checker: FootprintCollisionChecker, config: Optional[PlannerConfig] = None):
+    def __init__(self, checker, config: Optional[PlannerConfig] = None):
         self.checker = checker
         self.config = config or PlannerConfig()
         if self.config.algorithm not in ('rrt', 'rrt_star'):
@@ -291,10 +440,10 @@ class RRTPlanner:
         if self._rng.random() < self.config.goal_bias:
             return np.array(goal[:2])
         (x0, x1), (y0, y1) = self.checker.x_bounds, self.checker.y_bounds
-        # Reject samples whose centre is surely in collision (cheap).
+        # Reject samples that collide at every heading (cheap).
         for _ in range(100):
             q = np.array([self._rng.uniform(x0, x1), self._rng.uniform(y0, y1)])
-            if self.checker.clearance(q[0:1], q[1:2])[0] >= self.checker.inscribed_radius:
+            if not self.checker.surely_blocked(q[0], q[1]):
                 return q
         return q
 
