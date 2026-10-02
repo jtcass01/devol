@@ -218,8 +218,8 @@ def test_ekf_global_start_is_not_the_spawn_pose():
     assert np.isclose(P[2, 2], (2 * np.pi) ** 2 / 12)
 
 
-def _load_stack(monkeypatch):
-    """Loads localization_stack.launch.py with stand-ins for the ROS launch modules."""
+def _load_launch(monkeypatch, filename='localization_stack.launch.py'):
+    """Loads a launch file of this package with stand-ins for the ROS launch modules."""
     import importlib.util
     import sys
     import types
@@ -233,7 +233,9 @@ def _load_stack(monkeypatch):
     mods = {
         'launch': {'LaunchDescription': Rec},
         'launch.actions': {n: type(n, (Rec,), {}) for n in
-                           ('DeclareLaunchArgument', 'EmitEvent', 'OpaqueFunction', 'RegisterEventHandler')},
+                           ('DeclareLaunchArgument', 'EmitEvent', 'OpaqueFunction', 'RegisterEventHandler',
+                            'IncludeLaunchDescription')},
+        'launch.launch_description_sources': {'PythonLaunchDescriptionSource': Rec},
         'launch.event_handlers': {'OnProcessExit': Rec},
         'launch.events': {'Shutdown': Rec},
         'launch.substitutions': {'LaunchConfiguration': type('LaunchConfiguration', (Rec,), {})},
@@ -246,15 +248,15 @@ def _load_stack(monkeypatch):
         m.__dict__.update(attrs)
         monkeypatch.setitem(sys.modules, name, m)
     spec = importlib.util.spec_from_file_location(
-        'stack', Path(__file__).resolve().parents[1] / 'launch' / 'localization_stack.launch.py')
-    stack = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(stack)
-    return stack
+        filename.split('.')[0], Path(__file__).resolve().parents[1] / 'launch' / filename)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.mark.parametrize('scenario', ['nominal', 'global', 'kidnap'])
 def test_stack_sets_filter_init_per_scenario(monkeypatch, scenario):
-    stack = _load_stack(monkeypatch)
+    stack = _load_launch(monkeypatch)
     values = {name: default for name, (default, _) in stack.ARGS.items()}
     values.update(scenario=scenario, seed='7', viz='false')
 
@@ -274,3 +276,16 @@ def test_stack_sets_filter_init_per_scenario(monkeypatch, scenario):
     else:
         assert ekf['init_mode'] == 'pose' and ekf['initial_pose'] == [0.0, 0.0, 0.0]
         assert pf['init_mode'] == 'pose' and (pf['initial_x'], pf['initial_y']) == (0.0, 0.0)
+
+
+def test_test_cases_detect_a_still_running_sim(monkeypatch, tmp_path):
+    tc = _load_launch(monkeypatch, 'localization_test_cases.launch.py')
+    running = [['/usr/bin/ruby3.3', '/usr/bin/gz', 'sim', '-s', 'factory.sdf'], ['gz', 'sim', '-g'],
+               ['/opt/ros/lyrical/lib/ros_gz_bridge/parameter_bridge', '--ros-args'], ['gz-sim-server']]
+    harmless = [['bash', '-c', 'pkill -f "gz sim"'], ['gz', 'topic', '-l'], ['python3', 'gz', 'sim'], []]
+    assert all(tc.is_sim_process(a) for a in running)
+    assert not any(tc.is_sim_process(a) for a in harmless)
+    for pid, argv in enumerate(running[:1] + harmless[:2], start=100):
+        (tmp_path / str(pid)).mkdir()
+        (tmp_path / str(pid) / 'cmdline').write_bytes(b'\0'.join(a.encode() for a in argv) + b'\0')
+    assert tc.running_sim_processes(str(tmp_path)) == ['100 /usr/bin/ruby3.3 /usr/bin/gz sim -s factory.sdf']

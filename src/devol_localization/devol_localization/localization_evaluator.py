@@ -73,6 +73,9 @@ class LocalizationEvaluator(Node):
         self.declare_parameter('finish_radius', 0.5)
         self.declare_parameter('settle_time', 3.0)
         self.declare_parameter('max_duration', 0.0)             # sim seconds; 0 = no limit
+        # A fresh sim starts its clock at 0. Ground truth whose first stamp is later than this comes from a
+        # previous sim that is still shutting down, and is ignored; 0 = accept any start time (bag replays).
+        self.declare_parameter('max_start_time', 0.0)
 
         gp = self.get_parameter
         self._out = Path(str(gp('output_dir').value)).expanduser()
@@ -113,9 +116,26 @@ class LocalizationEvaluator(Node):
         self.get_logger().info(f'Scoring {list(self._poses)} ({self._scenario}) into {self._out}')
 
     # ------------------------------------------------------------ callbacks
+    def _reset(self) -> None:
+        for samples in (*self._poses.values(), *self._compute.values()):
+            samples.clear()
+        self._odom0, self._goal_time = None, None
+
     def _gt_cb(self, msg: Odometry) -> None:
         p = msg.pose.pose
         t = stamp_seconds(msg.header.stamp)
+        gt = self._poses[GROUND_TRUTH]
+        max_start = float(self.get_parameter('max_start_time').value)
+        if not gt and max_start > 0.0 and t > max_start:
+            self.get_logger().warning(
+                f'Ignoring ground truth at t = {t:.1f} s: a new sim starts near 0 s, so this is probably a '
+                f'previous Gazebo still shutting down. Stop it (pkill -f "gz sim"; pkill -f parameter_bridge).',
+                throttle_duration_sec=5.0)
+            return
+        if gt and t < gt[-1][0] - 1.0:
+            self.get_logger().warning(f'Sim clock jumped back from {gt[-1][0]:.1f} s to {t:.1f} s (a new sim '
+                                      'started); discarding everything recorded so far')
+            self._reset()
         self._poses[GROUND_TRUTH].append([t, p.position.x, p.position.y,
                                           yaw_from_quaternion(p.orientation), 0.0, 0.0, 0.0])
         if not self._finish_on_goal or self.finished:
@@ -135,6 +155,10 @@ class LocalizationEvaluator(Node):
             self.timed_out = True
 
     def _odom_cb(self, msg: Odometry) -> None:
+        gt = self._poses[GROUND_TRUTH]
+        if float(self.get_parameter('max_start_time').value) > 0.0 and (
+                not gt or stamp_seconds(msg.header.stamp) > gt[-1][0] + 1.0):
+            return   # dead reckoning starts with this run's ground truth, not a stale sim's odometry
         p = msg.pose.pose
         odom = np.array([p.position.x, p.position.y, yaw_from_quaternion(p.orientation)])
         if self._odom0 is None:
@@ -166,6 +190,7 @@ class LocalizationEvaluator(Node):
         if gt.shape[0] < 2:
             return {}
         gt_t, gt_poses = gt[:, 0], gt[:, 1:4]
+        in_run = (gt_t[0] - 1.0, gt_t[-1] + 1.0)   # drops stale samples from a previous sim's clock
         event: Optional[float] = None
         if self._scenario == 'global':
             event = float(gt_t[0])
@@ -177,6 +202,7 @@ class LocalizationEvaluator(Node):
             if name == GROUND_TRUTH:
                 continue
             a = np.asarray(samples, dtype=float).reshape(-1, 7)
+            a = a[(a[:, 0] >= in_run[0]) & (a[:, 0] <= in_run[1])]
             scores[name] = score_estimator(
                 gt_t, gt_poses, a[:, 0], a[:, 1:4],
                 compute_ms=[ms for _, ms in self._compute.get(name, [])],

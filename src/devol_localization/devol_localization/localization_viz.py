@@ -32,6 +32,7 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float64
 
+from devol_localization.graceful import init_with_stop_flag
 from devol_localization.pose2d import (covariance_3x3, transform_points, wrap_angle,
                                        yaw_from_quaternion)
 from devol_localization.viz_core import LocalizationFigure, VideoRecorder, VizState
@@ -185,14 +186,14 @@ class LocalizationViz(Node):
 
 
 def main(args=None) -> None:
-    rclpy.init(args=args)
+    stop = init_with_stop_flag(args)
     node = LocalizationViz()
     executor = SingleThreadedExecutor()
     executor.add_node(node)
     period = 1.0 / max(node.rate_hz, 0.1)
     next_draw = time.monotonic()
     try:
-        while rclpy.ok() and (node.headless or node.figure.is_open()):
+        while rclpy.ok() and not stop and (node.headless or node.figure.is_open()):
             executor.spin_once(timeout_sec=max(0.0, min(0.05, next_draw - time.monotonic())))
             now = time.monotonic()
             if now >= next_draw:

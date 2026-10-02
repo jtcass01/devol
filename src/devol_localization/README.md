@@ -36,6 +36,11 @@ ros2 launch devol_localization localization_test_cases.launch.py test_case:=1   
 ros2 launch devol_localization localization_test_cases.launch.py test_case:=2   # kidnap onto Goal 2 after Goal 1: PF back within 0.25 m before 60 s
 ```
 
+Start each test case only after the previous Gazebo has fully exited: a sim or bridge still shutting
+down publishes its own clock and ground truth, which would be scored as the new run. The launch refuses
+to start while `gz sim` or `parameter_bridge` is running (stop them with `pkill -f "gz sim"; pkill -f
+parameter_bridge`), and the scorer ignores ground truth that starts after 10 s of sim time.
+
 Videos use ffmpeg when installed and OpenCV (`python3-opencv`) otherwise; without either the views
 still run and only the PNG screenshots are saved.
 

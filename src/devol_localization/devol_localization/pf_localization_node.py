@@ -38,6 +38,7 @@ from std_msgs.msg import Float64
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener, TransformException
 
+from devol_localization.graceful import init_with_stop_flag
 from devol_localization.particle_filter import (
     LikelihoodField, ParticleFilter, PFParams, odometry_delta, wrap_angle)
 
@@ -354,10 +355,11 @@ class PFLocalizationNode(Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    stop = init_with_stop_flag(args)
     node = PFLocalizationNode()
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not stop:
+            rclpy.spin_once(node, timeout_sec=0.1)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:

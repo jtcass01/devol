@@ -28,6 +28,41 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 
+def is_sim_process(argv):
+    """True for a Gazebo server (`gz sim ...`, run directly or through ruby) or a ros_gz parameter_bridge.
+
+    Matches on the program and its first arguments, not on the whole command line, so a shell whose
+    script merely mentions `gz sim` (or pkill -f "gz sim") is not mistaken for a running sim.
+    """
+    args = list(argv)
+    if not args:
+        return False
+    program = os.path.basename(args[0])
+    if program == 'parameter_bridge' or program.startswith('gz-sim'):
+        return True
+    if program.startswith('ruby'):
+        args = args[1:]
+    return len(args) >= 2 and os.path.basename(args[0]) == 'gz' and args[1] == 'sim'
+
+
+def running_sim_processes(proc='/proc'):
+    """Command lines of Gazebo servers and ros_gz bridges already running ([] where /proc is unavailable)."""
+    found = []
+    try:
+        pids = [p for p in os.listdir(proc) if p.isdigit() and int(p) != os.getpid()]
+    except OSError:
+        return []
+    for pid in pids:
+        try:
+            with open(os.path.join(proc, pid, 'cmdline'), 'rb') as f:
+                argv = [a.decode(errors='replace') for a in f.read().split(b'\0') if a]
+        except OSError:
+            continue
+        if is_sim_process(argv):
+            found.append(f'{pid} {" ".join(argv)}')
+    return found
+
+
 def launch_setup(context):
     def arg(name):
         return context.perform_substitution(LaunchConfiguration(name))
@@ -35,6 +70,14 @@ def launch_setup(context):
     case = arg('test_case')
     if case not in ('1', '2'):
         raise RuntimeError(f'test_case must be 1 or 2, got {case}')
+    if arg('check_running_sim') == 'true':
+        stale = running_sim_processes()
+        if stale:
+            raise RuntimeError(
+                'A Gazebo sim or ros_gz bridge from an earlier run is still running, and its clock and ground '
+                'truth would be scored as this run:\n  ' + '\n  '.join(stale) +
+                '\nWait for it to exit or stop it (pkill -f "gz sim"; pkill -f parameter_bridge), then relaunch. '
+                '(check_running_sim:=false skips this check.)')
     out = os.path.expanduser(arg('output_dir') or f'~/loc_results/test_case_{case}')
     sim_args = {
         'scenario': 'nominal' if case == '1' else 'kidnap',
@@ -72,6 +115,7 @@ def generate_launch_description():
         ('viz_window', '16.0', 'Side of the robot-following map view in m; 0 = whole map'),
         ('record_video', 'true', 'Save <filter>.mp4 of each view (ffmpeg or OpenCV) next to the results'),
         ('record_bag', 'false', 'Also record the raw streams for offline replay'),
+        ('check_running_sim', 'true', 'Refuse to start while a Gazebo sim or ros_gz bridge is still running'),
         ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
         ('num_particles', '2000', 'PF particle count'),
         ('seed', '0', 'Noise and PF seed'),

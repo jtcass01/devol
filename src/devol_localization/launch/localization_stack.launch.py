@@ -119,7 +119,9 @@ def launch_setup(context):
                          'estimators': estimators, 'start_pose': list(start),
                          'waypoints': [c for _, g in goals for c in g[:2]],
                          'config_json': json.dumps(config), 'test_case': int(a['test_case']),
-                         'finish_on_goal': finish, 'max_duration': float(a['max_duration'])}])
+                         'finish_on_goal': finish, 'max_duration': float(a['max_duration']),
+                         # A live test case starts a fresh sim at t = 0; a later first stamp is a stale sim.
+                         'max_start_time': 10.0 if int(a['test_case']) else 0.0}])
         nodes.append(evaluator)
         if finish:
             # The scorer exits when the route is done; take everything else down with it.
