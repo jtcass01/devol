@@ -79,6 +79,38 @@ def test_recovery_and_jump_detection():
     assert recovery_time(t, err, 30.0) == pytest.approx(12.0)
     assert recovery_time(t, err, 30.0, timeout=10.0) is None
     assert recovery_time(t, np.where(t < 30, 0.05, 8.0), 30.0) is None
+    # Crossing under the threshold just before the trial ends is not a recovery (dwell 3 s).
+    crossing = np.where(t < 30.0, 0.05, np.where(t < 58.0, 8.0, 0.1))
+    assert recovery_time(t, crossing, 30.0) is None
+    assert recovery_time(t, crossing, 30.0, dwell=1.0) == pytest.approx(28.0)
+
+
+def test_analyze_rescores_recovery_from_trajectories(tmp_path):
+    """Old trials are re-scored from trajectory.csv; dead reckoning never counts as recovered."""
+    from devol_localization.localization_study import load_rows, summarize
+    from devol_localization.metrics import write_trajectory_csv
+    t = np.arange(0.0, 60.0, 0.1)
+    for seed, pf_back in ((0, 42.0), (1, 58.5)):    # seed 1 only touches 0.25 m in the last 1.5 s
+        d = tmp_path / 'kidnap' / 'N2000_k1_s0.03' / f'seed{seed:02d}'
+        d.mkdir(parents=True)
+        rows = []
+        for ti in t:
+            rows.append([ti, 'ground_truth', ti * 0.1, 0.0, 0.0, 0, 0, 0])
+            rows.append([ti, 'pf', ti * 0.1 + (0.1 if ti < 30 or ti >= pf_back else 5.0), 0.0, 0.0, 0, 0, 0])
+            rows.append([ti, 'dead_reckoning', ti * 0.1 + (0.1 if ti >= 58.0 else 3.0), 0.0, 0.0, 0, 0, 0])
+        write_trajectory_csv(d / 'trajectory.csv', rows)
+        stale = {'recovered': True, 'recovery_time': 1.0, 'event_time': 30.0, 'pos_rmse': 1.0, 'yaw_rmse': 0.0,
+                 'compute_ms_mean': None, 'waypoint_errors': []}
+        (d / 'summary.json').write_text(json.dumps({
+            'config': {'scenario': 'kidnap', 'num_particles': 2000, 'k': 1.0, 'sigma_r': 0.03, 'seed': seed},
+            'estimators': {'pf': stale, 'dead_reckoning': stale}}))
+    rows = load_rows(tmp_path)
+    pf = {r['seed']: r for r in rows if r['estimator'] == 'pf'}
+    assert pf[0]['recovered'] and pf[0]['recovery_time'] == pytest.approx(12.0)
+    assert not pf[1]['recovered']
+    assert all(r['recovered'] is None for r in rows if r['estimator'] == 'dead_reckoning')
+    table = {r['estimator']: r for r in summarize(rows)}
+    assert table['pf']['recovered'] == 1 and 'recovered' not in table['dead_reckoning']
 
 
 def test_score_estimator_metrics():

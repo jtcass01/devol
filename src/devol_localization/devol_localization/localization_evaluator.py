@@ -65,6 +65,7 @@ class LocalizationEvaluator(Node):
         self.declare_parameter('waypoint_radius', 0.5)
         self.declare_parameter('recovery_threshold', 0.25)
         self.declare_parameter('recovery_timeout', 60.0)
+        self.declare_parameter('recovery_dwell', 3.0)           # s below the threshold to count as recovered
         self.declare_parameter('kidnap_jump', 1.0)
         self.declare_parameter('config_json', '{}')
         self.declare_parameter('write_period', 15.0)
@@ -207,10 +208,13 @@ class LocalizationEvaluator(Node):
             scores[name] = score_estimator(
                 gt_t, gt_poses, a[:, 0], a[:, 1:4],
                 compute_ms=[ms for _, ms in self._compute.get(name, [])],
-                waypoints=self._waypoints, event_time=event,
+                waypoints=self._waypoints,
+                # Dead reckoning cannot relocalize; a "recovery" would be its drift crossing the truth.
+                event_time=None if name == DEAD_RECKONING else event,
                 threshold=float(self.get_parameter('recovery_threshold').value),
                 timeout=float(self.get_parameter('recovery_timeout').value),
-                waypoint_radius=float(self.get_parameter('waypoint_radius').value))
+                waypoint_radius=float(self.get_parameter('waypoint_radius').value),
+                dwell=float(self.get_parameter('recovery_dwell').value))
         write_summary(self._out / 'summary.json', self._config, scores)
         return scores
 

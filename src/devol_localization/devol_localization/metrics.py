@@ -3,9 +3,12 @@
 Metrics follow the annotated outline: position RMSE, heading RMSE (wrapped), position error at
 each waypoint, per-update compute time, and for the adversarial tests the recovery time, which is
 the simulated time from the event (start of a global-localization trial, or the kidnap) until the
-position error falls below the threshold (0.25 m) and stays below it for the rest of the trial.
-Trials that are still above the threshold at the end, or recover only after the timeout, count as
-failures. Aggregation reports mean +/- 95% t-interval and Clopper-Pearson intervals for rates.
+position error falls below the threshold (0.25 m) and stays below it for the rest of the trial,
+and for at least RECOVERY_DWELL s (so an estimate that merely crosses the truth as the trial ends
+does not count). Trials that are still above the threshold at the end, or recover only after the
+timeout, count as failures. Dead reckoning is never scored for recovery: it has no way to relocalize,
+so any "recovery" would be its drifting path crossing the truth by chance. Aggregation reports
+mean +/- 95% t-interval and Clopper-Pearson intervals for rates.
 """
 
 import csv
@@ -22,6 +25,7 @@ __author__ = "Jacob Taylor Cassady"
 __email__ = "jcassad1@jh.edu"
 
 RECOVERY_THRESHOLD: float = 0.25
+RECOVERY_DWELL: float = 3.0     # s below the threshold, at the end of the trial, to count as recovered
 
 
 def interpolate_poses(t_ref: np.ndarray, poses_ref: np.ndarray, t_query: np.ndarray) -> np.ndarray:
@@ -48,8 +52,12 @@ def detect_jump(t: np.ndarray, poses: np.ndarray, jump: float = 1.0, max_speed: 
 
 
 def recovery_time(t: np.ndarray, pos_err: np.ndarray, event_time: float,
-                  threshold: float = RECOVERY_THRESHOLD, timeout: Optional[float] = None) -> Optional[float]:
-    """Seconds after event_time until the error drops below threshold for good; None if it never does."""
+                  threshold: float = RECOVERY_THRESHOLD, timeout: Optional[float] = None,
+                  dwell: float = RECOVERY_DWELL) -> Optional[float]:
+    """Seconds after event_time until the error drops below threshold for good; None if it never does.
+
+    "For good" means until the end of the trial and for at least `dwell` seconds.
+    """
     t = np.asarray(t, dtype=float)
     err = np.asarray(pos_err, dtype=float)
     after = t >= event_time
@@ -61,6 +69,8 @@ def recovery_time(t: np.ndarray, pos_err: np.ndarray, event_time: float,
     bad = np.flatnonzero(err >= threshold)
     rec = 0.0 if bad.size == 0 else float(t[bad[-1] + 1] - event_time)
     if timeout is not None and rec > timeout:
+        return None
+    if t[-1] - (event_time + rec) < dwell:
         return None
     return rec
 
@@ -109,7 +119,7 @@ def waypoint_times(gt_t, gt_poses, waypoints: Sequence[Sequence[float]], radius:
 def score_estimator(gt_t, gt_poses, est_t, est_poses, compute_ms: Sequence[float] = (),
                     waypoints: Sequence[Sequence[float]] = (), event_time: Optional[float] = None,
                     threshold: float = RECOVERY_THRESHOLD, timeout: Optional[float] = None,
-                    waypoint_radius: float = 0.5) -> EstimatorScore:
+                    waypoint_radius: float = 0.5, dwell: float = RECOVERY_DWELL) -> EstimatorScore:
     s = EstimatorScore()
     if len(gt_t) < 2 or len(est_t) == 0:
         return s
@@ -131,7 +141,7 @@ def score_estimator(gt_t, gt_poses, est_t, est_poses, compute_ms: Sequence[float
         s.compute_ms_p95 = float(np.percentile(c, 95))
     if event_time is not None:
         s.event_time = float(event_time)
-        s.recovery_time = recovery_time(t, pos, event_time, threshold, timeout)
+        s.recovery_time = recovery_time(t, pos, event_time, threshold, timeout, dwell)
         s.recovered = s.recovery_time is not None
     return s
 
@@ -270,3 +280,17 @@ def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names
     else:
         raise ValueError(f'unknown test case {case}')
     return ok, lines
+
+
+def rescore_recovery(trajectory: Path, estimator: str, event_time: float, threshold: float = RECOVERY_THRESHOLD,
+                     timeout: Optional[float] = None, dwell: float = RECOVERY_DWELL) -> Optional[float]:
+    """Recovery time of one estimator recomputed from a trial's saved trajectory.csv (no re-run needed)."""
+    data = read_trajectory_csv(trajectory)
+    if 'ground_truth' not in data or estimator not in data:
+        return None
+    gt_t, gt_poses = data['ground_truth']
+    est_t, est_poses = data[estimator]
+    if len(gt_t) < 2 or len(est_t) == 0:
+        return None
+    t, pos, _ = errors_against_truth(gt_t, gt_poses, est_t, est_poses)
+    return recovery_time(t, pos, event_time, threshold, timeout, dwell) if len(t) else None

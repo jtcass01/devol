@@ -27,7 +27,8 @@ from typing import Dict, List
 
 import numpy as np
 
-from devol_localization.metrics import clopper_pearson, mean_ci95
+from devol_localization.metrics import (RECOVERY_DWELL, RECOVERY_THRESHOLD, clopper_pearson, mean_ci95,
+                                        rescore_recovery)
 
 __author__ = "Jacob Taylor Cassady"
 __email__ = "jcassad1@jh.edu"
@@ -104,7 +105,9 @@ def run(args) -> int:
     return 1 if failures else 0
 
 
-def load_rows(out: Path) -> List[dict]:
+def load_rows(out: Path, recovery_timeout: float = 60.0, recovery_dwell: float = RECOVERY_DWELL) -> List[dict]:
+    """Per-trial rows. Recovery is re-scored from trajectory.csv with the current rule (threshold held
+    for recovery_dwell s), so older trials need only re-analysis, and dead reckoning is never scored."""
     rows = []
     for path in sorted(out.glob('*/*/seed*/summary.json')):
         body = json.loads(path.read_text())
@@ -113,6 +116,12 @@ def load_rows(out: Path) -> List[dict]:
             # The EKF and dead reckoning do not depend on N: count them at the nominal N only.
             if est != 'pf' and c.get('num_particles') != NOMINAL['num_particles']:
                 continue
+            if est == 'dead_reckoning':
+                m = {**m, 'recovered': None, 'recovery_time': None}
+            elif m.get('event_time') is not None and (path.parent / 'trajectory.csv').is_file():
+                rec = rescore_recovery(path.parent / 'trajectory.csv', est, m['event_time'], RECOVERY_THRESHOLD,
+                                       recovery_timeout, recovery_dwell)
+                m = {**m, 'recovered': rec is not None, 'recovery_time': rec}
             rows.append({'scenario': c['scenario'], 'num_particles': c['num_particles'], 'k': c['k'],
                          'sigma_r': c['sigma_r'], 'seed': c['seed'], 'estimator': est, **m})
     return rows
@@ -133,7 +142,7 @@ def summarize(rows: List[dict]) -> List[dict]:
         wp = [np.nanmean([e if e is not None else np.nan for e in x['waypoint_errors']])
               if x['waypoint_errors'] else np.nan for x in g]
         row['waypoint_err'], row['waypoint_err_ci95'], _ = mean_ci95(wp)
-        if scenario != 'nominal':
+        if scenario != 'nominal' and est != 'dead_reckoning':
             ok = sum(1 for x in g if x['recovered'])
             lo, hi = clopper_pearson(ok, len(g))
             row.update({'recovered': ok, 'recovery_rate_lo95': lo, 'recovery_rate_hi95': hi})
@@ -214,7 +223,7 @@ def plot_sensitivity(out: Path, table: List[dict]) -> None:
 
 def analyze(args) -> int:
     out = Path(args.out).expanduser()
-    rows = load_rows(out)
+    rows = load_rows(out, getattr(args, 'recovery_timeout', 60.0), getattr(args, 'recovery_dwell', RECOVERY_DWELL))
     if not rows:
         print(f'no summary.json under {out}', flush=True)
         return 1
@@ -243,6 +252,10 @@ def main(argv=None) -> int:
     r.add_argument('--verbose', action='store_true')
     a = sub.add_parser('analyze', help='summarize existing trials')
     a.add_argument('--out', required=True)
+    for q in (r, a):
+        q.add_argument('--recovery-timeout', type=float, default=60.0, help='s after the event (as the scorer)')
+        q.add_argument('--recovery-dwell', type=float, default=RECOVERY_DWELL,
+                       help='s the error must stay under 0.25 m at the end of a trial to count as recovered')
     args = p.parse_args(argv)
     return run(args) if args.cmd == 'run' else analyze(args)
 
