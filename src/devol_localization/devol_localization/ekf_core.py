@@ -3,7 +3,11 @@
 Pure numpy, no ROS, so the filter math can be tested offline.
 
 Prediction uses the odometry motion model (rot1, trans, rot2) from
-Probabilistic Robotics, Table 5.6, with noise parameters alpha1..alpha4.
+Probabilistic Robotics, Table 5.6, with noise parameters alpha1..alpha4. Unlike the
+book, each variance grows linearly with the size of the increment rather than with
+its square, so the accumulated uncertainty depends on the distance and angle travelled
+and not on the odometry rate (with squared terms, 1 m split into 50 steps carries
+1/50 of the variance of a single 1 m step, which made the filter overconfident).
 The correction step takes a full pose observation (x, y, yaw) in the map
 frame, such as the output of a scan matcher, so the measurement Jacobian is
 the identity.
@@ -49,16 +53,13 @@ def odometry_delta(prev_pose: Sequence[float], pose: Sequence[float]) -> Tuple[f
 class PoseEKF:
     """EKF over the state [x, y, yaw] in the map frame."""
 
-    def __init__(self, alphas: Sequence[float] = (0.05, 0.005, 0.05, 0.005),
-                 min_motion_std: Tuple[float, float] = (0.002, 0.002)) -> None:
+    def __init__(self, alphas: Sequence[float] = (0.02, 0.01, 0.01, 0.002)) -> None:
         """
-        :param alphas: Odometry noise (alpha1..alpha4): rot from rot, rot from trans,
-                       trans from trans, trans from rot (Probabilistic Robotics, 5.4).
-        :param min_motion_std: Floor on the (trans, rot) noise std per step, applied
-                               only when the robot moves, so a parked robot stays put.
+        :param alphas: Odometry noise (alpha1..alpha4), each a variance per unit of motion:
+                       rot from rot (rad^2/rad), rot from trans (rad^2/m),
+                       trans from trans (m^2/m), trans from rot (m^2/rad).
         """
         self.alphas: ndarray = asarray(alphas, dtype=float)
-        self.min_motion_std: Tuple[float, float] = min_motion_std
         self.x: ndarray = zeros(3)
         self.P: ndarray = eye(3)
         self.initialized: bool = False
@@ -88,14 +89,9 @@ class PoseEKF:
                             [1.0, 0.0, 1.0]])
 
         r1, t, r2 = abs(rot1), abs(trans), abs(rot2)
-        var_rot1: float = a1 * r1 ** 2 + a2 * t ** 2
-        var_trans: float = a3 * t ** 2 + a4 * (r1 ** 2 + r2 ** 2)
-        var_rot2: float = a1 * r2 ** 2 + a2 * t ** 2
-        if t > 0.0 or r1 > 0.0 or r2 > 0.0:
-            trans_floor, rot_floor = self.min_motion_std
-            var_trans = max(var_trans, trans_floor ** 2)
-            var_rot1 = max(var_rot1, rot_floor ** 2)
-            var_rot2 = max(var_rot2, rot_floor ** 2)
+        var_rot1: float = a1 * r1 + 0.5 * a2 * t
+        var_trans: float = a3 * t + a4 * (r1 + r2)
+        var_rot2: float = a1 * r2 + 0.5 * a2 * t
         M: ndarray = diag([var_rot1, var_trans, var_rot2])
 
         self.P = G @ self.P @ G.T + V @ M @ V.T

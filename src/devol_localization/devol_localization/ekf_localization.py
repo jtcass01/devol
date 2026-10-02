@@ -21,7 +21,8 @@ from typing import Optional, Tuple
 
 from numpy import ndarray, array, asarray, arctan2, cos, sin, diag, int8, zeros
 
-from rclpy import init as rclpy_init, shutdown as rclpy_shutdown, spin as rclpy_spin
+from rclpy import init as rclpy_init, try_shutdown as rclpy_try_shutdown, spin as rclpy_spin
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
@@ -31,7 +32,8 @@ from nav_msgs.msg import Odometry, OccupancyGrid
 from sensor_msgs.msg import LaserScan
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster, TransformException
 
-from devol_localization.ekf_core import PoseEKF, odometry_delta, wrap_angle, CHI2_3DOF_99
+from devol_localization.ekf_core import PoseEKF, wrap_angle, CHI2_3DOF_99
+from devol_localization.ekf_pipeline import EKFPipeline
 from devol_localization.scan_matcher import DistanceField, ScanMatcher, scan_to_points
 
 __author__ = "Jacob Taylor Cassady"
@@ -82,8 +84,8 @@ class EKFLocalization(Node):
         self.declare_parameter('initial_pose_from_tf', True)
         self.declare_parameter('initial_pose', [0.0, 0.0, 0.0])
         self.declare_parameter('initial_std', [0.1, 0.1, 0.05])
-        # Odometry motion model.
-        self.declare_parameter('odom_alphas', [0.05, 0.005, 0.05, 0.005])
+        # Odometry motion model; variances per unit of motion (see ekf_core.PoseEKF).
+        self.declare_parameter('odom_alphas', [0.02, 0.01, 0.01, 0.002])
         # Laser pose in the base frame (x, y, yaw); defaults from a200_macro.urdf.xacro.
         self.declare_parameter('laser_pose', [0.32825, 0.0, 0.0])
         # Scan matcher.
@@ -92,9 +94,16 @@ class EKFLocalization(Node):
         self.declare_parameter('max_field_distance', 2.0)
         self.declare_parameter('inlier_distance', 0.3)
         self.declare_parameter('min_inlier_fraction', 0.5)
-        self.declare_parameter('match_covariance_scale', 10.0)
-        self.declare_parameter('match_min_std', [0.02, 0.01])
+        self.declare_parameter('match_covariance_scale', 20.0)
+        self.declare_parameter('match_min_std', [0.05, 0.02])
+        self.declare_parameter('max_ambiguity', 0.95)
         self.declare_parameter('gate_chi2', CHI2_3DOF_99)
+        # Search window half-widths [min, max], sized from 3 sigma of the covariance.
+        self.declare_parameter('search_window_xy', [0.15, 1.5])
+        self.declare_parameter('search_window_yaw', [0.05, 0.8])
+        # Re-acquisition: after this many failed scans, inflate the covariance per failed scan.
+        self.declare_parameter('lost_after', 5)
+        self.declare_parameter('lost_inflation_std', [0.05, 0.03])
 
         ns: str = self._str('namespace').rstrip('/')
         self._map_frame: str = self._str('map_frame')
@@ -105,13 +114,17 @@ class EKFLocalization(Node):
         self._initial_std: ndarray = asarray(self.get_parameter('initial_std').value, dtype=float)
         self._laser_pose: Tuple[float, float, float] = tuple(self.get_parameter('laser_pose').value)
         self._beam_step: int = int(self.get_parameter('beam_step').value)
-        self._gate: float = float(self.get_parameter('gate_chi2').value)
 
         self._ekf: PoseEKF = PoseEKF(alphas=self.get_parameter('odom_alphas').value)
-        self._matcher: Optional[ScanMatcher] = None
-        self._last_odom: Optional[Tuple[float, float, float]] = None
+        self._pipeline: EKFPipeline = EKFPipeline(
+            self._ekf,
+            window_xy=tuple(self.get_parameter('search_window_xy').value),
+            window_yaw=tuple(self.get_parameter('search_window_yaw').value),
+            gate=float(self.get_parameter('gate_chi2').value),
+            lost_after=int(self.get_parameter('lost_after').value),
+            lost_inflation_std=tuple(self.get_parameter('lost_inflation_std').value))
         self._last_odom_msg: Optional[Odometry] = None
-        self._stats = {'scans': 0, 'matched': 0, 'fused': 0, 'gated': 0, 'match_ms': 0.0}
+        self._match_ms: float = 0.0
 
         # TF
         self._tf_buffer: Buffer = Buffer()
@@ -155,10 +168,11 @@ class EKFLocalization(Node):
                               inlier_distance=float(self.get_parameter('inlier_distance').value),
                               min_inlier_fraction=float(self.get_parameter('min_inlier_fraction').value),
                               covariance_scale=float(self.get_parameter('match_covariance_scale').value),
-                              min_std=tuple(self.get_parameter('match_min_std').value))
+                              min_std=tuple(self.get_parameter('match_min_std').value),
+                              max_ambiguity=float(self.get_parameter('max_ambiguity').value))
         with self._lock:
-            first: bool = self._matcher is None
-            self._matcher = matcher
+            first: bool = self._pipeline.matcher is None
+            self._pipeline.matcher = matcher
         if first:
             self.get_logger().info(f'Map received: {info.width}x{info.height} @ {info.resolution:.3f} m')
 
@@ -166,32 +180,24 @@ class EKFLocalization(Node):
         p = msg.pose.pose
         odom_pose: Tuple[float, float, float] = (p.position.x, p.position.y, yaw_from_quaternion(p.orientation))
         with self._lock:
-            if not self._ekf.initialized:
-                if not self._initialize(odom_pose, msg):
-                    return
-            elif self._last_odom is not None:
-                self._ekf.predict(*odometry_delta(self._last_odom, odom_pose))
-            self._last_odom = odom_pose
+            if not self._ekf.initialized and not self._initialize(odom_pose, msg):
+                return
+            self._pipeline.on_odom(odom_pose)
             self._last_odom_msg = msg
             self._publish(msg.header.stamp)
 
     def scan_received(self, msg: LaserScan) -> None:
         with self._lock:
-            if self._matcher is None or not self._ekf.initialized:
+            if self._pipeline.matcher is None or not self._ekf.initialized:
                 return
-            self._stats['scans'] += 1
             points = scan_to_points(msg.ranges, msg.angle_min, msg.angle_increment, msg.range_min,
                                     msg.range_max, self._beam_step, self._laser_pose)
             t0: float = perf_counter()
-            result = self._matcher.match(points, self._ekf.x)
-            self._stats['match_ms'] += (perf_counter() - t0) * 1e3
-            if result is None:
-                return
-            self._stats['matched'] += 1
-            if self._ekf.correct(result.pose, result.covariance, gate=self._gate):
-                self._stats['fused'] += 1
-            else:
-                self._stats['gated'] += 1
+            lost_before: bool = self._pipeline.stats.failed_in_row >= self._pipeline.lost_after
+            result = self._pipeline.on_scan(points)
+            self._match_ms += (perf_counter() - t0) * 1e3
+            if result is not None and lost_before:
+                self.get_logger().info('Scan match re-acquired')
             if self._last_odom_msg is not None:
                 self._publish(self._last_odom_msg.header.stamp)
 
@@ -246,8 +252,9 @@ class EKFLocalization(Node):
         msg.pose.covariance = cov
         self._pose_pub.publish(msg)
 
-        if self._tf_broadcaster is not None and self._last_odom is not None:
-            map_to_odom = compose((x[0], x[1], x[2]), inverse(self._last_odom))
+        last_odom = self._pipeline.last_odom
+        if self._tf_broadcaster is not None and last_odom is not None:
+            map_to_odom = compose((x[0], x[1], x[2]), inverse(last_odom))
             tf = TransformStamped()
             tf.header.stamp = stamp
             tf.header.frame_id = self._map_frame
@@ -259,15 +266,21 @@ class EKFLocalization(Node):
 
     def log_stats(self) -> None:
         with self._lock:
-            s = dict(self._stats)
+            s = self._pipeline.stats
             x = self._ekf.x.copy()
+            std = self._ekf.P.diagonal() ** 0.5
             ready = self._ekf.initialized
+            avg_ms = self._match_ms / s.scans if s.scans else 0.0
+            line = (f'pose=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}) std=({std[0]:.2f}, {std[1]:.2f}, {std[2]:.3f}) '
+                    f'scans={s.scans} matched={s.matched} fused={s.fused} gated={s.gated} '
+                    f'failed_in_row={s.failed_in_row} reacquired={s.reacquired} match={avg_ms:.1f} ms')
+            lost = s.failed_in_row >= self._pipeline.lost_after
         if not ready:
             return
-        avg_ms = s['match_ms'] / s['scans'] if s['scans'] else 0.0
-        self.get_logger().info(f'pose=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}) scans={s["scans"]} '
-                               f'matched={s["matched"]} fused={s["fused"]} gated={s["gated"]} '
-                               f'match={avg_ms:.1f} ms')
+        if lost:
+            self.get_logger().warning('Scan matching lost; widening search. ' + line)
+        else:
+            self.get_logger().info(line)
 
 
 def main(args=None) -> None:
@@ -275,11 +288,11 @@ def main(args=None) -> None:
     node = EKFLocalization()
     try:
         rclpy_spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
-        rclpy_shutdown()
+        rclpy_try_shutdown()
 
 
 if __name__ == '__main__':

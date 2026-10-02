@@ -1,10 +1,10 @@
 """Scan-to-map matching that turns a 2D lidar scan into a pose observation.
 
 The occupancy grid is converted once into a distance field (metres to the
-nearest occupied cell). A scan is matched by Gauss-Newton / Levenberg-Marquardt
-on the squared distances of its endpoints to the nearest obstacle, starting
-from the filter's prior pose. The result and an approximate covariance feed
-the EKF correction step.
+nearest occupied cell). A scan is matched in two stages: a coarse correlative
+search over a pose window around the filter's prior (sized from its covariance),
+then Levenberg-Marquardt on the squared distances of the endpoints to the nearest
+obstacle. The result and an approximate covariance feed the EKF correction step.
 
 Pure numpy/scipy, no ROS.
 """
@@ -12,8 +12,8 @@ Pure numpy/scipy, no ROS.
 from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple
 
-from numpy import (ndarray, asarray, array, cos, sin, zeros, diag, isfinite, clip,
-                   floor, minimum, gradient, int64, float64, sqrt, arange)
+from numpy import (ndarray, asarray, array, cos, sin, zeros, full, diag, isfinite, clip, exp,
+                   floor, minimum, gradient, int64, float64, sqrt, arange, argmax, unravel_index)
 from numpy.linalg import solve, inv, LinAlgError
 from scipy.ndimage import distance_transform_edt
 
@@ -30,6 +30,7 @@ class MatchResult:
     inlier_fraction: float
     rms_error: float         # metres, over inliers
     iterations: int
+    ambiguity: float = 0.0   # second-best / best search score, 0 without a search
 
 
 class DistanceField:
@@ -109,13 +110,17 @@ def scan_to_points(ranges: Sequence[float], angle_min: float, angle_increment: f
 class ScanMatcher:
     def __init__(self, field: DistanceField, max_iterations: int = 20,
                  inlier_distance: float = 0.3, min_points: int = 30,
-                 min_inlier_fraction: float = 0.5, covariance_scale: float = 10.0,
-                 min_std: Tuple[float, float] = (0.02, 0.01)) -> None:
+                 min_inlier_fraction: float = 0.5, covariance_scale: float = 20.0,
+                 min_std: Tuple[float, float] = (0.05, 0.02), search_points: int = 60,
+                 max_ambiguity: float = 0.95) -> None:
         """
         :param inlier_distance: Endpoints farther than this from any obstacle are ignored.
         :param covariance_scale: Inflates the Gauss-Newton covariance, which is
                                  overconfident because neighbouring beams are correlated.
         :param min_std: Floor on the reported (position, yaw) std.
+        :param search_points: Endpoints used by the coarse correlative search.
+        :param max_ambiguity: Reject a match when a distinct pose in the search window
+                              scores at least this fraction of the best one.
         """
         self.field: DistanceField = field
         self.max_iterations: int = max_iterations
@@ -124,23 +129,72 @@ class ScanMatcher:
         self.min_inlier_fraction: float = min_inlier_fraction
         self.covariance_scale: float = covariance_scale
         self.min_std: Tuple[float, float] = min_std
+        self.search_points: int = search_points
+        self.max_ambiguity: float = max_ambiguity
 
-    def _residuals(self, pose: ndarray, pts: ndarray) -> Tuple[ndarray, ndarray, ndarray]:
+    def search(self, points: ndarray, prior: Sequence[float], half_xy: float,
+               half_yaw: float, max_cells: int = 31, max_yaws: int = 61) -> Tuple[ndarray, float]:
+        """Coarse correlative search over a pose window centred on prior.
+
+        Scores every pose on an (x, y, yaw) grid by how close the scan endpoints land to
+        obstacles, so the best pose is found even when the prior is far outside the basin
+        of attraction of the gradient refinement. Returns (best pose, ambiguity), where
+        ambiguity is the best score among clearly different poses divided by the best score.
+        """
+        prior = asarray(prior, dtype=float)
+        res: float = self.field.resolution
+        xy_step: float = max(2.0 * res, 2.0 * half_xy / (max_cells - 1))
+        yaw_step: float = max(0.0087, 2.0 * half_yaw / (max_yaws - 1))
+        n_xy: int = int(half_xy / xy_step)
+        n_yaw: int = int(half_yaw / yaw_step)
+        offsets: ndarray = arange(-n_xy, n_xy + 1) * xy_step
+        yaws: ndarray = prior[2] + arange(-n_yaw, n_yaw + 1) * yaw_step
+        dx: ndarray = (offsets[:, None] + zeros(offsets.size)[None, :]).ravel()
+        dy: ndarray = (zeros(offsets.size)[:, None] + offsets[None, :]).ravel()
+
+        step: int = max(1, points.shape[0] // self.search_points)
+        pts: ndarray = points[::step]
+        sigma: float = max(0.1, xy_step)
+        dist: ndarray = self.field.dist
+        h, w = dist.shape
+        scores: ndarray = zeros((yaws.size, dx.size))
+        for k, yaw in enumerate(yaws):
+            c, s = cos(yaw), sin(yaw)
+            wx: ndarray = prior[0] + c * pts[:, 0] - s * pts[:, 1]
+            wy: ndarray = prior[1] + s * pts[:, 0] + c * pts[:, 1]
+            cols: ndarray = floor((wx[None, :] + dx[:, None] - self.field.origin_x) / res).astype(int64)
+            rows: ndarray = floor((wy[None, :] + dy[:, None] - self.field.origin_y) / res).astype(int64)
+            inside: ndarray = (cols >= 0) & (rows >= 0) & (cols < w) & (rows < h)
+            d: ndarray = full(cols.shape, self.field.max_distance)
+            d[inside] = dist[rows[inside], cols[inside]]
+            scores[k] = exp(-0.5 * (d / sigma) ** 2).mean(axis=1)
+
+        k_best, j_best = unravel_index(argmax(scores), scores.shape)
+        best: float = float(scores[k_best, j_best])
+        pose: ndarray = array([prior[0] + dx[j_best], prior[1] + dy[j_best], wrap_angle(yaws[k_best])])
+
+        # Second peak: best score among poses well away from the winner.
+        far_xy: ndarray = ((dx - dx[j_best]) ** 2 + (dy - dy[j_best]) ** 2) > (2.0 * xy_step + 0.2) ** 2
+        far_yaw: ndarray = abs(yaws - yaws[k_best]) > 2.0 * yaw_step + 0.05
+        other: ndarray = far_yaw[:, None] | far_xy[None, :]
+        second: float = float(scores[other].max()) if other.any() else 0.0
+        return pose, (second / best if best > 0.0 else 1.0)
+
+    def _residuals(self, pose: ndarray, pts: ndarray,
+                   inlier_distance: float) -> Tuple[ndarray, ndarray, ndarray]:
         c, s = cos(pose[2]), sin(pose[2])
         rx: ndarray = c * pts[:, 0] - s * pts[:, 1]
         ry: ndarray = s * pts[:, 0] + c * pts[:, 1]
         d, gx, gy = self.field.lookup(pose[0] + rx, pose[1] + ry)
         # d(world point)/d(yaw) = [-ry, rx].
         J: ndarray = array([gx, gy, -gx * ry + gy * rx]).T
-        return d, J, d < self.inlier_distance
+        return d, J, d < inlier_distance
 
-    def match(self, points: ndarray, prior: Sequence[float]) -> Optional[MatchResult]:
-        """Aligns base-frame scan points to the map starting from prior [x, y, yaw]."""
-        if points.shape[0] < self.min_points:
-            return None
-        pose: ndarray = asarray(prior, dtype=float).copy()
+    def _refine(self, points: ndarray, pose: ndarray, inlier_distance: float
+                ) -> Optional[Tuple[ndarray, ndarray, ndarray, ndarray, int]]:
+        """Levenberg-Marquardt on squared endpoint distances over the inlier set."""
         lam: float = 1e-3
-        d, J, inl = self._residuals(pose, points)
+        d, J, inl = self._residuals(pose, points, inlier_distance)
         cost: float = float((d[inl] ** 2).sum())
         it: int = 0
         for it in range(1, self.max_iterations + 1):
@@ -155,7 +209,7 @@ class ScanMatcher:
                 return None
             trial: ndarray = pose + step
             trial[2] = wrap_angle(trial[2])
-            d_t, J_t, inl_t = self._residuals(trial, points)
+            d_t, J_t, inl_t = self._residuals(trial, points, inlier_distance)
             # Compare costs over the same inlier set to keep the test fair.
             trial_cost: float = float((d_t[inl] ** 2).sum())
             if trial_cost < cost:
@@ -168,6 +222,32 @@ class ScanMatcher:
                 lam *= 10.0
                 if lam > 1e4:
                     break
+        return pose, d, J, inl, it
+
+    def match(self, points: ndarray, prior: Sequence[float], half_xy: float = 0.0,
+              half_yaw: float = 0.0) -> Optional[MatchResult]:
+        """Aligns base-frame scan points to the map near prior [x, y, yaw].
+
+        With a non-zero window (half_xy metres, half_yaw radians) a coarse correlative
+        search picks the starting pose for the gradient refinement; size the window from
+        the filter covariance so the matcher can re-acquire after odometry drifts.
+        """
+        if points.shape[0] < self.min_points:
+            return None
+        pose: ndarray = asarray(prior, dtype=float).copy()
+        ambiguity: float = 0.0
+        if half_xy > 0.0 or half_yaw > 0.0:
+            pose, ambiguity = self.search(points, pose, half_xy, half_yaw)
+            if ambiguity > self.max_ambiguity:
+                return None
+
+        refined = self._refine(points, pose, 2.0 * self.inlier_distance)
+        if refined is None:
+            return None
+        refined = self._refine(points, refined[0], self.inlier_distance)
+        if refined is None:
+            return None
+        pose, d, J, inl, it = refined
 
         n_in: int = int(inl.sum())
         frac: float = n_in / points.shape[0]
@@ -185,4 +265,5 @@ class ScanMatcher:
         cov = cov + diag(clip(floor_diag - diag(cov), 0.0, None))
         cov = 0.5 * (cov + cov.T)
         return MatchResult(pose=pose, covariance=cov, inlier_fraction=frac,
-                           rms_error=float(sqrt((di ** 2).mean())), iterations=it)
+                           rms_error=float(sqrt((di ** 2).mean())), iterations=it,
+                           ambiguity=ambiguity)

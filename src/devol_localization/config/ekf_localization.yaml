@@ -14,13 +14,19 @@ ekf_localization:
     initial_pose_from_tf: true
     initial_pose: [0.0, 0.0, 0.0]
     initial_std: [0.1, 0.1, 0.05]
-    odom_alphas: [0.05, 0.005, 0.05, 0.005]
+    # Variance per unit of motion: rot<-rot (rad^2/rad), rot<-trans (rad^2/m), trans<-trans (m^2/m), trans<-rot (m^2/rad).
+    odom_alphas: [0.02, 0.01, 0.01, 0.002]
     laser_pose: [0.32825, 0.0, 0.0]
     beam_step: 4
     occupied_threshold: 50
     max_field_distance: 2.0
     inlier_distance: 0.3
     min_inlier_fraction: 0.5
-    match_covariance_scale: 10.0
-    match_min_std: [0.02, 0.01]
+    match_covariance_scale: 20.0
+    match_min_std: [0.05, 0.02]
+    max_ambiguity: 0.95
     gate_chi2: 11.345
+    search_window_xy: [0.15, 1.5]
+    search_window_yaw: [0.05, 0.8]
+    lost_after: 5
+    lost_inflation_std: [0.05, 0.03]
