@@ -33,6 +33,13 @@ def generate_launch_description():
         choices=['a_star', 'rrt', 'rrt_star'],
         description='Local planner: a_star (padded C-space map) or rrt / rrt_star (robot footprint on the octomap projected_map)'
     )
+    declare_map_odom_tf = DeclareLaunchArgument(
+        'map_odom_tf',
+        default_value='static',
+        choices=['static', 'none'],
+        description='static: publish the placeholder map -> odom at the spawn pose; none: another node '
+                    'publishes map -> odom (e.g. devol_localization ground_truth_tf or a filter)'
+    )
     declare_octomap_resolution = DeclareLaunchArgument(
         'octomap_resolution',
         default_value='0.05',
@@ -83,7 +90,8 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(sim_pkg_share, 'launch', 'spawn_entities.launch.py')
             ),
-            launch_arguments={'maze': maze_folder}.items()
+            launch_arguments={'maze': maze_folder,
+                              'map_odom_tf': context.perform_substitution(LaunchConfiguration('map_odom_tf'))}.items()
         )
 
         # Bridge, PID, RViz
@@ -258,5 +266,6 @@ def generate_launch_description():
         declare_namespace,
         declare_planner,
         declare_octomap_resolution,
+        declare_map_odom_tf,
         OpaqueFunction(function=launch_setup)
     ])
