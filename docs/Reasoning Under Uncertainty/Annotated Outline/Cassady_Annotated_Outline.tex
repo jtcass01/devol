@@ -65,11 +65,120 @@ This section will present the quantitative findings from the simulated trials us
     \item \textbf{Gutmann, J.-S., \& Fox, D. (2002) \cite{gutmann2002experimental}:} This experimental comparison of Kalman filter, Markov, and Monte Carlo localization in accuracy, robustness, and recovery from robot displacement will be used for \textbf{comparison}, as the prior result against which this study's findings are checked.
 \end{itemize}
 
+\subsection{Preliminary Results}\label{sec:Preliminary-Results}
+\noindent\textit{All numbers in this subsection are preliminary. The 20-seed table is being re-run after a fix to the odometry noise injector, and the sensitivity sweep over $N$, $k$ and $\sigma_r$ is still running. Results marked ``offline synthetic'' come from a 2D test map with simulated odometry and LIDAR, not Gazebo.}
+
+\paragraph{Core comparison (Gazebo, 20 seeds).}
+Table~\ref{tab:core-ci} will report 20 seeded Gazebo trials per row at the nominal operating point: $N = 2000$ particles, injected odometry noise $k = 1$ ($\alpha_{1..4} = 0.05$) and LIDAR range noise $\sigma_r = 0.03$~m, with the RRT* planner driving the three-waypoint route on ground truth. A first 20-seed run is superseded: the odometry noise injector turned in-place spins into spurious jumps of about 0.7~m and $90^\circ$, corrupting the inputs of every estimator. The injector has been fixed and the nominal, kidnap and global-localization scenarios are being re-run for all estimators.
+
+\begin{table}[H]
+\centering
+\caption{Core results, Gazebo, 20 seeds per row ($N=2000$, $k=1$, $\sigma_r=0.03$~m). Mean $\pm$ 95\% CI; recovery is to within 0.25~m, with its 95\% Clopper--Pearson interval. Pending the re-run with the corrected noise injector.}
+\label{tab:core-ci}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{llcccccc}
+\hline
+Scenario & Estimator & Pos.\ RMSE (m) & Head.\ RMSE ($^\circ$) & Waypoint err.\ (m) & Update (ms) & Recovered & Recovery (s) \\
+\hline
+Nominal & EKF & \multicolumn{6}{c}{pending re-run} \\
+        & PF  & \multicolumn{6}{c}{pending re-run} \\
+        & Dead reckoning & \multicolumn{6}{c}{pending re-run} \\
+\hline
+Kidnap  & EKF & \multicolumn{6}{c}{pending re-run} \\
+        & PF  & \multicolumn{6}{c}{pending re-run} \\
+\hline
+Global  & EKF & \multicolumn{6}{c}{pending re-run} \\
+        & PF  & \multicolumn{6}{c}{pending re-run} \\
+        & Dead reckoning & \multicolumn{6}{c}{pending re-run} \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Test cases (Gazebo, single runs).}
+The two test cases for the operable-code deliverable both pass (Figures~\ref{fig:tc1-final} and~\ref{fig:tc2-posteriors}), with expected outputs derived independently of the filters: the waypoints in the route's pose file for the nominal case, and the teleport pose for the kidnap case (Table~\ref{tab:test-cases}). On the nominal route the EKF finished within 6~cm of every waypoint (0.070~m RMSE) and the PF within 11~cm (0.121~m RMSE), against 3.06~m mean error for dead reckoning. After a teleport at $t = 37$~s the PF was back within 0.25~m in 6.1~s, and the EKF never recovered, finishing 21.5~m from the true pose.
+
+\begin{table}[H]
+\centering
+\caption{Test cases, Gazebo, single runs ($N=2000$, $k=1$, $\sigma_r=0.03$~m). Both pass.}
+\label{tab:test-cases}
+\small
+\begin{tabular}{llll}
+\hline
+Test case & Estimator & Result & Expected output \\
+\hline
+1: nominal route & EKF & waypoint errors 0.058 / 0.028 / 0.035 m (RMSE 0.070 m) & route waypoints \\
+                 & PF  & waypoint errors 0.075 / 0.111 / 0.059 m (RMSE 0.121 m) & \\
+                 & Dead reckoning & 3.06 m mean error & \\
+\hline
+2: kidnap at 37 s & EKF & not recovered, 21.5 m final error & teleport pose \\
+                  & PF  & within 0.25 m after 6.1 s & \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.85\linewidth}
+\includegraphics[width=\linewidth]{gazebo_tc1_ekf_final.png}
+\caption{EKF: 0.035~m final error, $2\sigma$ bound 0.037~m.}
+\end{subfigure}
+\begin{subfigure}{0.85\linewidth}
+\includegraphics[width=\linewidth]{gazebo_tc1_pf_final.png}
+\caption{PF ($N = 2000$): 0.059~m final error, $2\sigma$ bound 0.058~m.}
+\end{subfigure}
+\caption{Test case 1 (nominal route, Gazebo, seed 0), final frame of each filter's live view. Left of each: occupancy map, ground truth (green), estimate and $2\sigma$ ellipse, and the LIDAR scan projected from the estimate. Right: position and heading error against the filter's own $2\sigma$ bound. Both filters stay mostly below the 0.25~m threshold, with brief spikes above it, and their errors repeatedly exceed $2\sigma$, the overconfidence discussed below.}
+\label{fig:tc1-final}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.32\linewidth}
+\includegraphics[width=\linewidth]{gazebo_tc2_posterior_t38.png}
+\caption{$t = 38.1$~s (1~s after): PF 3.23~m, EKF 8.39~m.}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.32\linewidth}
+\includegraphics[width=\linewidth]{gazebo_tc2_posterior_t42.png}
+\caption{$t = 42.1$~s (5~s after): PF 0.13~m, EKF 4.41~m.}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.32\linewidth}
+\includegraphics[width=\linewidth]{gazebo_tc2_posterior_t52.png}
+\caption{$t = 52.1$~s (15~s after): PF 0.06~m, EKF 16.63~m.}
+\end{subfigure}
+\caption{Test case 2 (kidnap at $t = 37$~s, Gazebo), intermediate posteriors of both filters at the same moments: PF particles and mean with $2\sigma$ ellipse (orange), EKF mean and $2\sigma$ ellipse (blue), ground truth (green). The injected particles spread over the map find the true pose within seconds, while the EKF's single Gaussian stays confidently wrong and drifts further away. At 5~s the PF mean is already close although its $2\sigma$ ellipse is still several metres wide, because particles remain spread over the map. Live-view recordings of both test cases are written to \texttt{results/test\_case\_1} and \texttt{results/test\_case\_2} by the test-case launch file.}
+\label{fig:tc2-posteriors}
+\end{figure}
+
+An earlier Gazebo check replayed two recorded 60~s, roughly 21~m drives through both filters without injected noise (PF at $N = 500$). Odometry alone averaged 3.7--4.0~m of position error; the EKF averaged 0.08~m (0.26~m worst, $0.3^\circ$ heading) at about 4~ms per scan; the PF averaged 0.15--0.18~m (0.38--0.66~m worst, $0.6$--$0.9^\circ$ heading) at a 1.25~ms median. Both filters were overconfident: the EKF's position RMSE was about four times its reported $\sigma$, and the PF's about thirteen times. The final paper will report a covariance consistency check (normalized estimation error squared) alongside RMSE so that this is quantified rather than anecdotal.
+
+\paragraph{Offline synthetic tests.}
+Before the Gazebo runs, the evaluation pipeline was exercised on a synthetic 2D map. On the nominal route the EKF reached 0.03~m and the PF 0.09~m position RMSE. After a kidnap the PF recovered in 11~s and the EKF did not (Figures~\ref{fig:prelim-kidnap-ekf} and~\ref{fig:prelim-kidnap-pf}, which add the error-versus-time traces the Gazebo posterior snapshots lack). Global localization from a uniform prior with 2000 particles converged confidently onto the $180^\circ$ mirror of the true pose, a symmetry failure that the full study will probe with larger particle counts; it is also a concrete example of the perceptual ambiguity described in the Problem Statement.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{synthetic_kidnap_ekf.png}
+\caption{EKF on the offline synthetic kidnap test. Left: map, ground truth (green), EKF estimate and $2\sigma$ ellipse (blue), and the LIDAR scan projected from the estimate. Right: position and heading error against the filter's own $2\sigma$ bound. After the teleport at about 37~s the error jumps above 10~m and never returns; the covariance grows but the single Gaussian cannot jump to the true pose.}
+\label{fig:prelim-kidnap-ekf}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{synthetic_kidnap_pf.png}
+\caption{PF on the same offline synthetic kidnap test ($N = 2000$). The error spikes above 15~m at the teleport and falls back under the 0.25~m threshold within about 11~s as injected particles find the true pose.}
+\label{fig:prelim-kidnap-pf}
+\end{figure}
+
+
+\paragraph{Still to come.}
+The 20-seed results and the one-factor-at-a-time sweep over $N$, $k$ and $\sigma_r$ will be added here.
+
 \section{Conclusion}\label{Conclusion}
 The final section will synthesize the experimental results to definitively answer whether the primary hypothesis holds true: that the Particle Filter recovers in both adversarial scenarios where the EKF does not, and that the EKF matches or exceeds nominal-route accuracy at lower per-step compute time. It will discuss the practical implications of these findings for the robotic system's downstream waypoint controller and planning pipeline. Lastly, it will propose future work, such as mitigating the noted implementation asymmetry or extending the evaluation to dynamic obstacles within the factory.
 
 \section*{Acknowledgments}\label{sec:Acknowledgments}
-Anthropic's Claude was used to review this outline against the course rubric and the instructor's feedback on the proposal, and to draft revisions to it.
+Anthropic's Claude was used to review this outline against the course rubric and the instructor's feedback on the proposal, to draft revisions to it, and to summarize the preliminary trial results and extract figure stills from the filter visualizations. The localization nodes, evaluation tooling and simulation runs reported here were also developed with Claude's assistance.
 
 \bibliography{ref}
 
