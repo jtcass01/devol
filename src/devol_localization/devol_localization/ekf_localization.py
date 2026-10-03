@@ -9,6 +9,7 @@ Inputs
 
 Outputs
   pose_topic   (geometry_msgs/PoseWithCovarianceStamped) pose (x, y, yaw) of the base in the map frame
+  compute_time_topic (std_msgs/Float64) scan-update compute time in ms, for the study's compute metric
   TF map -> odom (only when publish_tf is true; the sim launches a static one today)
 
 Frames follow REP 105: odometry owns odom -> base, this node estimates map -> base and
@@ -19,7 +20,8 @@ from threading import Lock
 from time import perf_counter
 from typing import Optional, Tuple
 
-from numpy import ndarray, array, asarray, arctan2, cos, sin, diag, int8, zeros
+from numpy import ndarray, array, asarray, arctan2, column_stack, cos, sin, diag, int8, zeros
+from numpy.random import default_rng
 
 from rclpy import init as rclpy_init, try_shutdown as rclpy_try_shutdown, spin as rclpy_spin
 from rclpy.executors import ExternalShutdownException
@@ -30,9 +32,10 @@ from rclpy.duration import Duration
 from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped, Quaternion
 from nav_msgs.msg import Odometry, OccupancyGrid
 from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Float64
 from tf2_ros import Buffer, TransformListener, TransformBroadcaster, TransformException
 
-from devol_localization.ekf_core import PoseEKF, wrap_angle, CHI2_3DOF_99
+from devol_localization.ekf_core import PoseEKF, global_initial_state, wrap_angle, CHI2_3DOF_99
 from devol_localization.ekf_pipeline import EKFPipeline
 from devol_localization.scan_matcher import DistanceField, ScanMatcher, scan_to_points
 
@@ -74,6 +77,7 @@ class EKFLocalization(Node):
         self.declare_parameter('map_topic', 'projected_map')
         self.declare_parameter('scan_topic', 'sensors/lidar2d_0/scan')
         self.declare_parameter('pose_topic', 'ekf_pose')
+        self.declare_parameter('compute_time_topic', 'ekf_compute_time_ms')
         self.declare_parameter('initial_pose_topic', 'initialpose')
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
@@ -82,7 +86,15 @@ class EKFLocalization(Node):
         # Initial pose: by default taken from the (static) map -> odom TF composed with the
         # first odometry message, which is where the robot was spawned.
         self.declare_parameter('initial_pose_from_tf', True)
+        # init_mode overrides initial_pose_from_tf when set: 'tf', 'pose' (initial_pose) or
+        # 'global' (mean and covariance of the map's free space, the study's global-localization
+        # test: a single Gaussian spanning the map).
+        self.declare_parameter('init_mode', '')
         self.declare_parameter('initial_pose', [0.0, 0.0, 0.0])
+        # init_mode global: 'random' draws the mean from the free space and the heading uniformly
+        # (seeded by global_init_seed); 'centroid' uses the free-space centroid and heading 0.
+        self.declare_parameter('global_init_mean', 'random')
+        self.declare_parameter('global_init_seed', 0)
         self.declare_parameter('initial_std', [0.1, 0.1, 0.05])
         # Odometry motion model; variances per unit of motion (see ekf_core.PoseEKF).
         self.declare_parameter('odom_alphas', [0.02, 0.01, 0.01, 0.002])
@@ -111,7 +123,11 @@ class EKFLocalization(Node):
         self._map_frame: str = self._str('map_frame')
         self._odom_frame: str = self._str('odom_frame')
         self._publish_tf: bool = self.get_parameter('publish_tf').value
-        self._init_from_tf: bool = self.get_parameter('initial_pose_from_tf').value
+        self._init_mode: str = self._str('init_mode') or (
+            'tf' if self.get_parameter('initial_pose_from_tf').value else 'pose')
+        if self._init_mode not in ('tf', 'pose', 'global'):
+            raise ValueError(f'init_mode must be tf, pose or global, got {self._init_mode}')
+        self._free_space: Optional[ndarray] = None
         self._initial_pose: Tuple[float, float, float] = tuple(self.get_parameter('initial_pose').value)
         self._initial_std: ndarray = asarray(self.get_parameter('initial_std').value, dtype=float)
         self._laser_pose: Tuple[float, float, float] = tuple(self.get_parameter('laser_pose').value)
@@ -140,6 +156,7 @@ class EKFLocalization(Node):
                                          if self.get_parameter('map_transient_local').value
                                          else DurabilityPolicy.VOLATILE))
         self._pose_pub = self.create_publisher(PoseWithCovarianceStamped, f'{ns}/{self._str("pose_topic")}', 10)
+        self._compute_pub = self.create_publisher(Float64, f'{ns}/{self._str("compute_time_topic")}', 10)
         self.create_subscription(OccupancyGrid, f'{ns}/{self._str("map_topic")}', self.map_received, map_qos)
         self.create_subscription(Odometry, f'{ns}/{self._str("odom_topic")}', self.odom_received, 50)
         self.create_subscription(LaserScan, f'{ns}/{self._str("scan_topic")}', self.scan_received,
@@ -177,9 +194,17 @@ class EKFLocalization(Node):
                               covariance_scale=float(self.get_parameter('match_covariance_scale').value),
                               min_std=tuple(self.get_parameter('match_min_std').value),
                               max_ambiguity=float(self.get_parameter('max_ambiguity').value))
+        occupied = int(self.get_parameter('occupied_threshold').value)
+        rows, cols = ((grid >= 0) & (grid < occupied)).nonzero()
+        free_space = None
+        if rows.size:
+            xy = column_stack((info.origin.position.x + (cols + 0.5) * info.resolution,
+                               info.origin.position.y + (rows + 0.5) * info.resolution))
+            free_space = xy
         with self._lock:
             first: bool = self._pipeline.matcher is None
             self._pipeline.matcher = matcher
+            self._free_space = free_space
         if first:
             self.get_logger().info(f'Map received: {info.width}x{info.height} @ {info.resolution:.3f} m')
 
@@ -204,8 +229,10 @@ class EKFLocalization(Node):
                                     msg.range_max, self._beam_step, self._laser_pose)
             t0: float = perf_counter()
             lost_before: bool = self._pipeline.stats.failed_in_row >= self._pipeline.lost_after
-            result = self._pipeline.on_scan(points, self._stamp(msg) if self._align else None)
-            self._match_ms += (perf_counter() - t0) * 1e3
+            result = self._pipeline.on_scan(points)
+            dt_ms: float = (perf_counter() - t0) * 1e3
+            self._match_ms += dt_ms
+            self._compute_pub.publish(Float64(data=dt_ms))
             if result is not None and lost_before:
                 self.get_logger().info('Scan match re-acquired')
             if self._last_odom_msg is not None:
@@ -230,7 +257,18 @@ class EKFLocalization(Node):
     # ---------------------------------------------------------------- helpers
 
     def _initialize(self, odom_pose: Tuple[float, float, float], msg: Odometry) -> bool:
-        if self._init_from_tf:
+        if self._init_mode == 'global':
+            if self._free_space is None:
+                self.get_logger().info('Waiting for the map to initialize globally', throttle_duration_sec=5.0)
+                return False
+            how = self._str('global_init_mean')
+            rng = default_rng(int(self.get_parameter('global_init_seed').value))
+            x, P = global_initial_state(self._free_space, rng, mean=how)
+            self._ekf.reset((float(x[0]), float(x[1]), float(x[2])), P)
+            self.get_logger().info(f'Filter initialized globally ({how}) at x={x[0]:.2f} y={x[1]:.2f} '
+                                   f'yaw={x[2]:.2f}, std x={P[0, 0] ** 0.5:.1f} m y={P[1, 1] ** 0.5:.1f} m')
+            return True
+        if self._init_mode == 'tf':
             try:
                 tf = self._tf_buffer.lookup_transform(self._map_frame, self._odom_frame, Time(),
                                                       timeout=Duration(seconds=0.0))

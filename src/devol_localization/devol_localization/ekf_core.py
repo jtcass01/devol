@@ -121,3 +121,31 @@ class PoseEKF:
         I_K: ndarray = eye(3) - K
         self.P = I_K @ self.P @ I_K.T + K @ R @ K.T
         return True
+
+
+def global_initial_state(free_xy: ndarray, rng=None, mean: str = 'random') -> Tuple[ndarray, ndarray]:
+    """Single-Gaussian stand-in for a uniform prior over the free space, for global localization.
+
+    `mean='random'` draws the mean from the free cells and the heading uniformly (pass a seeded
+    numpy Generator so each trial is reproducible); `'centroid'` uses the free-space centroid with
+    heading 0. Note the factory's free-space centroid is within 0.1 m of the spawn pose (0, 0, 0),
+    so 'centroid' starts the filter on the true pose and is not a global-localization test there.
+    The covariance is the free space's second moment about the chosen mean, and the heading
+    variance is that of a uniform heading, (2 pi)^2 / 12.
+    """
+    from numpy import outer
+    from numpy.random import default_rng
+    xy = asarray(free_xy, dtype=float).reshape(-1, 2)
+    centroid = xy.mean(axis=0)
+    if mean == 'centroid':
+        x = array([centroid[0], centroid[1], 0.0])
+    elif mean == 'random':
+        rng = rng if rng is not None else default_rng()
+        x = array([*xy[rng.integers(len(xy))], rng.uniform(-pi, pi)])
+    else:
+        raise ValueError(f"mean must be 'random' or 'centroid', got {mean}")
+    d = centroid - x[:2]
+    P = zeros((3, 3))
+    P[:2, :2] = (xy - centroid).T @ (xy - centroid) / max(len(xy) - 1, 1) + outer(d, d)
+    P[2, 2] = (2.0 * pi) ** 2 / 12.0
+    return x, P

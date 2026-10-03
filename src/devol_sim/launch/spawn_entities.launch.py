@@ -56,6 +56,12 @@ def generate_launch_description():
         default_value='/devol_drive',
         description='Namespace for topics'
     )
+    declare_map_odom_tf = DeclareLaunchArgument(
+        'map_odom_tf',
+        default_value='static',
+        choices=['static', 'none'],
+        description='static: publish map -> odom at the spawn pose; none: leave it to another node'
+    )
     declare_publish_robot_description_semantic_cmd = DeclareLaunchArgument(
         "publish_robot_description_semantic",
         default_value="true",
@@ -193,7 +199,8 @@ def generate_launch_description():
             spawn_robot,
             *goal_spawners,
             base_link_to_diff_drive_tf,
-            odom_to_diff_drive_tf,
+            *([odom_to_diff_drive_tf]
+              if context.perform_substitution(LaunchConfiguration('map_odom_tf')) == 'static' else []),
             maze_world_tf,
             lidar2d_tf,
             lidar3d_tf,
@@ -206,5 +213,6 @@ def generate_launch_description():
         declare_namespace,
         declare_publish_robot_description_semantic_cmd,
         maze_arg,
+        declare_map_odom_tf,
         OpaqueFunction(function=launch_setup)
     ])
