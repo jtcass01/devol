@@ -32,6 +32,7 @@ def generate_launch_description():
             PathJoinSubstitution([FindExecutable(name="xacro")]), 
             ' ', urdf_path, ' ',
             "use_gazebo:=true ",
+            "wheel_slip_compliance:=", LaunchConfiguration('wheel_slip_compliance'),
         ]
     ), value_type=str)
 
@@ -61,6 +62,11 @@ def generate_launch_description():
         default_value='static',
         choices=['static', 'none'],
         description='static: publish map -> odom at the spawn pose; none: leave it to another node'
+    )
+    declare_wheel_slip_compliance = DeclareLaunchArgument(
+        'wheel_slip_compliance',
+        default_value='0.5',
+        description='Unitless WheelSlip compliance for all four wheels (lateral and longitudinal); 0 = no slip'
     )
     declare_publish_robot_description_semantic_cmd = DeclareLaunchArgument(
         "publish_robot_description_semantic",
@@ -214,5 +220,6 @@ def generate_launch_description():
         declare_publish_robot_description_semantic_cmd,
         maze_arg,
         declare_map_odom_tf,
+        declare_wheel_slip_compliance,
         OpaqueFunction(function=launch_setup)
     ])
