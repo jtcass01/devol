@@ -95,12 +95,18 @@ class PFParams:
     # Odometry motion noise (Thrun's alpha1..alpha4), std-dev form:
     # rot std = a1*|rot| + a2*|trans|, trans std = a3*|trans| + a4*(|rot1|+|rot2|).
     # Sized for skid-steer odometry, whose yaw can be off by ~30% while
-    # turning: too little rotation noise lets the particle cloud fall behind
-    # the true heading and collapse (particle depletion).
+    # turning and which drifts in translation during in-place spins. Too
+    # little noise lets the particle cloud fall behind the true pose and
+    # collapse to a few cm (particle depletion); alpha3/alpha4 below 0.22
+    # did that on the recorded study_nominal Gazebo drive.
     alpha1: float = 0.3
-    alpha2: float = 0.1
-    alpha3: float = 0.1
-    alpha4: float = 0.05
+    alpha2: float = 0.22
+    alpha3: float = 0.22
+    alpha4: float = 0.22
+    # Increments translating less than this (m) are an in-place turn: the
+    # noise is spread as a pure rotation (rot1 = 0, rot2 = rot1 + rot2), as
+    # AMCL does, because the direction of a sub-cm creep is arbitrary.
+    min_translation: float = 0.01
     # Likelihood field model. Fewer beams and a wider sigma keep the
     # likelihood from being overconfident when the scan and map disagree.
     sigma_hit: float = 0.3
@@ -162,9 +168,11 @@ class ParticleFilter:
         p = self.params
         n = self.particles.shape[0]
         at = abs(trans)
-        std_rot1 = p.alpha1 * abs(rot1) + p.alpha2 * at
-        std_trans = p.alpha3 * at + p.alpha4 * (abs(rot1) + abs(rot2))
-        std_rot2 = p.alpha1 * abs(rot2) + p.alpha2 * at
+        # Noise magnitudes only; the mean motion stays (rot1, trans, rot2).
+        e1, e2 = (0.0, rot1 + rot2) if at < p.min_translation else (rot1, rot2)
+        std_rot1 = p.alpha1 * abs(e1) + p.alpha2 * at
+        std_trans = p.alpha3 * at + p.alpha4 * (abs(e1) + abs(e2))
+        std_rot2 = p.alpha1 * abs(e2) + p.alpha2 * at
 
         r1 = rot1 - self.rng.normal(0.0, 1.0, n) * std_rot1
         t = trans - self.rng.normal(0.0, 1.0, n) * std_trans

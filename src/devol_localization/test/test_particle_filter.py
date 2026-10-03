@@ -259,3 +259,17 @@ def test_plain_sir_does_not_recover_from_kidnapping(world):
     pf.init_gaussian(truth[0], 0.2, 0.1)
     errs, _ = run(pf, grid, truth, odom, rng=rng, kidnap_at=(30, np.array([3.0, 3.0, 0.0])))
     assert np.all(errs[-20:] > 0.25)
+
+
+def test_creeping_in_place_turn_spreads_noise_as_rotation():
+    """A 0.1 rad in-place turn whose odometry creeps 0.2 mm sideways must not
+    read the creep direction as a 90 deg rot1: that put ~0.16 m of translation
+    and ~26 deg of rot1 noise on every particle while the robot stood still."""
+    rot1, trans, rot2 = odometry_delta((0.0, 0.0, 0.0), (0.0, 2e-4, 0.1))
+    assert abs(rot1) > 1.0          # the decomposition really is degenerate
+    pf = ParticleFilter(PFParams(num_particles=5000), seed=0)
+    pf.init_gaussian((0.0, 0.0, 0.0), 0.0, 0.0)
+    pf.predict(rot1, trans, rot2)
+    assert np.std(np.hypot(pf.particles[:, 0], pf.particles[:, 1])) < 0.02
+    assert abs(np.mean(pf.particles[:, 2]) - 0.1) < 0.01
+    assert np.std(pf.particles[:, 2]) < 0.05
