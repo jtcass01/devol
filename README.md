@@ -98,7 +98,7 @@ cd ~/devol/src/devol_localization && python3 -m pytest -q test
 cd ~/devol/src/devol_sim && python3 -m pytest -q test/test_rrt_planner.py
 ```
 
-Expected: `28 passed` and `18 passed`.
+Expected: `38 passed` and `18 passed`. Two of the 38 skip if OpenCV is missing or ROS is not sourced.
 
 ## 6. Run the simulation
 
@@ -139,9 +139,13 @@ ros2 launch devol_localization localization_test_cases.launch.py test_case:=1   
 ros2 launch devol_localization localization_test_cases.launch.py test_case:=2   # kidnapped robot
 ```
 
-There is nothing to stop by hand. The run ends a few seconds after the robot reaches Goal 3 (or after
-400 s of simulation time), prints a PASS/FAIL report, and leaves these files in
-`~/loc_results/test_case_<n>`:
+Start each test case only after the previous Gazebo has fully exited. If a Gazebo server or bridge
+from an earlier run is still alive, the launch stops with an error rather than scoring the old sim's
+clock and pose; see Troubleshooting for the commands that clear them.
+
+There is nothing to stop by hand. The run ends a few seconds after the robot reaches Goal 3, prints a
+PASS/FAIL report, and leaves these files in `~/loc_results/test_case_<n>`. A run that has not reached
+Goal 3 after 400 s of simulation time (`max_duration`) ends and FAILs.
 
 - `verdict.txt`: the PASS/FAIL report, one line per check.
 - `summary.json`: for the EKF, the PF and an odometry-only (dead reckoning) baseline, the position and
@@ -176,8 +180,8 @@ dead reckoning from odometry alone is worse than both.
 without the filters being told, then the planner drives on to Goal 3. The expected output is that
 teleport pose.
 
-**PASS** when the PF returns to within 0.25 m of the true pose, and stays there, within 60 s of the
-kidnap. The EKF's outcome is reported either way: it keeps a single Gaussian with no re-seeding, so it
+**PASS** when, within 60 s of the kidnap, the PF returns to within 0.25 m of the true pose and stays
+there for at least 3 s. The EKF's outcome is reported either way: it keeps a single Gaussian with no re-seeding, so it
 is not expected to recover, and that contrast is part of the study.
 
 ## 8. Full study (optional)
@@ -205,4 +209,10 @@ ros2 run devol_localization localization_study analyze --out ~/loc_results/study
 - **The robot never moves and the planner logs "TF lookup failed":** the `odom → a200_base_link`
   transform is missing; make sure the build is from the current `Agent-Localization` branch and that
   `install/setup.bash` is sourced.
+- **A test case aborts saying a Gazebo server or `parameter_bridge` is still running:** an earlier run
+  hasn't finished shutting down. Stop it, check that nothing is left, then relaunch:
+  ```bash
+  pkill -f gz-sim; pkill -f "gz sim"; pkill -f parameter_bridge
+  pgrep -af "gz-sim|gz sim|parameter_bridge"   # should print nothing
+  ```
 - **Bridges print a segmentation fault after Ctrl-C:** harmless; it happens only during shutdown.
