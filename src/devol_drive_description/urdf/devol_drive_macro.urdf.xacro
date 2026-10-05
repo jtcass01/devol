@@ -39,10 +39,11 @@
         caster_density:=0.1
         max_linear_acceleration:=10
         namespace:=/devol_drive
+        use_cameras:=true
     ">
         <xacro:property name="caster_offset" value="${body_length/2 - caster_radius}"/>
 
-        <xacro:a200 namespace="${namespace}" />
+        <xacro:a200 namespace="${namespace}" use_cameras="${use_cameras}" />
 
         <xacro:devol 
             parent="${tf_prefix}top_plate_mount_ur" 

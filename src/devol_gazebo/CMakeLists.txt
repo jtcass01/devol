@@ -9,23 +9,13 @@ project(devol_gazebo)
 # Such variables can be used lateron in the CMakeLists.txt file.
 find_package(ament_cmake REQUIRED)
 
-find_package(gz-cmake3 REQUIRED)
-find_package(gz-plugin2 REQUIRED COMPONENTS register)
-set(GZ_PLUGIN_VER ${gz-plugin2_VERSION_MAJOR})
-find_package(gz-common5 REQUIRED COMPONENTS profiler)
-set(GZ_COMMON_VER ${gz-common5_VERSION_MAJOR})
-
-# Harmonic
-if("$ENV{GZ_VERSION}" STREQUAL "harmonic")
-  find_package(gz-sim8 REQUIRED)
-  set(GZ_SIM_VER ${gz-sim8_VERSION_MAJOR})
-  message(STATUS "Compiling against Gazebo Harmonic")
-# Default to Garden
-else()
-  find_package(gz-sim7 REQUIRED)
-  set(GZ_SIM_VER ${gz-sim7_VERSION_MAJOR})
-  message(STATUS "Compiling against Gazebo Garden")
-endif()
+# Gazebo Jetty libraries are provided through the ROS 2 Lyrical vendor packages.
+find_package(gz_sim_vendor REQUIRED)
+find_package(gz-sim REQUIRED)
+find_package(gz_plugin_vendor REQUIRED)
+find_package(gz-plugin REQUIRED COMPONENTS register)
+find_package(gz_common_vendor REQUIRED)
+find_package(gz-common REQUIRED COMPONENTS profiler)
 
 
 # Following 'add_library' directive defines a library target named 'BasicSystem'.
@@ -49,9 +39,8 @@ target_include_directories(
 # The 'PRIVATE' keyword stipulates that the gz-sim library will not
 # automatically be included if the 'BasicSystem' target were to
 # be linked to anoter target. 
-# ${GZ_SIM_VER} is substituted by the value that is was set to above.
 target_link_libraries(BasicSystem PRIVATE
-  gz-sim${GZ_SIM_VER}::gz-sim${GZ_SIM_VER})
+  gz-sim::gz-sim)
 
 
 # Following directives similarly specify another target: 'FullSystem'.
@@ -65,7 +54,7 @@ target_include_directories(
 )
 
 target_link_libraries(FullSystem PRIVATE
-  gz-sim${GZ_SIM_VER}::gz-sim${GZ_SIM_VER})
+  gz-sim::gz-sim)
 
 
 
@@ -113,8 +102,8 @@ endif()
 # will be set by exectuting 'source install/setup.bash' after compilation.
 # When using this template for your project, change the filenames of the
 # files in the 'hooks' folder, to correspond to your project name.
-ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/${PROJECT_NAME}.dsv.in")
-ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/${PROJECT_NAME}.sh.in")
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/arc_lsi_gazebo.dsv.in")
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/arc_lsi_gazebo.sh.in")
 
 
 # Following directive configures ament based on the previous directives, and should

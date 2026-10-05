@@ -25,7 +25,7 @@
 #include <gz/plugin/Register.hh>
 
 // Don't forget to include the plugin's header.
-#include "devol_gazebo/BasicSystem.hh"
+#include "arc_lsi_gazebo/BasicSystem.hh"
 
 // This is required to register the plugin. Make sure the interfaces match
 // what's in the header.

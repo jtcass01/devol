@@ -26,10 +26,24 @@ def generate_launch_description():
         default_value='/devol_drive',
         description='Namespace for topics'
     )
-    
+    declare_gz_gui = DeclareLaunchArgument(
+        'gz_gui',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Open the Gazebo GUI (false runs the server headless)'
+    )
+    declare_rviz = DeclareLaunchArgument(
+        'rviz',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Open RViz'
+    )
+
     def launch_setup(context):
         maze_folder = context.perform_substitution(LaunchConfiguration('maze'))
         namespace = context.perform_substitution(LaunchConfiguration('namespace'))
+        gz_gui = context.perform_substitution(LaunchConfiguration('gz_gui')) == 'true'
+        use_rviz = context.perform_substitution(LaunchConfiguration('rviz')) == 'true'
         world_file = os.path.join(gz_pkg_share, 'worlds', maze_folder, 'maze_world.sdf')
 
         # Poses CSV file
@@ -57,7 +71,7 @@ def generate_launch_description():
                     get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
                 )
             ]),
-            launch_arguments={'gz_args': f'-r {world_file}'}.items(),
+            launch_arguments={'gz_args': f'-r {world_file}' if gz_gui else f'-r -s {world_file}'}.items(),
         )
 
         # Include spawn entities launch file (robot, goals, map, static transforms)
@@ -96,6 +110,8 @@ def generate_launch_description():
                     # -----------------
                     "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
                     '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+                    # odom -> a200_base_link from the Gazebo DiffDrive plugin
+                    '/model/devol_drive/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
                     ],
             remappings=[
                 ('/model/devol_drive/tf', '/tf'),
@@ -151,11 +167,12 @@ def generate_launch_description():
             system_bridge_cmd,
             # pid_controller,
             # agent_motion_planner,
-            rviz
-        ]
+        ] + ([rviz] if use_rviz else [])
 
     return LaunchDescription([
         maze_arg,
         declare_namespace,
+        declare_gz_gui,
+        declare_rviz,
         OpaqueFunction(function=launch_setup)
     ])

@@ -51,6 +51,8 @@ def generate_launch_description():
         namespace = context.perform_substitution(LaunchConfiguration('namespace'))
         octomap_resolution = float(context.perform_substitution(LaunchConfiguration('octomap_resolution')))
         planner = context.perform_substitution(LaunchConfiguration('planner'))
+        gz_gui = context.perform_substitution(LaunchConfiguration('gz_gui')) == 'true'
+        use_rviz = context.perform_substitution(LaunchConfiguration('rviz')) == 'true'
 
         world_file = os.path.join(gz_pkg_share, 'worlds', maze_folder, 'maze_world.sdf')
 
@@ -82,7 +84,7 @@ def generate_launch_description():
                     get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
                 )
             ]),
-            launch_arguments={'gz_args': f'-r {world_file}'}.items(),
+            launch_arguments={'gz_args': f'-r {world_file}' if gz_gui else f'-r -s {world_file}'}.items(),
         )
 
         # Include spawn entities launch file (robot, goals, map, static transforms)
@@ -122,6 +124,8 @@ def generate_launch_description():
                     # -----------------
                     "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
                     '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+                    # odom -> a200_base_link from the Gazebo DiffDrive plugin
+                    '/model/devol_drive/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
                     '/model/longeron_strut/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
                     ],
             remappings=[
@@ -225,7 +229,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'pointcloud_file': pcd_file,
                          'frame_id': 'map',
-                         'publish_rate': 30.0,
+                         'publish_rate': 1.0,  # octomap only needs the static cloud once
                          'topic_name': 'static_map_pointcloud',
                          'namespace': namespace}]
         )
@@ -258,13 +262,14 @@ def generate_launch_description():
             *planner_nodes,
             pointcloud_publisher,
             goal_points_publisher,
-            rviz
-        ]
+        ] + ([rviz] if use_rviz else [])
 
     return LaunchDescription([
         maze_arg,
         declare_namespace,
         declare_planner,
+        DeclareLaunchArgument('gz_gui', default_value='true', choices=['true', 'false'], description='Open the Gazebo GUI'),
+        DeclareLaunchArgument('rviz', default_value='true', choices=['true', 'false'], description='Open RViz'),
         declare_octomap_resolution,
         declare_map_odom_tf,
         OpaqueFunction(function=launch_setup)
