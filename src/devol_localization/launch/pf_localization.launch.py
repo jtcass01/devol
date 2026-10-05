@@ -8,16 +8,22 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    default_params = join(get_package_share_directory('devol_localization'), 'config', 'pf_localization.yaml')
+    default_params = join(
+        get_package_share_directory('devol_localization'), 'config', 'pf_localization.yaml'
+    )
 
     declare_params = DeclareLaunchArgument(
-        'params_file', default_value=default_params, description='Particle filter parameter file')
+        'params_file', default_value=default_params, description='Particle filter parameter file'
+    )
     declare_num_particles = DeclareLaunchArgument(
-        'num_particles', default_value='500', description='Number of particles')
+        'num_particles', default_value='500', description='Number of particles'
+    )
     declare_publish_tf = DeclareLaunchArgument(
-        'publish_tf', default_value='false', description='Broadcast map -> odom')
+        'publish_tf', default_value='false', description='Broadcast map -> odom'
+    )
     declare_init_mode = DeclareLaunchArgument(
-        'init_mode', default_value='tf', description='tf | pose | global')
+        'init_mode', default_value='tf', description='tf | pose | global'
+    )
 
     pf_node = Node(
         package='devol_localization',
@@ -34,5 +40,6 @@ def generate_launch_description():
         ],
     )
 
-    return LaunchDescription([
-        declare_params, declare_num_particles, declare_publish_tf, declare_init_mode, pf_node])
+    return LaunchDescription(
+        [declare_params, declare_num_particles, declare_publish_tf, declare_init_mode, pf_node]
+    )

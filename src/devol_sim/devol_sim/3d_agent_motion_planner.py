@@ -13,18 +13,15 @@ from rclpy.qos import QoSProfile
 from geometry_msgs.msg import PoseStamped
 from visualization_msgs.msg import MarkerArray
 import tf2_ros
-from matplotlib.pyplot import (ion, 
-                               close as plt_close, 
-                               figure as plt_figure, 
-                               pause as plt_pause)
+from matplotlib.pyplot import ion, close as plt_close, figure as plt_figure, pause as plt_pause
 from sensor_msgs.msg import PointCloud2
-from sensor_msgs_py.point_cloud2 import read_points 
+from sensor_msgs_py.point_cloud2 import read_points
 
 from devol_sim.a_star_planner import a_star_grid
 from devol_sim.utils import quaternion_to_euler
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 def euclidean_distance(p1: Tuple[int, int, int], p2: Tuple[int, int, int]) -> float:
@@ -32,12 +29,12 @@ def euclidean_distance(p1: Tuple[int, int, int], p2: Tuple[int, int, int]) -> fl
     assert len(p2) == 3
     x1, y1, z1 = p1
     x2, y2, z2 = p2
-    return ((x2-x1)**2+(y2-y1)**2+(z2-z1)**2)**0.5
+    return ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) ** 0.5
 
 
 class AgentMotionPlanner3D(RCLPY_Node):
-    """
-    """
+    """ """
+
     def __init__(self):
         super().__init__('agent_motion_planner_3d')
 
@@ -51,18 +48,36 @@ class AgentMotionPlanner3D(RCLPY_Node):
         self.declare_parameter('tf_to_frame', 'map')
         self.declare_parameter('tf_from_frame', 'a200_base_link')
 
-        self._publish_rate: float = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
-        self._viz_rate: float = float(self.get_parameter('viz_rate').get_parameter_value().double_value)
-        self._namespace: str = str(self.get_parameter('namespace').get_parameter_value().string_value)
-        self._octomap_resolution: float = float(self.get_parameter('octomap_resolution').get_parameter_value().double_value)
-        self._goal_tolerance: float = float(self.get_parameter('goal_tolerance').get_parameter_value().double_value)
-        self._lookahead: float = float(self.get_parameter('lookahead').get_parameter_value().double_value)
-        self._intermediate_goal_tolerance: float = float(self.get_parameter('intermediate_goal_tolerance').get_parameter_value().double_value)
+        self._publish_rate: float = float(
+            self.get_parameter('publish_rate').get_parameter_value().double_value
+        )
+        self._viz_rate: float = float(
+            self.get_parameter('viz_rate').get_parameter_value().double_value
+        )
+        self._namespace: str = str(
+            self.get_parameter('namespace').get_parameter_value().string_value
+        )
+        self._octomap_resolution: float = float(
+            self.get_parameter('octomap_resolution').get_parameter_value().double_value
+        )
+        self._goal_tolerance: float = float(
+            self.get_parameter('goal_tolerance').get_parameter_value().double_value
+        )
+        self._lookahead: float = float(
+            self.get_parameter('lookahead').get_parameter_value().double_value
+        )
+        self._intermediate_goal_tolerance: float = float(
+            self.get_parameter('intermediate_goal_tolerance').get_parameter_value().double_value
+        )
         self._dt: float = 1.0 / self._publish_rate
 
         # TF frames
-        self._to_frame: str = str(self.get_parameter('tf_to_frame').get_parameter_value().string_value)
-        tf_from_frame: str = str(self.get_parameter('tf_from_frame').get_parameter_value().string_value)
+        self._to_frame: str = str(
+            self.get_parameter('tf_to_frame').get_parameter_value().string_value
+        )
+        tf_from_frame: str = str(
+            self.get_parameter('tf_from_frame').get_parameter_value().string_value
+        )
         self._from_frame = f'{self._namespace[1:]}/{tf_from_frame}'
 
         # TF
@@ -72,10 +87,12 @@ class AgentMotionPlanner3D(RCLPY_Node):
         # I/O
         qos_profile = QoSProfile(depth=10)
         self._goal_pub = self.create_publisher(PoseStamped, f'/goal_pose', qos_profile)
-        self._point_cloud_center_sub = self.create_subscription(PointCloud2, 
-                                                                f'{self._namespace}/octomap_point_cloud_centers', 
-                                                                self._cloud_received, 10)
-        self._goals_sub = self.create_subscription(MarkerArray, f'{self._namespace}/goal_points', self._goal_points_received, 10)
+        self._point_cloud_center_sub = self.create_subscription(
+            PointCloud2, f'{self._namespace}/octomap_point_cloud_centers', self._cloud_received, 10
+        )
+        self._goals_sub = self.create_subscription(
+            MarkerArray, f'{self._namespace}/goal_points', self._goal_points_received, 10
+        )
 
         # State
         self._occupied_cells: Set[Tuple[float, float, float]] = set()
@@ -136,35 +153,54 @@ class AgentMotionPlanner3D(RCLPY_Node):
 
                     min_bound = cells_array.min(axis=0)
                     max_bound = cells_array.max(axis=0)
-                    
+
                     # Plot occupied cells
-                    self._ax.scatter(cells_array[:, 0], 
-                                     cells_array[:, 1], 
-                                     cells_array[:, 2],
-                                     c='red', marker='s', s=1, alpha=0.01)
-                    
+                    self._ax.scatter(
+                        cells_array[:, 0],
+                        cells_array[:, 1],
+                        cells_array[:, 2],
+                        c='red',
+                        marker='s',
+                        s=1,
+                        alpha=0.01,
+                    )
+
                     # Plot goal Positions
                     if len(goals) > 0:
-                        self._ax.scatter(goals[:, 0],
-                                         goals[:, 1],
-                                         goals[:, 2],
-                                         c='green', marker='o', s=1, alpha=1.0,
-                                         edgecolors='darkgreen', linewidths=2,
-                                         label='Goals')
-                        
+                        self._ax.scatter(
+                            goals[:, 0],
+                            goals[:, 1],
+                            goals[:, 2],
+                            c='green',
+                            marker='o',
+                            s=1,
+                            alpha=1.0,
+                            edgecolors='darkgreen',
+                            linewidths=2,
+                            label='Goals',
+                        )
+
                     if robot_state is not None:
-                        self._ax.scatter(robot_state[0],
-                                         robot_state[1],
-                                         robot_state[2],
-                                         c='blue', marker='^', s=200, alpha=1.0,
-                                         edgecolors='darkblue', linewidths=2,
-                                         label='Robot')
+                        self._ax.scatter(
+                            robot_state[0],
+                            robot_state[1],
+                            robot_state[2],
+                            c='blue',
+                            marker='^',
+                            s=200,
+                            alpha=1.0,
+                            edgecolors='darkblue',
+                            linewidths=2,
+                            label='Robot',
+                        )
 
                     # Set labels
                     self._ax.set_xlabel('X (m)')
                     self._ax.set_ylabel('Y (m)')
                     self._ax.set_zlabel('Z (m)')
-                    self._ax.set_title(f'Octomap Visualization\n{len(occupied_cells)} occupied cells')
+                    self._ax.set_title(
+                        f'Octomap Visualization\n{len(occupied_cells)} occupied cells'
+                    )
 
                     # Set limits
                     self._ax.set_xlim(min_bound[0], max_bound[0])
@@ -172,10 +208,15 @@ class AgentMotionPlanner3D(RCLPY_Node):
                     self._ax.set_zlim(min_bound[2], max_bound[2])
                 else:
                     # No data yet
-                    self._ax.text(0.5, 0.5, 0.5, 'Waiting for octomap data...', 
-                                horizontalalignment='center',
-                                verticalalignment='center',
-                                transform=self._ax.transAxes)
+                    self._ax.text(
+                        0.5,
+                        0.5,
+                        0.5,
+                        'Waiting for octomap data...',
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        transform=self._ax.transAxes,
+                    )
                     self._ax.set_xlabel('X (m)')
                     self._ax.set_ylabel('Y (m)')
                     self._ax.set_zlabel('Z (m)')
@@ -209,7 +250,7 @@ class AgentMotionPlanner3D(RCLPY_Node):
         return (
             round(x / self._octomap_resolution) * self._octomap_resolution,
             round(y / self._octomap_resolution) * self._octomap_resolution,
-            round(z / self._octomap_resolution) * self._octomap_resolution
+            round(z / self._octomap_resolution) * self._octomap_resolution,
         )
 
     def _world_to_grid(self, x: float, y: float, z: float) -> int:
@@ -244,38 +285,38 @@ class AgentMotionPlanner3D(RCLPY_Node):
         self._goal_pub.publish(msg)
 
     def _grid_to_world(self, row: int, col: int, height: int) -> Tuple[float, float]:
-        x = self._origin_x + (col+0.5) * self._octomap_resolution
-        y = self._origin_y + (row+0.5) * self._octomap_resolution
-        z = self._origin_z + (height+0.5) * self._octomap_resolution
+        x = self._origin_x + (col + 0.5) * self._octomap_resolution
+        y = self._origin_y + (row + 0.5) * self._octomap_resolution
+        z = self._origin_z + (height + 0.5) * self._octomap_resolution
         return x, y, z
-    
+
     def plan_to_goals(self):
         with self._occupied_cells_lock:
             if len(self._occupied_cells) == 0:
                 return
-        
+
         if (len(self._goals) == 0) or (self._goal_index >= len(self._goals)):
             return
-        
+
         # Get robot's curent position from tf, it would be better if there was a particle filter on the other side of this.
         try:
             trans = self._tf_buffer.lookup_transform(
-                self._to_frame, self._from_frame,
-                rclpy.time.Time(), timeout=Duration(seconds=0.5))
+                self._to_frame, self._from_frame, rclpy.time.Time(), timeout=Duration(seconds=0.5)
+            )
             with self._robot_state_lock:
                 self._robot_state = (
                     trans.transform.translation.x,
                     trans.transform.translation.y,
-                    trans.transform.translation.z
+                    trans.transform.translation.z,
                 )
 
         except tf2_ros.LookupException:
-            self.get_logger().warning('Transform isn\'t available, waiting...')
+            self.get_logger().warning("Transform isn't available, waiting...")
             return
         except Exception as e:
             self.get_logger().warning(f'TF lookup failed: {str(e)}')
             return
-        
+
         # Convert robot position and goal to grid indices
         try:
             robot_grid = self._world_to_grid(*self._robot_state)
@@ -306,6 +347,6 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
+
 if __name__ == '__main__':
     main()
-

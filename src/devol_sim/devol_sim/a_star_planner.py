@@ -2,13 +2,15 @@ from __future__ import annotations
 from numpy import ndarray, inf, array
 from typing import List, Tuple, Dict
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
 
 def euclidean_distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
     x1, y1 = p1
     x2, y2 = p2
-    return ((x2-x1)**2+(y2-y1)**2)**0.5
+    return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+
 
 def list_neighbors(map: ndarray, p: Tuple[int, int]) -> List[Tuple[int, int]]:
     x, y = p
@@ -17,14 +19,14 @@ def list_neighbors(map: ndarray, p: Tuple[int, int]) -> List[Tuple[int, int]]:
 
     # 8 directions
     directions = [
-        (-1,  0),  # up
-        ( 1,  0),  # down
-        ( 0, -1),  # left
-        ( 0,  1),  # right
+        (-1, 0),  # up
+        (1, 0),  # down
+        (0, -1),  # left
+        (0, 1),  # right
         (-1, -1),  # up-left
-        (-1,  1),  # up-right
-        ( 1, -1),  # down-left
-        ( 1,  1)   # down-right
+        (-1, 1),  # up-right
+        (1, -1),  # down-left
+        (1, 1),  # down-right
     ]
 
     for dx, dy in directions:
@@ -34,41 +36,46 @@ def list_neighbors(map: ndarray, p: Tuple[int, int]) -> List[Tuple[int, int]]:
 
     return neighbors
 
-class Edge: 
+
+class Edge:
     """This class provides a basic data structure for representing
     a directional edge in a graph. Travel is possible between
     the starting node to the ending node at the given cost
     but travel in the opposite direction is not allowed."""
+
     def __init__(self, starting_node, ending_node, cost):
         self.start = starting_node
-        self.end = ending_node 
-        self.cost = cost 
+        self.end = ending_node
+        self.cost = cost
 
     def __repr__(self):
-        return 'Node'+self.__str__()
+        return 'Node' + self.__str__()
+
     def __str__(self):
         return f'({self.start.name},{self.end.name},{self.cost})'
 
     def __eq__(self, obj):
-        if  isinstance(obj, Edge):
-            return self.start == obj.start and self.end == obj.end and self.cost == obj.cost 
+        if isinstance(obj, Edge):
+            return self.start == obj.start and self.end == obj.end and self.cost == obj.cost
         return False
+
 
 class Node:
     """This class provides a basic data structure for representing
     a node in A* Graph"""
+
     def __init__(self, name, h):
-        #The name of the node (can be anything, just for human readable output)
+        # The name of the node (can be anything, just for human readable output)
         self.name = name
-        #The current best cost-to-come for the node
-        self.g = inf 
-        #The current best estimate of the node's total cost
-        self.f = inf 
-        #The heuristic estimate of the cost-to-go for the node
-        self.h = h 
-        #The list of edges which connect the node 
+        # The current best cost-to-come for the node
+        self.g = inf
+        # The current best estimate of the node's total cost
+        self.f = inf
+        # The heuristic estimate of the cost-to-go for the node
+        self.h = h
+        # The list of edges which connect the node
         self.edges = []
-        #The previous node in path to the goal
+        # The previous node in path to the goal
         self.previous = None
 
     def add_neighbor(self, node: Node, cost: int):
@@ -83,10 +90,12 @@ class Node:
         return f'({self.name},{self.f},{self.g},{self.h})'
 
     def __eq__(self, obj):
-        if  isinstance(obj, Node):
-            return self.name == obj.name and self.f == obj.f  and self.g == obj.g and self.h == obj.h 
+        if isinstance(obj, Node):
+            return (
+                self.name == obj.name and self.f == obj.f and self.g == obj.g and self.h == obj.h
+            )
         return False
-    
+
     def __hash__(self):
         return hash(self.name)
 
@@ -96,10 +105,13 @@ class Node:
     def __lt__(self, other: Node):
         return self.f < other.f
 
-def a_star_grid(map: ndarray, start: Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
+
+def a_star_grid(
+    map: ndarray, start: Tuple[int, int], goal: Tuple[int, int]
+) -> List[Tuple[int, int]]:
     """This function will compute the optimal path between a start point and an end point given a grid-based
-    map. It is up to the student to implement the heuristic function and cost function. Assume a cell's 
-    indices represent it's position in cartesian space. (e.g. cells [1,3] and [1,5] are 2 units apart). 
+    map. It is up to the student to implement the heuristic function and cost function. Assume a cell's
+    indices represent it's position in cartesian space. (e.g. cells [1,3] and [1,5] are 2 units apart).
 
     If no path exists then this function should return an empty list.
 
@@ -109,7 +121,7 @@ def a_star_grid(map: ndarray, start: Tuple[int, int], goal: Tuple[int, int]) -> 
       :param goal: A tuple of indicies indicating the goal cell of the search
 
     Output
-      :return: path: a list of Tuples indicating the indicies of the cells that make up the path with 
+      :return: path: a list of Tuples indicating the indicies of the cells that make up the path with
                     the starting cell as the first element of the list and the ending cell as the last
                     element in the list"""
     open_list: List[Tuple[int, int]] = [start]
@@ -119,14 +131,16 @@ def a_star_grid(map: ndarray, start: Tuple[int, int], goal: Tuple[int, int]) -> 
 
     while open_list:
         # pick n_best from O such that f(n_best) <= f(n)
-        n_best: Tuple[int, int] = min(open_list, key=lambda n: g_cost[n] + euclidean_distance(n, goal))
+        n_best: Tuple[int, int] = min(
+            open_list, key=lambda n: g_cost[n] + euclidean_distance(n, goal)
+        )
 
         if n_best == goal:
             path = [n_best]
             while n_best in came_from:
                 n_best = came_from[n_best]
                 path.append(n_best)
-            return path[::-1] # reverse
+            return path[::-1]  # reverse
 
         # Remove n_best from O and add it to C
         open_list.remove(n_best)
@@ -146,9 +160,10 @@ def a_star_grid(map: ndarray, start: Tuple[int, int], goal: Tuple[int, int]) -> 
 
     return []
 
+
 def a_star_graph(start: Node, goal: Node) -> List[Node]:
     """This function will compute the optimal path between a starting node and an ending node.
-    The result should be a list of the Edges that represent the optimal path to the goal. 
+    The result should be a list of the Edges that represent the optimal path to the goal.
     For this function the cost and heuristic functions are defined when the node is originally created.
 
     If no path exists then this function should return an empty list.
@@ -169,7 +184,7 @@ def a_star_graph(start: Node, goal: Node) -> List[Node]:
     while open_list:
         # pick n_best from O such that f(n_best) <= f(n)
         n_best: Node = min(open_list, key=lambda n: n.f)
-    
+
         if n_best == goal:
             path = [n_best]
             while n_best in came_from:
@@ -197,51 +212,58 @@ def a_star_graph(start: Node, goal: Node) -> List[Node]:
 
     return []
 
+
 def graph_demo():
     nodes: List[Node] = []
 
-    nodes.append(Node('A', 10)) # A
+    nodes.append(Node('A', 10))  # A
     nodes.append(Node('B', 5))  # B
     nodes.append(Node('C', 6))  # C
     nodes.append(Node('D', 2))  # D
     nodes.append(Node('E', 3))  # E
     nodes.append(Node('F', 0))  # F
 
-    nodes[0].add_neighbor(nodes[1],3)
-    nodes[0].add_neighbor(nodes[2],4)
-    nodes[1].add_neighbor(nodes[3],2)
-    nodes[1].add_neighbor(nodes[4],2)
-    nodes[2].add_neighbor(nodes[4],4)
-    nodes[3].add_neighbor(nodes[5],5)
-    nodes[3].add_neighbor(nodes[4],4)
-    nodes[4].add_neighbor(nodes[5],4)
+    nodes[0].add_neighbor(nodes[1], 3)
+    nodes[0].add_neighbor(nodes[2], 4)
+    nodes[1].add_neighbor(nodes[3], 2)
+    nodes[1].add_neighbor(nodes[4], 2)
+    nodes[2].add_neighbor(nodes[4], 4)
+    nodes[3].add_neighbor(nodes[5], 5)
+    nodes[3].add_neighbor(nodes[4], 4)
+    nodes[4].add_neighbor(nodes[5], 4)
 
-    path = a_star_graph(nodes[0],nodes[-1])
+    path = a_star_graph(nodes[0], nodes[-1])
 
     for e_i in path:
         print(e_i)
 
-def grid_demo():
-    map = array([[0,0,1,0,0,0,0,0,0],
-                 [0,0,1,0,0,0,0,0,0],
-                 [0,0,1,0,0,1,1,1,0],
-                 [0,0,1,0,0,1,0,0,0],
-                 [0,0,1,0,0,1,0,1,1],
-                 [0,0,1,0,0,1,0,0,0],
-                 [0,0,0,0,0,1,0,0,0],
-                 [0,0,0,0,0,1,0,0,0],
-                 [0,0,0,0,0,1,0,0,0],
-        ])
 
-    start = (0,0)
-    goal =  (8,8)
+def grid_demo():
+    map = array(
+        [
+            [0, 0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 1, 1, 1, 0],
+            [0, 0, 1, 0, 0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0, 1, 0, 1, 1],
+            [0, 0, 1, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0, 0],
+        ]
+    )
+
+    start = (0, 0)
+    goal = (8, 8)
     path = a_star_grid(map, start, goal)
     for c_i in path:
         print(c_i)
 
+
 def main():
     graph_demo()
     grid_demo()
+
 
 if __name__ == '__main__':
     main()

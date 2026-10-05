@@ -17,8 +17,8 @@ import numpy as np
 
 from devol_localization.pose2d import transform_points
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 # Categorical slots from the project's chart palette (fixed order).
 COLOR_TRUTH = '#1baf7a'
@@ -30,31 +30,36 @@ TEXT_SECONDARY = '#52514e'
 GRID = '#e4e3df'
 
 # Husky A200 chassis, metres, base frame (approximate outer dimensions).
-FOOTPRINT = np.array([[0.495, 0.335], [-0.495, 0.335], [-0.495, -0.335], [0.495, -0.335], [0.495, 0.335]])
+FOOTPRINT = np.array(
+    [[0.495, 0.335], [-0.495, 0.335], [-0.495, -0.335], [0.495, -0.335], [0.495, 0.335]]
+)
 NOSE = np.array([[0.2, 0.0], [0.55, 0.0]])
 
 
 @dataclass
 class VizState:
     """Everything one frame shows. Poses are (x, y, yaw) in the map frame."""
+
     stamp: float = 0.0
     truth: Optional[np.ndarray] = None
     estimate: Optional[np.ndarray] = None
-    covariance: Optional[np.ndarray] = None        # 3x3 (x, y, yaw)
-    scan_points: Optional[np.ndarray] = None       # (N, 2) in the map frame
-    particles: Optional[np.ndarray] = None         # (M, 3)
+    covariance: Optional[np.ndarray] = None  # 3x3 (x, y, yaw)
+    scan_points: Optional[np.ndarray] = None  # (N, 2) in the map frame
+    particles: Optional[np.ndarray] = None  # (M, 3)
     truth_trail: np.ndarray = field(default_factory=lambda: np.zeros((0, 2)))
     estimate_trail: np.ndarray = field(default_factory=lambda: np.zeros((0, 2)))
     err_t: np.ndarray = field(default_factory=lambda: np.zeros(0))
     pos_err: np.ndarray = field(default_factory=lambda: np.zeros(0))
-    pos_bound: np.ndarray = field(default_factory=lambda: np.zeros(0))   # 2 sigma
-    yaw_err: np.ndarray = field(default_factory=lambda: np.zeros(0))     # degrees
-    yaw_bound: np.ndarray = field(default_factory=lambda: np.zeros(0))   # 2 sigma, degrees
+    pos_bound: np.ndarray = field(default_factory=lambda: np.zeros(0))  # 2 sigma
+    yaw_err: np.ndarray = field(default_factory=lambda: np.zeros(0))  # degrees
+    yaw_bound: np.ndarray = field(default_factory=lambda: np.zeros(0))  # 2 sigma, degrees
     compute_ms: Optional[float] = None
     status: str = ''
 
 
-def ellipse_points(mean: Sequence[float], cov2: np.ndarray, n_sigma: float = 2.0, n: int = 64) -> np.ndarray:
+def ellipse_points(
+    mean: Sequence[float], cov2: np.ndarray, n_sigma: float = 2.0, n: int = 64
+) -> np.ndarray:
     """Outline of the n-sigma ellipse of a 2x2 covariance."""
     vals, vecs = np.linalg.eigh(np.asarray(cov2, dtype=float))
     vals = np.maximum(vals, 0.0)
@@ -75,14 +80,21 @@ def map_image(grid: np.ndarray) -> np.ndarray:
 
 
 class LocalizationFigure:
-    def __init__(self, mode: str = 'ekf', title: str = '', window: float = 0.0, history: float = 0.0,
-                 interactive: bool = True) -> None:
+    def __init__(
+        self,
+        mode: str = 'ekf',
+        title: str = '',
+        window: float = 0.0,
+        history: float = 0.0,
+        interactive: bool = True,
+    ) -> None:
         """
         :param mode: 'ekf' or 'pf' (draws particles and uses the PF colour).
         :param window: Side of the square view that follows the robot, metres; 0 shows the whole map.
         :param history: Seconds of error history to show; 0 shows the whole run.
         """
         import matplotlib
+
         if not interactive:
             matplotlib.use('Agg', force=True)
         import matplotlib.pyplot as plt
@@ -99,63 +111,116 @@ class LocalizationFigure:
         if interactive:
             plt.ion()
         self.fig = plt.figure(figsize=(13.0, 7.2), facecolor='white')
-        gs = GridSpec(2, 2, width_ratios=[1.55, 1.0], hspace=0.32, wspace=0.18,
-                      left=0.05, right=0.97, top=0.92, bottom=0.08, figure=self.fig)
+        gs = GridSpec(
+            2,
+            2,
+            width_ratios=[1.55, 1.0],
+            hspace=0.32,
+            wspace=0.18,
+            left=0.05,
+            right=0.97,
+            top=0.92,
+            bottom=0.08,
+            figure=self.fig,
+        )
         self.ax_map = self.fig.add_subplot(gs[:, 0])
         self.ax_pos = self.fig.add_subplot(gs[0, 1])
         self.ax_yaw = self.fig.add_subplot(gs[1, 1], sharex=self.ax_pos)
-        self.fig.suptitle(title or f'{label} localization vs Gazebo ground truth', color=TEXT_PRIMARY,
-                          fontsize=13, x=0.05, ha='left')
+        self.fig.suptitle(
+            title or f'{label} localization vs Gazebo ground truth',
+            color=TEXT_PRIMARY,
+            fontsize=13,
+            x=0.05,
+            ha='left',
+        )
 
         ax = self.ax_map
         ax.set_aspect('equal')
         ax.set_xlabel('x (m)', color=TEXT_SECONDARY)
         ax.set_ylabel('y (m)', color=TEXT_SECONDARY)
         self._map_artist = None
-        self._truth_trail, = ax.plot([], [], color=COLOR_TRUTH, lw=1.5, alpha=0.8, zorder=3)
-        self._est_trail, = ax.plot([], [], color=color, lw=1.5, alpha=0.8, zorder=3, ls='--')
-        self._particles = ax.scatter([], [], s=4, color=color, alpha=0.5, linewidths=0, zorder=9,
-                                     label='particles') if mode == 'pf' else None
-        self._scan = ax.scatter([], [], s=5, color=COLOR_SCAN, linewidths=0, zorder=5,
-                                label='lidar from estimate')
-        self._ellipse, = ax.plot([], [], color=color, lw=1.5, zorder=6, label=r'2$\sigma$ position')
-        self._truth_body, = ax.plot([], [], color=COLOR_TRUTH, lw=2.0, zorder=7, label='Gazebo ground truth')
-        self._truth_nose, = ax.plot([], [], color=COLOR_TRUTH, lw=2.0, zorder=7)
-        self._est_body, = ax.plot([], [], color=color, lw=2.0, zorder=8, label=f'{label} estimate')
-        self._est_nose, = ax.plot([], [], color=color, lw=2.0, zorder=8)
+        (self._truth_trail,) = ax.plot([], [], color=COLOR_TRUTH, lw=1.5, alpha=0.8, zorder=3)
+        (self._est_trail,) = ax.plot([], [], color=color, lw=1.5, alpha=0.8, zorder=3, ls='--')
+        self._particles = (
+            ax.scatter(
+                [], [], s=4, color=color, alpha=0.5, linewidths=0, zorder=9, label='particles'
+            )
+            if mode == 'pf'
+            else None
+        )
+        self._scan = ax.scatter(
+            [], [], s=5, color=COLOR_SCAN, linewidths=0, zorder=5, label='lidar from estimate'
+        )
+        (self._ellipse,) = ax.plot(
+            [], [], color=color, lw=1.5, zorder=6, label=r'2$\sigma$ position'
+        )
+        (self._truth_body,) = ax.plot(
+            [], [], color=COLOR_TRUTH, lw=2.0, zorder=7, label='Gazebo ground truth'
+        )
+        (self._truth_nose,) = ax.plot([], [], color=COLOR_TRUTH, lw=2.0, zorder=7)
+        (self._est_body,) = ax.plot(
+            [], [], color=color, lw=2.0, zorder=8, label=f'{label} estimate'
+        )
+        (self._est_nose,) = ax.plot([], [], color=color, lw=2.0, zorder=8)
         ax.legend(loc='upper left', fontsize=8, framealpha=0.9, markerscale=3)
-        self._status = ax.text(0.99, 0.01, '', transform=ax.transAxes, ha='right', va='bottom', fontsize=9,
-                               family='monospace', color=TEXT_PRIMARY,
-                               bbox=dict(facecolor='white', alpha=0.85, edgecolor=GRID))
+        self._status = ax.text(
+            0.99,
+            0.01,
+            '',
+            transform=ax.transAxes,
+            ha='right',
+            va='bottom',
+            fontsize=9,
+            family='monospace',
+            color=TEXT_PRIMARY,
+            bbox=dict(facecolor='white', alpha=0.85, edgecolor=GRID),
+        )
 
-        for a, ylabel in ((self.ax_pos, 'position error (m)'), (self.ax_yaw, 'heading error (deg)')):
+        for a, ylabel in (
+            (self.ax_pos, 'position error (m)'),
+            (self.ax_yaw, 'heading error (deg)'),
+        ):
             a.set_ylabel(ylabel, color=TEXT_SECONDARY)
             a.grid(True, color=GRID, lw=0.8)
             for s in ('top', 'right'):
                 a.spines[s].set_visible(False)
         self.ax_yaw.set_xlabel('sim time (s)', color=TEXT_SECONDARY)
-        self._pos_line, = self.ax_pos.plot([], [], color=color, lw=2.0, label='error')
-        self._pos_bound, = self.ax_pos.plot([], [], color=color, lw=1.0, ls=':', label=r'filter 2$\sigma$')
+        (self._pos_line,) = self.ax_pos.plot([], [], color=color, lw=2.0, label='error')
+        (self._pos_bound,) = self.ax_pos.plot(
+            [], [], color=color, lw=1.0, ls=':', label=r'filter 2$\sigma$'
+        )
         self.ax_pos.axhline(0.25, color=TEXT_SECONDARY, lw=1.0, ls='--')
-        self.ax_pos.text(1.0, 0.25, ' 0.25 m', transform=self.ax_pos.get_yaxis_transform(), va='center',
-                         ha='left', fontsize=8, color=TEXT_SECONDARY, clip_on=False)
+        self.ax_pos.text(
+            1.0,
+            0.25,
+            ' 0.25 m',
+            transform=self.ax_pos.get_yaxis_transform(),
+            va='center',
+            ha='left',
+            fontsize=8,
+            color=TEXT_SECONDARY,
+            clip_on=False,
+        )
         self.ax_pos.legend(loc='upper left', fontsize=8)
-        self._yaw_line, = self.ax_yaw.plot([], [], color=color, lw=2.0)
-        self._yaw_bound_hi, = self.ax_yaw.plot([], [], color=color, lw=1.0, ls=':')
-        self._yaw_bound_lo, = self.ax_yaw.plot([], [], color=color, lw=1.0, ls=':')
+        (self._yaw_line,) = self.ax_yaw.plot([], [], color=color, lw=2.0)
+        (self._yaw_bound_hi,) = self.ax_yaw.plot([], [], color=color, lw=1.0, ls=':')
+        (self._yaw_bound_lo,) = self.ax_yaw.plot([], [], color=color, lw=1.0, ls=':')
         self.ax_yaw.axhline(0.0, color=TEXT_SECONDARY, lw=0.8)
 
         if interactive:
             self.fig.show()
 
     # ------------------------------------------------------------------ map
-    def set_map(self, grid: np.ndarray, resolution: float, origin_x: float, origin_y: float) -> None:
+    def set_map(
+        self, grid: np.ndarray, resolution: float, origin_x: float, origin_y: float
+    ) -> None:
         h, w = np.asarray(grid).shape
         extent = (origin_x, origin_x + w * resolution, origin_y, origin_y + h * resolution)
         img = map_image(grid)
         if self._map_artist is None:
-            self._map_artist = self.ax_map.imshow(img, origin='lower', extent=extent, interpolation='nearest',
-                                                  zorder=1)
+            self._map_artist = self.ax_map.imshow(
+                img, origin='lower', extent=extent, interpolation='nearest', zorder=1
+            )
         else:
             self._map_artist.set_data(img)
             self._map_artist.set_extent(extent)
@@ -179,11 +244,15 @@ class LocalizationFigure:
         body(self._est_body, self._est_nose, s.estimate)
         self._truth_trail.set_data(s.truth_trail[:, 0], s.truth_trail[:, 1])
         self._est_trail.set_data(s.estimate_trail[:, 0], s.estimate_trail[:, 1])
-        self._scan.set_offsets(s.scan_points if s.scan_points is not None and len(s.scan_points)
-                               else np.zeros((0, 2)))
+        self._scan.set_offsets(
+            s.scan_points if s.scan_points is not None and len(s.scan_points) else np.zeros((0, 2))
+        )
         if self._particles is not None:
-            self._particles.set_offsets(s.particles[:, :2] if s.particles is not None and len(s.particles)
-                                        else np.zeros((0, 2)))
+            self._particles.set_offsets(
+                s.particles[:, :2]
+                if s.particles is not None and len(s.particles)
+                else np.zeros((0, 2))
+            )
         if s.estimate is not None and s.covariance is not None:
             e = ellipse_points(s.estimate, s.covariance[:2, :2])
             self._ellipse.set_data(e[:, 0], e[:, 1])
@@ -253,8 +322,10 @@ class VideoRecorder:
         self._writer = None
         self._size = None
         from matplotlib.animation import writers
+
         if writers.is_available('ffmpeg'):
             from matplotlib.animation import FFMpegWriter
+
             self._writer = FFMpegWriter(fps=fps, bitrate=4000)
             self._writer.setup(fig, path, dpi=100)
             self.backend = 'ffmpeg'
@@ -276,9 +347,10 @@ class VideoRecorder:
             frame = self._cv2.cvtColor(rgba, self._cv2.COLOR_RGBA2BGR)
             if self._writer is None:
                 self._size = (frame.shape[1], frame.shape[0])
-                self._writer = self._cv2.VideoWriter(self.path, self._cv2.VideoWriter_fourcc(*'mp4v'),
-                                                     self._fps, self._size)
-            elif (frame.shape[1], frame.shape[0]) != self._size:   # window resized
+                self._writer = self._cv2.VideoWriter(
+                    self.path, self._cv2.VideoWriter_fourcc(*'mp4v'), self._fps, self._size
+                )
+            elif (frame.shape[1], frame.shape[0]) != self._size:  # window resized
                 frame = self._cv2.resize(frame, self._size)
             self._writer.write(frame)
 
@@ -292,8 +364,21 @@ class VideoRecorder:
         self._writer = None
 
 
-def posterior_figure(grid, resolution: float, origin: Sequence[float], truth, ekf_pose, ekf_cov, pf_pose, pf_cov,
-                     particles, scan_points=None, stamp: float = 0.0, window: float = 8.0, title: str = ''):
+def posterior_figure(
+    grid,
+    resolution: float,
+    origin: Sequence[float],
+    truth,
+    ekf_pose,
+    ekf_cov,
+    pf_pose,
+    pf_cov,
+    particles,
+    scan_points=None,
+    stamp: float = 0.0,
+    window: float = 8.0,
+    title: str = '',
+):
     """One frame comparing the two posteriors at the same instant: the PF's particle set and the EKF's
     single Gaussian (2-sigma ellipse), with ground truth. Returns a Matplotlib figure (Agg)."""
     from matplotlib.figure import Figure
@@ -302,19 +387,54 @@ def posterior_figure(grid, resolution: float, origin: Sequence[float], truth, ek
     fig = Figure(figsize=(7.5, 6.6), facecolor='white')
     ax = fig.add_subplot(1, 1, 1)
     h, w = np.asarray(grid).shape
-    ax.imshow(map_image(grid), origin='lower', interpolation='nearest', zorder=1,
-              extent=(origin[0], origin[0] + w * resolution, origin[1], origin[1] + h * resolution))
+    ax.imshow(
+        map_image(grid),
+        origin='lower',
+        interpolation='nearest',
+        zorder=1,
+        extent=(origin[0], origin[0] + w * resolution, origin[1], origin[1] + h * resolution),
+    )
     handles = []
     if particles is not None and len(particles):
         p = np.asarray(particles)
-        ax.quiver(p[:, 0], p[:, 1], np.cos(p[:, 2]), np.sin(p[:, 2]), color=COLOR_PF, alpha=0.35, zorder=4,
-                  angles='xy', scale_units='xy', scale=1.0 / 0.25, width=0.002, headwidth=3)
-        handles.append(Line2D([], [], color=COLOR_PF, marker='>', ls='', alpha=0.6,
-                              label=f'PF particles ({len(p)})'))
+        ax.quiver(
+            p[:, 0],
+            p[:, 1],
+            np.cos(p[:, 2]),
+            np.sin(p[:, 2]),
+            color=COLOR_PF,
+            alpha=0.35,
+            zorder=4,
+            angles='xy',
+            scale_units='xy',
+            scale=1.0 / 0.25,
+            width=0.002,
+            headwidth=3,
+        )
+        handles.append(
+            Line2D(
+                [],
+                [],
+                color=COLOR_PF,
+                marker='>',
+                ls='',
+                alpha=0.6,
+                label=f'PF particles ({len(p)})',
+            )
+        )
     if scan_points is not None and len(scan_points):
-        ax.scatter(scan_points[:, 0], scan_points[:, 1], s=4, color=COLOR_SCAN, linewidths=0, zorder=3)
-        handles.append(Line2D([], [], color=COLOR_SCAN, marker='o', ls='', ms=3, label='lidar from ground truth'))
-    for pose, cov, color, label in ((pf_pose, pf_cov, COLOR_PF, 'PF'), (ekf_pose, ekf_cov, COLOR_EKF, 'EKF')):
+        ax.scatter(
+            scan_points[:, 0], scan_points[:, 1], s=4, color=COLOR_SCAN, linewidths=0, zorder=3
+        )
+        handles.append(
+            Line2D(
+                [], [], color=COLOR_SCAN, marker='o', ls='', ms=3, label='lidar from ground truth'
+            )
+        )
+    for pose, cov, color, label in (
+        (pf_pose, pf_cov, COLOR_PF, 'PF'),
+        (ekf_pose, ekf_cov, COLOR_EKF, 'EKF'),
+    ):
         if pose is None:
             continue
         if cov is not None:
@@ -323,8 +443,14 @@ def posterior_figure(grid, resolution: float, origin: Sequence[float], truth, ek
         b, n = transform_points(pose, FOOTPRINT), transform_points(pose, NOSE)
         ax.plot(b[:, 0], b[:, 1], color=color, lw=2.0, ls='--', zorder=7)
         ax.plot(n[:, 0], n[:, 1], color=color, lw=2.0, zorder=7)
-        err = '' if truth is None else f', error {np.hypot(pose[0] - truth[0], pose[1] - truth[1]):.2f} m'
-        handles.append(Line2D([], [], color=color, lw=2.0, label=f'{label} mean and 2σ ellipse{err}'))
+        err = (
+            ''
+            if truth is None
+            else f', error {np.hypot(pose[0] - truth[0], pose[1] - truth[1]):.2f} m'
+        )
+        handles.append(
+            Line2D([], [], color=color, lw=2.0, label=f'{label} mean and 2σ ellipse{err}')
+        )
     if truth is not None:
         b, n = transform_points(truth, FOOTPRINT), transform_points(truth, NOSE)
         ax.plot(b[:, 0], b[:, 1], color=COLOR_TRUTH, lw=2.5, zorder=8)
@@ -342,6 +468,8 @@ def posterior_figure(grid, resolution: float, origin: Sequence[float], truth, ek
     ax.set_xlabel('x (m)', color=TEXT_SECONDARY)
     ax.set_ylabel('y (m)', color=TEXT_SECONDARY)
     ax.legend(handles=handles, loc='upper left', fontsize=8, framealpha=0.9)
-    ax.set_title(title or f'Posteriors at t = {stamp:.1f} s', color=TEXT_PRIMARY, loc='left', fontsize=11)
+    ax.set_title(
+        title or f'Posteriors at t = {stamp:.1f} s', color=TEXT_PRIMARY, loc='left', fontsize=11
+    )
     fig.tight_layout()
     return fig
