@@ -24,8 +24,8 @@ from tf2_ros import TransformBroadcaster
 
 from devol_localization.pose2d import compose, inverse, set_quaternion_yaw, yaw_from_quaternion
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 def planar_pose(msg: Odometry) -> np.ndarray:
@@ -47,7 +47,9 @@ class GroundTruthTF(Node):
         self._broadcaster = TransformBroadcaster(self)
         self.create_subscription(Odometry, gp('ground_truth_topic').value, self._gt_cb, 50)
         self.create_subscription(Odometry, gp('odom_topic').value, self._odom_cb, 50)
-        self.get_logger().info(f'Publishing {self._map_frame} -> {self._odom_frame} from ground truth')
+        self.get_logger().info(
+            f'Publishing {self._map_frame} -> {self._odom_frame} from ground truth'
+        )
 
     def _gt_cb(self, msg: Odometry) -> None:
         self._truth = planar_pose(msg)

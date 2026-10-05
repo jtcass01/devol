@@ -36,12 +36,17 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
 
-from devol_localization.metrics import (detect_jump, judge_test_case, score_estimator, write_summary,
-                                        write_trajectory_csv)
+from devol_localization.metrics import (
+    detect_jump,
+    judge_test_case,
+    score_estimator,
+    write_summary,
+    write_trajectory_csv,
+)
 from devol_localization.pose2d import compose, covariance_3x3, relative, yaw_from_quaternion
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 GROUND_TRUTH = 'ground_truth'
 DEAD_RECKONING = 'dead_reckoning'
@@ -55,25 +60,27 @@ class LocalizationEvaluator(Node):
     def __init__(self) -> None:
         super().__init__('localization_evaluator')
         self.declare_parameter('output_dir', 'results/trial')
-        self.declare_parameter('scenario', 'nominal')          # nominal | global | kidnap
+        self.declare_parameter('scenario', 'nominal')  # nominal | global | kidnap
         self.declare_parameter('ground_truth_topic', '/devol_drive/ground_truth/odom')
         self.declare_parameter('odom_topic', '/devol_drive/noisy/odom')
         self.declare_parameter('namespace', '/devol_drive')
         self.declare_parameter('estimators', ['ekf', 'pf'])
         self.declare_parameter('start_pose', [0.0, 0.0, 0.0])
-        self.declare_parameter('waypoints', [0.0])               # flat [x0, y0, x1, y1, ...]
+        self.declare_parameter('waypoints', [0.0])  # flat [x0, y0, x1, y1, ...]
         self.declare_parameter('waypoint_radius', 0.5)
         self.declare_parameter('recovery_threshold', 0.25)
         self.declare_parameter('recovery_timeout', 60.0)
-        self.declare_parameter('recovery_dwell', 3.0)           # s below the threshold to count as recovered
+        self.declare_parameter(
+            'recovery_dwell', 3.0
+        )  # s below the threshold to count as recovered
         self.declare_parameter('kidnap_jump', 1.0)
         self.declare_parameter('config_json', '{}')
         self.declare_parameter('write_period', 15.0)
-        self.declare_parameter('test_case', 0)                  # 0 none, 1 nominal route, 2 kidnapping
+        self.declare_parameter('test_case', 0)  # 0 none, 1 nominal route, 2 kidnapping
         self.declare_parameter('finish_on_goal', False)
         self.declare_parameter('finish_radius', 0.5)
         self.declare_parameter('settle_time', 3.0)
-        self.declare_parameter('max_duration', 0.0)             # sim seconds; 0 = no limit
+        self.declare_parameter('max_duration', 0.0)  # sim seconds; 0 = no limit
         # A fresh sim starts its clock at 0. Ground truth whose first stamp is later than this comes from a
         # previous sim that is still shutting down, and is ignored; 0 = accept any start time (bag replays).
         self.declare_parameter('max_start_time', 0.0)
@@ -89,8 +96,13 @@ class LocalizationEvaluator(Node):
             self._config = json.loads(str(gp('config_json').value))
         except json.JSONDecodeError:
             self._config = {'config_json': str(gp('config_json').value)}
-        self._config.update({'scenario': self._scenario, 'start_pose': self._start_pose.tolist(),
-                             'waypoints': self._waypoints})
+        self._config.update(
+            {
+                'scenario': self._scenario,
+                'start_pose': self._start_pose.tolist(),
+                'waypoints': self._waypoints,
+            }
+        )
 
         # name -> list of [t, x, y, yaw, std_x, std_y, std_yaw]
         self._poses: Dict[str, List[List[float]]] = {GROUND_TRUTH: [], DEAD_RECKONING: []}
@@ -109,10 +121,18 @@ class LocalizationEvaluator(Node):
         for name in gp('estimators').value:
             self._poses[name] = []
             self._compute[name] = []
-            self.create_subscription(PoseWithCovarianceStamped, f'{ns}/{name}_pose',
-                                     lambda msg, n=name: self._est_cb(n, msg), 50)
-            self.create_subscription(Float64, f'{ns}/{name}_compute_time_ms',
-                                     lambda msg, n=name: self._compute_cb(n, msg), 50)
+            self.create_subscription(
+                PoseWithCovarianceStamped,
+                f'{ns}/{name}_pose',
+                lambda msg, n=name: self._est_cb(n, msg),
+                50,
+            )
+            self.create_subscription(
+                Float64,
+                f'{ns}/{name}_compute_time_ms',
+                lambda msg, n=name: self._compute_cb(n, msg),
+                50,
+            )
         self.create_timer(float(gp('write_period').value), self.write)
         self.get_logger().info(f'Scoring {list(self._poses)} ({self._scenario}) into {self._out}')
 
@@ -132,14 +152,18 @@ class LocalizationEvaluator(Node):
                 f'Ignoring ground truth at t = {t:.1f} s: a new sim starts near 0 s, so this is probably a '
                 'previous Gazebo still shutting down. Stop it '
                 '(pkill -f gz-sim; pkill -f "gz sim"; pkill -f parameter_bridge).',
-                throttle_duration_sec=5.0)
+                throttle_duration_sec=5.0,
+            )
             return
         if gt and t < gt[-1][0] - 1.0:
-            self.get_logger().warning(f'Sim clock jumped back from {gt[-1][0]:.1f} s to {t:.1f} s (a new sim '
-                                      'started); discarding everything recorded so far')
+            self.get_logger().warning(
+                f'Sim clock jumped back from {gt[-1][0]:.1f} s to {t:.1f} s (a new sim '
+                'started); discarding everything recorded so far'
+            )
             self._reset()
-        self._poses[GROUND_TRUTH].append([t, p.position.x, p.position.y,
-                                          yaw_from_quaternion(p.orientation), 0.0, 0.0, 0.0])
+        self._poses[GROUND_TRUTH].append(
+            [t, p.position.x, p.position.y, yaw_from_quaternion(p.orientation), 0.0, 0.0, 0.0]
+        )
         if not self._finish_on_goal or self.finished:
             return
         gp = self.get_parameter
@@ -159,8 +183,9 @@ class LocalizationEvaluator(Node):
     def _odom_cb(self, msg: Odometry) -> None:
         gt = self._poses[GROUND_TRUTH]
         if float(self.get_parameter('max_start_time').value) > 0.0 and (
-                not gt or stamp_seconds(msg.header.stamp) > gt[-1][0] + 1.0):
-            return   # dead reckoning starts with this run's ground truth, not a stale sim's odometry
+            not gt or stamp_seconds(msg.header.stamp) > gt[-1][0] + 1.0
+        ):
+            return  # dead reckoning starts with this run's ground truth, not a stale sim's odometry
         p = msg.pose.pose
         odom = np.array([p.position.x, p.position.y, yaw_from_quaternion(p.orientation)])
         if self._odom0 is None:
@@ -171,8 +196,15 @@ class LocalizationEvaluator(Node):
     def _est_cb(self, name: str, msg: PoseWithCovarianceStamped) -> None:
         p = msg.pose.pose
         std = np.sqrt(np.maximum(np.diag(covariance_3x3(msg.pose.covariance)), 0.0))
-        self._poses[name].append([stamp_seconds(msg.header.stamp), p.position.x, p.position.y,
-                                  yaw_from_quaternion(p.orientation), *std])
+        self._poses[name].append(
+            [
+                stamp_seconds(msg.header.stamp),
+                p.position.x,
+                p.position.y,
+                yaw_from_quaternion(p.orientation),
+                *std,
+            ]
+        )
 
     def _compute_cb(self, name: str, msg: Float64) -> None:
         self._compute[name].append([self.get_clock().now().nanoseconds * 1e-9, float(msg.data)])
@@ -192,7 +224,7 @@ class LocalizationEvaluator(Node):
         if gt.shape[0] < 2:
             return {}
         gt_t, gt_poses = gt[:, 0], gt[:, 1:4]
-        in_run = (gt_t[0] - 1.0, gt_t[-1] + 1.0)   # drops stale samples from a previous sim's clock
+        in_run = (gt_t[0] - 1.0, gt_t[-1] + 1.0)  # drops stale samples from a previous sim's clock
         event: Optional[float] = None
         if self._scenario == 'global':
             event = float(gt_t[0])
@@ -206,7 +238,10 @@ class LocalizationEvaluator(Node):
             a = np.asarray(samples, dtype=float).reshape(-1, 7)
             a = a[(a[:, 0] >= in_run[0]) & (a[:, 0] <= in_run[1])]
             scores[name] = score_estimator(
-                gt_t, gt_poses, a[:, 0], a[:, 1:4],
+                gt_t,
+                gt_poses,
+                a[:, 0],
+                a[:, 1:4],
                 compute_ms=[ms for _, ms in self._compute.get(name, [])],
                 waypoints=self._waypoints,
                 # Dead reckoning cannot relocalize; a "recovery" would be its drift crossing the truth.
@@ -214,7 +249,8 @@ class LocalizationEvaluator(Node):
                 threshold=float(self.get_parameter('recovery_threshold').value),
                 timeout=float(self.get_parameter('recovery_timeout').value),
                 waypoint_radius=float(self.get_parameter('waypoint_radius').value),
-                dwell=float(self.get_parameter('recovery_dwell').value))
+                dwell=float(self.get_parameter('recovery_dwell').value),
+            )
         write_summary(self._out / 'summary.json', self._config, scores)
         return scores
 
@@ -224,15 +260,29 @@ class LocalizationEvaluator(Node):
         if not self._test_case:
             return None
         if not scores:
-            passed, lines = False, ['FAIL no ground truth received (is the ground-truth bridge running?)']
+            passed, lines = (
+                False,
+                ['FAIL no ground truth received (is the ground-truth bridge running?)'],
+            )
         else:
-            passed, lines = judge_test_case(self._test_case, scores, self._config.get('waypoint_names', ()),
-                                            float(self.get_parameter('recovery_threshold').value),
-                                            timed_out=self.finish_reason if self.timed_out else '')
-        title = {1: 'Test case 1: nominal three-waypoint route', 2: 'Test case 2: kidnapping'}[self._test_case]
+            passed, lines = judge_test_case(
+                self._test_case,
+                scores,
+                self._config.get('waypoint_names', ()),
+                float(self.get_parameter('recovery_threshold').value),
+                timed_out=self.finish_reason if self.timed_out else '',
+            )
+        title = {1: 'Test case 1: nominal three-waypoint route', 2: 'Test case 2: kidnapping'}[
+            self._test_case
+        ]
         reason = f'; {self.finish_reason}' if self.finish_reason else ''
-        report = '\n'.join([f'===== {title}: {"PASS" if passed else "FAIL"} =====', *lines,
-                            f'(results in {self._out}{reason})'])
+        report = '\n'.join(
+            [
+                f'===== {title}: {"PASS" if passed else "FAIL"} =====',
+                *lines,
+                f'(results in {self._out}{reason})',
+            ]
+        )
         (self._out / 'verdict.txt').write_text(report + '\n')
         print('\n' + report + '\n', flush=True)
         return passed
@@ -249,11 +299,14 @@ def main(args=None) -> None:
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        s = (node._out / 'summary.json')
+        s = node._out / 'summary.json'
         if node.verdict() is None and s.exists():
             for name, m in json.loads(s.read_text())['estimators'].items():
-                print(f'[localization_evaluator] {name}: pos RMSE {m["pos_rmse"]} m, yaw RMSE {m["yaw_rmse"]} rad, '
-                      f'recovered {m["recovered"]} after {m["recovery_time"]} s', flush=True)
+                print(
+                    f'[localization_evaluator] {name}: pos RMSE {m["pos_rmse"]} m, yaw RMSE {m["yaw_rmse"]} rad, '
+                    f'recovered {m["recovered"]} after {m["recovery_time"]} s',
+                    flush=True,
+                )
         node.destroy_node()
         rclpy.try_shutdown()
 
