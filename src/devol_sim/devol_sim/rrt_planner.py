@@ -736,3 +736,11 @@ def densify(path: List[Pose], spacing: float) -> List[Pose]:
             out.append((x0 + a * (x1 - x0), y0 + a * (y1 - y0), seg))
     out.append(path[-1])
     return out
+
+
+def distance_to_segment(x: float, y: float, x0: float, y0: float, x1: float, y1: float) -> float:
+    """Distance from (x, y) to the segment (x0, y0)-(x1, y1)."""
+    dx, dy = x1 - x0, y1 - y0
+    length_sq = dx * dx + dy * dy
+    a = 0.0 if length_sq == 0.0 else min(1.0, max(0.0, ((x - x0) * dx + (y - y0) * dy) / length_sq))
+    return hypot(x - (x0 + a * dx), y - (y0 + a * dy))

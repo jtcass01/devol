@@ -32,7 +32,7 @@ from devol_sim.mobile_robot_goal import MobileRobotGoal
 from devol_sim.rrt_planner import (DEFAULT_BODY, FootprintCollisionChecker, GoalInCollision,
                                    MultiFootprintChecker, PlannerConfig, PlanResult, RRTPlanner,
                                    StartInCollision, body_checker_from_voxels, body_from_flat,
-                                   densify, wrap_to_pi)
+                                   densify, distance_to_segment, wrap_to_pi)
 from devol_sim.utils import euler_to_quaternion, quaternion_to_euler
 
 __author__ = "Jacob Taylor Cassady"
@@ -80,6 +80,9 @@ class RRTMotionPlanner(RCLPY_Node):
         self.declare_parameter('goal_approach_distance', 1.0)
         self.declare_parameter('corner_tolerance', 0.1)
         self.declare_parameter('turn_in_place_threshold', 0.35)
+        # Re-plan from the current pose when the robot is this far from the segment it is
+        # driving (e.g. after a kidnap teleport). <= 0 disables re-planning.
+        self.declare_parameter('replan_distance', 1.0)
 
         p = lambda name: self.get_parameter(name).value  # noqa: E731
         self._publish_rate = float(p('publish_rate'))
@@ -115,6 +118,7 @@ class RRTMotionPlanner(RCLPY_Node):
         self._waypoint_spacing = float(p('waypoint_spacing'))
         self._corner_tolerance = float(p('corner_tolerance'))
         self._turn_in_place_threshold = float(p('turn_in_place_threshold'))
+        self._replan_distance = float(p('replan_distance'))
 
         # TF
         self._tf_buffer = tf2_ros.Buffer()
@@ -312,6 +316,14 @@ class RRTMotionPlanner(RCLPY_Node):
             # The first waypoint is the robot's own position.
             self._path_index = 1
             self.publish_path(self._path)
+
+        if self._replan_distance > 0.0 and self._path_index < len(self._path):
+            (px, py, _), (wx, wy, _) = self._path[self._path_index - 1], self._path[self._path_index]
+            off_path = distance_to_segment(x, y, px, py, wx, wy)
+            if off_path > self._replan_distance:
+                self.get_logger().warning(f'{off_path:.2f} m off the path to {goal.name}; re-planning')
+                self._path = None
+                return
 
         if self._path_index < len(self._path):
             wx, wy, _ = self._path[self._path_index]
