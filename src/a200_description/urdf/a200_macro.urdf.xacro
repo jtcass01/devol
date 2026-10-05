@@ -6,13 +6,13 @@
     <xacro:include filename="$(find a200_description)/urdf/a200.gazebo.xacro"/>
     <xacro:include filename= "$(find realsense2_description)/urdf/_d435.urdf.xacro"/>
 
-    <xacro:macro name="a200" params="namespace:=/a200_0000" >
+    <xacro:macro name="a200" params="namespace:=/a200_0000 use_cameras:=true" >
         <!-- Base link is the center of the robot's bottom plate -->
         <link name="a200_base_link">
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/base_link.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/base_link.dae"/>
             </geometry>
             </visual>
             <collision>
@@ -33,7 +33,7 @@
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/top_chassis.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/top_chassis.dae"/>
             </geometry>
             </visual>
         </link>
@@ -65,7 +65,7 @@
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/wheels/outdoor.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/wheels/outdoor.dae"/>
             </geometry>
             </visual>
             <collision>
@@ -90,7 +90,7 @@
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/wheels/outdoor.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/wheels/outdoor.dae"/>
             </geometry>
             </visual>
             <collision>
@@ -116,7 +116,7 @@
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/wheels/outdoor.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/wheels/outdoor.dae"/>
             </geometry>
             </visual>
             <collision>
@@ -141,7 +141,7 @@
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/wheels/outdoor.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/wheels/outdoor.dae"/>
             </geometry>
             </visual>
             <collision>
@@ -227,7 +227,7 @@
         <link name="front_bumper_link">
             <visual>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/attachments/bumper.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/attachments/bumper.dae"/>
             </geometry>
             </visual>
         </link>
@@ -247,7 +247,7 @@
         <link name="rear_bumper_link">
             <visual>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/attachments/bumper.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/attachments/bumper.dae"/>
             </geometry>
             </visual>
         </link>
@@ -270,7 +270,7 @@
             <origin xyz="0 0 0"/>
             <material name="clearpath_dark_grey"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/attachments/pacs_top_plate.stl"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/attachments/pacs_top_plate.stl"/>
             </geometry>
             </visual>
             <collision>
@@ -309,13 +309,13 @@
             <visual>
             <origin rpy="0 0 0" xyz="0 0 0.3"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/attachments/300_mm_sensor_arch.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/attachments/300_mm_sensor_arch.dae"/>
             </geometry>
             </visual>
             <collision>
             <origin rpy="0 0 0" xyz="0 0 0.3"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_platform_description/meshes/a200/attachments/300_mm_sensor_arch.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_platform_description/a200/attachments/300_mm_sensor_arch.dae"/>
             </geometry>
             </collision>
         </link>
@@ -355,7 +355,7 @@
         <link name="fath_pivot_0_link">
             <visual>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_mounts_description/meshes/fath_pivot_mount_base.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_mounts_description/fath_pivot_mount_base.dae"/>
             </geometry>
             <origin rpy="0 0 1.5707963267948966" xyz="0 0 0"/>
             </visual>
@@ -375,7 +375,7 @@
         <link name="fath_pivot_0_hinge_link">
             <visual>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_mounts_description/meshes/fath_pivot_mount.dae"/>
+                <mesh filename="package://a200_description/meshes/clearpath_mounts_description/fath_pivot_mount.dae"/>
             </geometry>
             <origin rpy="0 0 1.5707963267948966" xyz="0 0 0"/>
             </visual>
@@ -406,7 +406,7 @@
             <visual>
             <material name="clearpath_dark_grey"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_mounts_description/meshes/pacs/bracket_horizontal.stl"/>
+                <mesh filename="package://a200_description/meshes/clearpath_mounts_description/pacs/bracket_horizontal.stl"/>
             </geometry>
             <origin rpy="0 0 0" xyz="0 0 0.010125"/>
             </visual>
@@ -434,7 +434,7 @@
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
                 <!-- Origin of this mesh is the base of the bracket. -->
-                <mesh filename="file:///opt/ros/jazzy/share/clearpath_sensors_description/meshes/hokuyo_ust.stl"/>
+                <mesh filename="package://a200_description/meshes/clearpath_sensors_description/hokuyo_ust.stl"/>
             </geometry>
             <material name="clearpath_dark_grey"/>
             </visual>
@@ -465,12 +465,12 @@
             </inertial>
             <visual>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/velodyne_description/meshes/VLP16_base_1.dae"/>
+                <mesh filename="package://a200_description/meshes/velodyne_description/VLP16_base_1.dae"/>
             </geometry>
             </visual>
             <visual>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/velodyne_description/meshes/VLP16_base_2.dae"/>
+                <mesh filename="package://a200_description/meshes/velodyne_description/VLP16_base_2.dae"/>
             </geometry>
             </visual>
             <collision>
@@ -494,7 +494,7 @@
             <visual>
             <origin xyz="0 0 -0.0377"/>
             <geometry>
-                <mesh filename="file:///opt/ros/jazzy/share/velodyne_description/meshes/VLP16_scan.dae"/>
+                <mesh filename="package://a200_description/meshes/velodyne_description/VLP16_scan.dae"/>
             </geometry>
             </visual>
         </link>
@@ -515,7 +515,7 @@
             <origin rpy="3.14159 0 3.14159" xyz="0 0 0.022"/>
         </xacro:sensor_d435>
 
-        <xacro:a200_gazebo namespace="${namespace}"/>
+        <xacro:a200_gazebo namespace="${namespace}" use_cameras="${use_cameras}"/>
 
     </xacro:macro>
 </robot>

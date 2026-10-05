@@ -6,7 +6,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ur_description REQUIRED)
 find_package(robotiq_description REQUIRED)
 find_package(realsense2_description REQUIRED)
-find_package(gz-sensors8 REQUIRED)
+find_package(gz_sensors_vendor REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

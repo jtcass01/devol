@@ -255,10 +255,10 @@ class AgentMotionPlanner(RCLPY_Node):
                 self._to_frame, self._from_frame,
                 when, timeout=Duration(seconds=0.5))
         except tf2_ros.LookupException:
-            self.get_logger().warn('Transform isn\'t available, waiting...')
+            self.get_logger().warning('Transform isn\'t available, waiting...')
             return
         except Exception as e:
-            self.get_logger().warn(f'TF lookup failed: {str(e)}')
+            self.get_logger().warning(f'TF lookup failed: {str(e)}')
             return
 
         pose = trans.transform.translation

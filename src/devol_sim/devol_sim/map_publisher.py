@@ -32,8 +32,8 @@ class MapPublisher(Node):
         
         # Check if map file exists
         if not os.path.exists(map_file):
-            self.get_logger().warn(f'Map file not found: {map_file}')
-            self.get_logger().warn('Map publisher will not publish maps. Create map.yaml to enable map publishing.')
+            self.get_logger().warning(f'Map file not found: {map_file}')
+            self.get_logger().warning('Map publisher will not publish maps. Create map.yaml to enable map publishing.')
             self.map_available = False
             return
         
@@ -42,7 +42,7 @@ class MapPublisher(Node):
                 map_config = yaml.safe_load(f)
         except Exception as e:
             self.get_logger().error(f'Failed to load map file: {e}')
-            self.get_logger().warn('Map publisher will not publish maps.')
+            self.get_logger().warning('Map publisher will not publish maps.')
             self.map_available = False
             return
         
