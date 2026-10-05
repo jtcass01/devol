@@ -26,7 +26,6 @@ setup(
             'diffdrive_pid = devol_sim.diffdrive_pid:main',
             'agent_motion_planner = devol_sim.agent_motion_planner:main',
             'rrt_motion_planner = devol_sim.rrt_motion_planner:main',
-            'map_publisher = devol_sim.map_publisher:main',
             'goal_points_publisher = devol_sim.goal_points_publisher:main',
             'map_padder = devol_sim.map_padder:main',
             'pointcloud_publisher = devol_sim.pointcloud_publisher:main',
