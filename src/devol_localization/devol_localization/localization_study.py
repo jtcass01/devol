@@ -51,10 +51,10 @@ def study_configs() -> List[dict]:
             if key in seen:
                 continue
             seen.add(key)
-            estimators = 'pf' if c['num_particles'] != NOMINAL['num_particles'] else 'ekf,pf'
+            estimators = 'pf' if c['num_particles'] != NOMINAL['num_particles'] else 'ekf,pf,hybrid'
             runs.append({'scenario': 'nominal', **c, 'estimators': estimators})
-    runs.append({'scenario': 'global', **NOMINAL, 'estimators': 'ekf,pf'})
-    runs.append({'scenario': 'kidnap', **NOMINAL, 'estimators': 'ekf,pf'})
+    runs.append({'scenario': 'global', **NOMINAL, 'estimators': 'ekf,pf,hybrid'})
+    runs.append({'scenario': 'kidnap', **NOMINAL, 'estimators': 'ekf,pf,hybrid'})
     return runs
 
 
@@ -182,7 +182,7 @@ def plot_sensitivity(out: Path, table: List[dict]) -> None:
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    colors = {'ekf': '#2a78d6', 'pf': '#eb6834', 'dead_reckoning': '#52514e'}
+    colors = {'ekf': '#2a78d6', 'pf': '#eb6834', 'hybrid': '#8a3ec2', 'dead_reckoning': '#52514e'}
     nominal = [r for r in table if r['scenario'] == 'nominal']
 
     def series(est, factor):
@@ -195,13 +195,14 @@ def plot_sensitivity(out: Path, table: List[dict]) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), facecolor='white')
     for ax, factor, label in zip(axes, ('num_particles', 'k', 'sigma_r'),
                                  ('particle count N', 'odometry noise scale k', 'lidar range noise σr (m)')):
-        for est in ('dead_reckoning', 'ekf', 'pf'):
+        for est in ('dead_reckoning', 'ekf', 'pf', 'hybrid'):
             pts = series(est, factor)
             if not pts:
                 continue
             if factor == 'num_particles' and est != 'pf':
-                if est == 'ekf':
-                    ax.axhline(pts[0]['pos_rmse'], color=colors[est], lw=1.5, ls='--', label='EKF (nominal)')
+                if est in ('ekf', 'hybrid'):
+                    ax.axhline(pts[0]['pos_rmse'], color=colors[est], lw=1.5, ls='--',
+                               label=f'{est.upper() if est == "ekf" else "hybrid"} (nominal N)')
                 continue
             x = [p[factor] for p in pts]
             ax.errorbar(x, [p['pos_rmse'] for p in pts], yerr=[np.nan_to_num(p['pos_rmse_ci95']) for p in pts],

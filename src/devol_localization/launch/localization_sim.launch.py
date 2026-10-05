@@ -104,7 +104,7 @@ def generate_launch_description():
         ('kidnap_time', '10.0', 'scenario:=kidnap: delay in sim seconds before the teleport'),
         ('kidnap_target', '5.45,2.03,0.0', 'scenario:=kidnap: x,y,yaw to teleport to (default Goal 2)'),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
-        ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf'),
+        ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf,hybrid (hybrid needs pf)'),
         ('k', '1.0', 'Odometry noise scale (alpha = 0.05 k)'),
         ('sigma_r', '0.03', 'Lidar range noise std, m'),
         ('seed', '0', 'Trial seed'),

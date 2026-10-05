@@ -3,20 +3,21 @@
   ros2 launch devol_localization localization_test_cases.launch.py test_case:=1   # nominal route
   ros2 launch devol_localization localization_test_cases.launch.py test_case:=2   # kidnapping
 
-Both start the factory sim headless with the controller on ground truth, the EKF and the PF at the
+Both start the factory sim headless with the controller on ground truth, the EKF, the PF and the hybrid
+EKF+PF (an EKF re-seeded from the PF after a kidnap; estimators:=ekf,pf leaves it out) at the
 nominal study point (N = 2000, k = 1, sigma_r = 0.03 m, seed 0) and a live window per filter. The run
 ends by itself a few seconds after the robot reaches Goal 3 (or FAILs at max_duration), then prints the
 verdict and leaves results, the two view videos, a final screenshot of each, and the intermediate
 posterior figures (PF particles + EKF 2-sigma ellipse at the same instant) in output_dir.
 
 Test case 1, nominal three-waypoint route: expected output is the Goal 1-3 poses in
-devol_gazebo/worlds/factory/poses.csv. PASS when the EKF and the PF are both within 0.25 m of ground
-truth at every waypoint and dead reckoning is worse than both.
+devol_gazebo/worlds/factory/poses.csv. PASS when every filter (EKF, PF and hybrid) is within 0.25 m of
+ground truth at every waypoint and dead reckoning is worse than all of them.
 
 Test case 2, kidnapping: kidnap_delay s after the robot reaches Goal 1, it is teleported onto Goal 2
 (5.45, 2.03, 0) without the estimators being told; the planner then drives on to Goal 3. Expected
-output is that pose. PASS when the PF returns within 0.25 m and stays there before the 60 s recovery
-timeout; the EKF's outcome is reported either way.
+output is that pose. PASS when the PF, and the hybrid when it runs, return within 0.25 m and stay there
+for 3 s before the 60 s recovery timeout; the EKF's outcome is reported either way.
 """
 
 import os
@@ -87,7 +88,7 @@ def launch_setup(context):
         'kidnap_trigger': 'after_waypoint',
         'kidnap_time': arg('kidnap_delay'),
         'kidnap_target': '5.45,2.03,0.0',
-        'estimators': 'ekf,pf',
+        'estimators': arg('estimators'),
         'k': '1.0',
         'sigma_r': '0.03',
         'num_particles': arg('num_particles'),
@@ -120,6 +121,7 @@ def generate_launch_description():
         ('record_bag', 'false', 'Also record the raw streams for offline replay'),
         ('check_running_sim', 'true', 'Refuse to start while a Gazebo sim or ros_gz bridge is still running'),
         ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
+        ('estimators', 'ekf,pf,hybrid', 'Estimators to run and judge (subset of ekf,pf,hybrid; hybrid needs pf)'),
         ('num_particles', '2000', 'PF particle count'),
         ('seed', '0', 'Noise and PF seed'),
         ('kidnap_delay', '10.0', 'Test case 2: sim seconds after reaching Goal 1 before the teleport'),

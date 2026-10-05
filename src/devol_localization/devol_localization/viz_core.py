@@ -24,6 +24,7 @@ __email__ = "jcassad1@jh.edu"
 COLOR_TRUTH = '#1baf7a'
 COLOR_EKF = '#2a78d6'
 COLOR_PF = '#eb6834'
+COLOR_HYBRID = '#8a3ec2'
 COLOR_SCAN = '#4a3aa7'
 TEXT_PRIMARY = '#0b0b0b'
 TEXT_SECONDARY = '#52514e'
@@ -78,7 +79,7 @@ class LocalizationFigure:
     def __init__(self, mode: str = 'ekf', title: str = '', window: float = 0.0, history: float = 0.0,
                  interactive: bool = True) -> None:
         """
-        :param mode: 'ekf' or 'pf' (draws particles and uses the PF colour).
+        :param mode: 'ekf', 'hybrid' (drawn like the EKF) or 'pf' (draws particles and uses the PF colour).
         :param window: Side of the square view that follows the robot, metres; 0 shows the whole map.
         :param history: Seconds of error history to show; 0 shows the whole run.
         """
@@ -92,8 +93,8 @@ class LocalizationFigure:
         self.mode = mode
         self.window = window
         self.history = history
-        color = COLOR_PF if mode == 'pf' else COLOR_EKF
-        label = 'PF' if mode == 'pf' else 'EKF'
+        color = {'pf': COLOR_PF, 'hybrid': COLOR_HYBRID}.get(mode, COLOR_EKF)
+        label = {'pf': 'PF', 'hybrid': 'Hybrid EKF+PF'}.get(mode, 'EKF')
         self._map_extent = None
 
         if interactive:
