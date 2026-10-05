@@ -1,0 +1,7 @@
+# Python formatting, applied by .github/workflows/format.yaml; run locally with `ruff format`.
+# Line length and quotes match the ament_flake8 tests in the ROS packages (99 columns, single quotes).
+line-length = 99
+extend-exclude = ["build", "install", "log"]
+
+[format]
+quote-style = "single"
