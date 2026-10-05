@@ -9,8 +9,8 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         <gazebo>
             <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
             <wheel link_name="front_left_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
+                <slip_compliance_lateral>0.0</slip_compliance_lateral>
+                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
                 <wheel_normal_force>113</wheel_normal_force>
                 <wheel_radius>0.1651</wheel_radius>
             </wheel>
@@ -20,8 +20,8 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         <gazebo>
             <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
             <wheel link_name="front_right_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
+                <slip_compliance_lateral>0.0</slip_compliance_lateral>
+                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
                 <wheel_normal_force>113</wheel_normal_force>
                 <wheel_radius>0.1651</wheel_radius>
             </wheel>
@@ -31,8 +31,8 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         <gazebo>
             <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
             <wheel link_name="rear_left_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
+                <slip_compliance_lateral>0.0</slip_compliance_lateral>
+                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
                 <wheel_normal_force>113</wheel_normal_force>
                 <wheel_radius>0.1651</wheel_radius>
             </wheel>
@@ -42,8 +42,8 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         <gazebo>
             <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
             <wheel link_name="rear_right_wheel_link">
-                <slip_compliance_lateral>1.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>1.0</slip_compliance_longitudinal>
+                <slip_compliance_lateral>0.0</slip_compliance_lateral>
+                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
                 <wheel_normal_force>113</wheel_normal_force>
                 <wheel_radius>0.1651</wheel_radius>
             </wheel>
@@ -52,10 +52,24 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 
         <gazebo>
             <plugin filename="libgz-sim-pose-publisher-system.so" name="gz::sim::systems::PosePublisher">
-            <publish_link_pose>true</publish_link_pose>
-            <publish_nested_model_pose>true</publish_nested_model_pose>
-            <use_pose_vector_msg>true</use_pose_vector_msg>
-            <update_frequency>50</update_frequency>
+                <publish_link_pose>true</publish_link_pose>
+                <publish_nested_model_pose>true</publish_nested_model_pose>
+                <use_pose_vector_msg>true</use_pose_vector_msg>
+                <update_frequency>50</update_frequency>
+            </plugin>
+        </gazebo>
+
+        <!-- Ground truth for the localization study: the model's world pose (world = map frame),
+             bridged by devol_localization's localization_sim.launch.py. tf_topic is set so it does not
+             publish on /model/<name>/pose, which the sim bridges onto /tf. -->
+        <gazebo>
+            <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+                <odom_frame>map</odom_frame>
+                <robot_base_frame>a200_base_link</robot_base_frame>
+                <odom_topic>${namespace}/ground_truth/odom</odom_topic>
+                <tf_topic>${namespace}/ground_truth/tf</tf_topic>
+                <odom_publish_frequency>50</odom_publish_frequency>
+                <dimensions>3</dimensions>
             </plugin>
         </gazebo>
 

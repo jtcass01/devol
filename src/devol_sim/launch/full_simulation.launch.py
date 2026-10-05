@@ -18,7 +18,8 @@ def generate_launch_description():
     maze_arg = DeclareLaunchArgument(
         'maze',
         default_value='factory',
-        description='Maze to load: basic_maze or Maze_ng'
+        choices=["empty", "factory", "moon_terrain"],
+        description='Maze to load: empty, factory or moon_terrain'
     )
     declare_namespace = DeclareLaunchArgument(
         'namespace',
@@ -103,28 +104,28 @@ def generate_launch_description():
             ]
         )
 
-        pid_controller = Node(
-            package='devol_sim',
-            executable='diffdrive_pid',
-            name='diffdrive_pid',
-            output='screen',
-            parameters=[
-                {'kp': 0.9},
-                {'kd': 0.0},
-                {'ki': 0.0},
-                {'lookahead': 0.3},
-                {'publish_rate': 30.0},
-                {'max_linear_vel': 0.75},
-                {'max_angular_vel': 1.0},
-                {'x': float(robot_pose['x'])},
-                {'y': float(robot_pose['y'])},
-                {'yaw': float(robot_pose['yaw'])},
-                {'namespace': namespace}
-            ]
-        )
+        # pid_controller = Node(
+        #     package='devol_sim',
+        #     executable='diffdrive_pid',
+        #     name='diffdrive_pid',
+        #     output='screen',
+        #     parameters=[
+        #         {'kp': 2.0},
+        #         {'ki': 0.01},
+        #         {'kd': 0.1},
+        #         {'lookahead': 0.3},
+        #         {'publish_rate': 30.0},
+        #         {'max_linear_vel': 0.75},
+        #         {'max_angular_vel': 1.0},
+        #         {'x': float(robot_pose['x'])},
+        #         {'y': float(robot_pose['y'])},
+        #         {'yaw': float(robot_pose['yaw'])},
+        #         {'namespace': namespace}
+        #     ]
+        # )
 
         # agent_motion_planner: Node = Node(
-        #     package='diff_drive_sim',
+        #     package='devol_sim',
         #     executable='agent_motion_planner',
         #     name='agent_motion_planner',
         #     output='screen',
@@ -148,7 +149,7 @@ def generate_launch_description():
             spawn_entities,
             bridge,
             system_bridge_cmd,
-            pid_controller,
+            # pid_controller,
             # agent_motion_planner,
             rviz
         ]

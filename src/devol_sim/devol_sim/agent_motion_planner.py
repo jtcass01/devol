@@ -12,15 +12,13 @@ from rclpy.duration import Duration
 from nav_msgs.msg import OccupancyGrid
 
 from geometry_msgs.msg import PoseStamped
-from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import MarkerArray, Marker
 import tf2_ros
 from matplotlib.pyplot import ion, subplots, pause, close as plt_close
 
-from diff_drive_sim.a_star_planner import a_star_grid
-from diff_drive_sim.utils import quaternion_to_euler
-
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+from devol_sim.a_star_planner import a_star_grid
+from devol_sim.utils import quaternion_to_euler, euler_to_quaternion
+from devol_sim.mobile_robot_goal import MobileRobotGoal
 
 
 def euclidean_distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
@@ -38,14 +36,26 @@ class AgentMotionPlanner(RCLPY_Node):
         super().__init__('agent_motion_planner')
 
         self.declare_parameter('publish_rate', 10.0)
+        self.declare_parameter('viz_rate', 2.0)
+        self.declare_parameter('namespace', '/devol_drive')
         self.declare_parameter('goal_tolerance', 0.15)
-        self.declare_parameter('lookahead', 0.3)
+        self.declare_parameter('lookahead', 0.15)
         self.declare_parameter('intermediate_goal_tolerance', 0.15)
+        self.declare_parameter('tf_to_frame', 'map')
+        self.declare_parameter('tf_from_frame', 'a200_base_link')
+
         self._publish_rate: float = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
+        self._viz_rate: float = float(self.get_parameter('viz_rate').get_parameter_value().double_value)
+        self._namespace: str = str(self.get_parameter('namespace').get_parameter_value().string_value)
         self._goal_tolerance: float = float(self.get_parameter('goal_tolerance').get_parameter_value().double_value)
         self._lookahead: float = float(self.get_parameter('lookahead').get_parameter_value().double_value)
         self._intermediate_goal_tolerance: float = float(self.get_parameter('intermediate_goal_tolerance').get_parameter_value().double_value)
         self._dt: float = 1.0 / self._publish_rate
+
+        # TF frames
+        self._to_frame: str = str(self.get_parameter('tf_to_frame').get_parameter_value().string_value)
+        tf_from_frame: str = str(self.get_parameter('tf_from_frame').get_parameter_value().string_value)
+        self._from_frame = f'{self._namespace[1:]}/{tf_from_frame}'
 
         # TF
         self._tf_buffer = tf2_ros.Buffer()
@@ -53,13 +63,13 @@ class AgentMotionPlanner(RCLPY_Node):
 
         # I/O
         qos_profile = QoSProfile(depth=10)
-        self._goal_pub = self.create_publisher(PoseStamped, '/goal_pose', qos_profile)
-        self._map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_received, 10)
-        self._goals_sub = self.create_subscription(MarkerArray, '/goal_points', self.goal_points_received, 10)
+        self._goal_pub = self.create_publisher(PoseStamped, f'{self._namespace}/goal_pose', qos_profile)
+        self._map_sub = self.create_subscription(OccupancyGrid, f'{self._namespace}/map', self.map_received, 10)
+        self._goals_sub = self.create_subscription(MarkerArray, f'{self._namespace}/goal_points', self.goal_points_received, 10)
 
         # State
         self._goal_index = 0
-        self._goals = []
+        self._goals: List[MobileRobotGoal] = []
         self._map_resolution = None
         self._origin_x = None
         self._origin_y = None
@@ -70,12 +80,9 @@ class AgentMotionPlanner(RCLPY_Node):
         self._goal_grid_state = None
         self._stop_event: Event = Event()
 
-        self._viz_thread: Thread = Thread(target=self.visualization_loop, daemon=True)
-        self._viz_thread.start()
-
-        # TF frames
-        self._to_frame = 'maze_world'
-        self._from_frame = 'diff_drive/body_link'
+        if self._viz_rate > 0.0:
+            self._viz_thread: Thread = Thread(target=self.visualization_loop, daemon=True)
+            self._viz_thread.start()
 
         # Timer loop
         self.timer = self.create_timer(self._dt, self.plan_to_goals)
@@ -84,10 +91,12 @@ class AgentMotionPlanner(RCLPY_Node):
 
     def stop(self):
         self._stop_event.set()
+        self._viz_thread.join()
 
     def visualization_loop(self):
         ion()
         fig, ax = subplots(figsize=(6, 6))
+        update_period: float = 1.0 / self._viz_rate
 
         while not self._stop_event.is_set():
             if self._map is None:
@@ -110,9 +119,9 @@ class AgentMotionPlanner(RCLPY_Node):
                 ax.plot(self._robot_grid_state[1], self._robot_grid_state[0], 'ro', label='Robot')
 
             # Draw goals
-            for gx, gy in self._goals:
-                r, c = self.world_to_grid(gx, gy)
-                ax.plot(c, r, 'gs', markersize=8, label='Goal')
+            for goal in self._goals:
+                r, c = self.world_to_grid(goal.x, goal.y)
+                ax.plot(c, r, 'gs', markersize=8, label=goal.name)
 
             # Draw short-term goal
             if self._goal_grid_state is not None:
@@ -123,12 +132,9 @@ class AgentMotionPlanner(RCLPY_Node):
             ax.set_ylabel("grid Y")
             ax.legend(loc='upper right')
 
-            pause(0.1)
+            pause(update_period)
         
-        try:
-            plt_close(fig)
-        except Exception:
-            pass
+        plt_close(fig)
 
     def map_received(self, msg: OccupancyGrid) -> None:
         map_data: np.ndarray = np.array(msg.data, dtype=np.int8)
@@ -148,15 +154,31 @@ class AgentMotionPlanner(RCLPY_Node):
 
         # Make a goal for each marker
         for marker in reversed(msg.markers):
-            x = marker.pose.position.x
-            y = marker.pose.position.y
-            self._goals.append((x, y))
+            marker: Marker = marker # Added for linter
+            name: str = marker.text
+            x: float = marker.pose.position.x
+            y: float = marker.pose.position.y
+            z: float = marker.pose.position.z
+            _, _, yaw = quaternion_to_euler(marker.pose.orientation)
+            goal: MobileRobotGoal = MobileRobotGoal(name=name,
+                                                    x=x, y=y, z=z,
+                                                    yaw=yaw)
+            self.get_logger().info(f'Received {goal}')
+            self._goals.append(goal)
 
-    def send_goal_pose(self, position: Tuple[float, float]) -> None:
+    def send_goal_pose(self, position: Tuple[float, float], yaw: float) -> None:
         msg: PoseStamped = PoseStamped()
         msg.header.frame_id = self._to_frame
         msg.pose.position.x = position[0]
         msg.pose.position.y = position[1]
+
+        quat: Tuple[float, float, float, float] = \
+            euler_to_quaternion(0.0, 0.0, yaw)
+        msg.pose.orientation.x = quat[0]
+        msg.pose.orientation.y = quat[1]
+        msg.pose.orientation.z = quat[2]
+        msg.pose.orientation.w = quat[3]
+
         self._goal_pub.publish(msg)
 
     def world_shift_trailer_hitch(self, x, y, theta):
@@ -178,7 +200,47 @@ class AgentMotionPlanner(RCLPY_Node):
         x = self._origin_x + (col+0.5) * self._map_resolution
         y = self._origin_y + (row+0.5) * self._map_resolution
         return x, y
-    
+
+    def add_yaw_to_path(self, path_grid: List[Tuple[int, int]], goal_yaw: float) -> List[Tuple[int, int, float]]:
+        """
+        Add yaw information to path by looking ahead to next waypoint.
+        For the last waypoint, use the direction from the previous waypoint.
+        
+        Args:
+            path_grid: List of (row, col) tuples in grid coordinates
+            
+        Returns:
+            List of (row, col, yaw) tuples
+        """
+        if len(path_grid) == 0:
+            return []
+        
+        if len(path_grid) == 1:
+            # Single point path - use current robot yaw or default
+            return [(path_grid[0][0], path_grid[0][1], 0.0)]
+        
+        path_with_yaw = []
+        
+        # For all waypoints except the last, look ahead
+        for i in range(len(path_grid) - 1):
+            current = path_grid[i]
+            next_point = path_grid[i + 1]
+            
+            # Convert to world coordinates to compute yaw
+            x_curr, y_curr = self.grid_to_world(current[0], current[1])
+            x_next, y_next = self.grid_to_world(next_point[0], next_point[1])
+            
+            # Compute yaw pointing to next waypoint
+            yaw = np.arctan2(y_next - y_curr, x_next - x_curr)
+            
+            path_with_yaw.append((current[0], current[1], yaw))
+        
+        # For the last waypoint, use direction from previous waypoint
+        last_point = path_grid[-1]
+        path_with_yaw.append((last_point[0], last_point[1], goal_yaw))
+        
+        return path_with_yaw
+        
     def plan_to_goals(self):
         if self._map is None:
             return
@@ -203,29 +265,30 @@ class AgentMotionPlanner(RCLPY_Node):
         roll, pitch, yaw = quaternion_to_euler(trans.transform.rotation)
 
         robot_state: Tuple[float, float] = (pose.x, pose.y)
-        goal_state: Tuple[float, float] = self._goals[self._goal_index]
+        goal: MobileRobotGoal = self._goals[self._goal_index]
         self._robot_grid_state = self.world_to_grid(robot_state[0], robot_state[1])
-        self._goal_grid_state = self.world_to_grid(goal_state[0], goal_state[1])
+        self._goal_grid_state = self.world_to_grid(goal.x, goal.y)
 
-        if euclidean_distance(robot_state, goal_state) <= self._goal_tolerance:
+        if euclidean_distance(robot_state, [goal.x, goal.y]) <= self._goal_tolerance:
             # Goal acheived!
-            self.get_logger().info(f'Successfully reached goal #{self._goal_index+1} at ({goal_state[0]}, {goal_state[1]})')
+            self.get_logger().info(f'Successfully reached goal: {goal.name}')
 
             self._goal_index += 1
             self._path_index = 0
             self._path = None
         else:
-
             # Plan from robot state to goal state
             if self._path is None:
-                self.get_logger().info(f'Calculating optimal path')
-                self._path: List[Tuple[int, int]] = a_star_grid(self._map, self._robot_grid_state, self._goal_grid_state)
+                self.get_logger().info(f'Calculating optimal path to {goal.name}')
+                path_grid: List[Tuple[int, int]] = a_star_grid(self._map, self._robot_grid_state, self._goal_grid_state)
+                self._path: List[Tuple[int, int, float]] = self.add_yaw_to_path(path_grid=path_grid, 
+                                                                                goal_yaw=goal.yaw)
                 self.get_logger().info(f'Path found: {self._path}')
 
             # If we have a path, let's walk it.
             if self._path_index < len(self._path):
-                intermediate_goal_grid: Tuple[int, int] = self._path[self._path_index]
-                intermediate_goal: Tuple[float, float] = self.grid_to_world(intermediate_goal_grid[0], intermediate_goal_grid[1])
+                row, col, goal_yaw = self._path[self._path_index]
+                intermediate_goal: Tuple[float, float] = self.grid_to_world(row, col)
                 # Shift the intermediate goal by the trailer hitch
                 trailer_hitch_goal: Tuple[float, float] = self.world_shift_trailer_hitch(intermediate_goal[0], intermediate_goal[1], yaw)
 
@@ -233,7 +296,7 @@ class AgentMotionPlanner(RCLPY_Node):
                 if euclidean_distance(robot_state, intermediate_goal) <= self._intermediate_goal_tolerance:
                     self._path_index += 1
                 else:
-                    self.send_goal_pose(trailer_hitch_goal)
+                    self.send_goal_pose(trailer_hitch_goal, goal_yaw)
 
 
 def main(args=None):
@@ -254,4 +317,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-

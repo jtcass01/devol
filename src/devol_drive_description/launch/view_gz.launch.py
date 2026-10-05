@@ -119,7 +119,6 @@ def generate_launch_description():
         ]
     )
 
-    # Subscribe to the joint states of the robot, and publish them to the robot state publisher
     start_robot_state_publisher_cmd: Node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -129,7 +128,6 @@ def generate_launch_description():
                     {"use_sim_time": use_sim_time}])
 
 
-    # Spawn robot command
     gz_spawn_entity_cmd: Node = Node(
         package="ros_gz_sim",
         executable="create",

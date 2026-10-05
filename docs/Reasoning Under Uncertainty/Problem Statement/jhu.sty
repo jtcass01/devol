@@ -1,0 +1,342 @@
+% ============================================================
+% jhu.sty -- Johns Hopkins Whiting School document style
+% ============================================================
+% Ported from the Application of Sensing Systems final exam
+% submission so a new assignment starts from a finished look: the
+% JHU brand palette, a branded title page, a running header that
+% names the current section, and a footer band with the page count.
+%
+% Set the document fields before \begin{document}:
+%
+%   \renewcommand{\jhuTitle}{Gesture Recognition System}
+%   \renewcommand{\jhuDocType}{Final Exam}
+%   \renewcommand{\jhuAuthor}{Jacob Taylor Cassady}
+%   \renewcommand{\jhuCourse}{665.681: Application of Sensing Systems}
+%   \renewcommand{\jhuRunningHead}{665.681 Final Exam}
+%
+% Then, after \begin{document}:
+%
+%   \jhutitlepage   % title page, and the page-counter fix it needs
+%   \jhucontents    % table of contents, followed by \newpage
+%
+% This file is duplicated in Exams/Template, HW/Template, and
+% Quizzes/Template on purpose: each template directory is self-contained,
+% so copying one into a new class repository is all it takes to get started.
+% ============================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{jhu}[2026/08/11 JHU Whiting School document style]
+
+% ------------------------------------------------------------
+% Document fields -- override these with \renewcommand
+% ------------------------------------------------------------
+\newcommand{\jhuTitle}{Document Title}
+\newcommand{\jhuDocType}{Assignment}
+\newcommand{\jhuAuthor}{YOUR-NAME}
+\newcommand{\jhuCourse}{CLASS-NUMBER: YOUR-CLASS}
+\newcommand{\jhuRunningHead}{CLASS-NUMBER Assignment}
+\newcommand{\jhuSchool}{Johns Hopkins University, Whiting School of Engineering}
+
+% ------------------------------------------------------------
+% Colors -- Johns Hopkins brand palette
+% ------------------------------------------------------------
+\RequirePackage[dvipsnames, table]{xcolor}
+\definecolor{jhublue}{HTML}{002D72}    % Heritage Blue (primary)
+\definecolor{jhuspirit}{HTML}{68ACE5}  % Spirit Blue (accent)
+\definecolor{jhugold}{HTML}{F1C400}    % Gold (accent)
+\definecolor{jhugray}{HTML}{5A5A5A}    % Neutral text
+
+% ------------------------------------------------------------
+% Page geometry
+% ------------------------------------------------------------
+% The bottom margin and footskip are set together so the footer band
+% always keeps clearance below the last line of body text.
+% headheight is sized to clear the two-line-capable header band;
+% fancyhdr warns below ~34pt. headsep then pulls the body back up.
+\RequirePackage[
+  letterpaper,
+  margin=1in,
+  bottom=1.15in,
+  headheight=34.5pt,
+  headsep=14pt,
+  footskip=32pt
+]{geometry}
+
+% ------------------------------------------------------------
+% Packages
+% ------------------------------------------------------------
+\RequirePackage{textcomp}
+\RequirePackage{microtype}
+\RequirePackage{amsmath, amssymb}
+\RequirePackage{graphicx}
+\RequirePackage{float}
+\RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{multirow}
+\RequirePackage{enumitem}
+\RequirePackage{titlesec}
+\RequirePackage{fancyhdr}
+\RequirePackage{lastpage}
+\RequirePackage{algorithm}
+\RequirePackage{algpseudocodex}
+\RequirePackage{bbding, pifont}
+\RequirePackage{cancel}
+\RequirePackage{url}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage[font=small, labelfont={bf, sf, color=jhublue}]{caption}
+
+% Symbol fonts carried over from the previous template. Drop them if
+% an assignment does not need them.
+\RequirePackage{textgreek}
+\RequirePackage{dsfont}
+
+\graphicspath{ {./Figures/} {./figures/} }
+\bibliographystyle{IEEEtran}
+
+\newcommand{\xmark}{\ding{55}}%
+
+% ------------------------------------------------------------
+% Headings and lists
+% ------------------------------------------------------------
+% Section headings in Heritage Blue with a Spirit Blue underline.
+\titleformat{\section}
+  {\Large\sffamily\bfseries\color{jhublue}}
+  {\thesection}{0.6em}{}
+  [{\vspace{2pt}\color{jhuspirit}\titlerule[1pt]}]
+
+\titleformat{\subsection}
+  {\large\sffamily\bfseries\color{jhublue}}
+  {\thesubsection}{0.5em}{}
+
+\titlespacing*{\section}{0pt}{2.2ex plus 1ex minus .2ex}{1.4ex plus .2ex}
+
+% "style=nextline" lets a long \item[...] label wrap onto the next
+% line instead of running past the right margin, and starts the body
+% text on its own line without needing a manual "\hfill \\".
+\setlist[description]{
+  style=nextline,
+  leftmargin=0pt,
+  labelwidth=0pt,
+  labelsep=0pt,
+  itemsep=1.0ex,
+  font=\normalfont\sffamily\bfseries\color{jhublue}
+}
+
+% ------------------------------------------------------------
+% Problem environment
+% ------------------------------------------------------------
+% One per file under sections/:
+%
+%   \begin{problem}[Bowl transfer / Bayes]  % optional short label for
+%     \label{problem-1}                     %   the contents page + header
+%     Full prompt here. Use math mode for   % \label first, if you want
+%     operators: $P(A \mid B)$, $A \cap B$. %   to \ref this problem
+%   \end{problem}
+%
+%   Your solution goes here, as ordinary prose, after \end{problem}.
+%
+% The printed heading is always the short "Problem N" ("Question N" in a
+% quiz -- see \jhuItemWord). The verbatim prompt sits in a tinted callout,
+% so a long prompt neither runs into the margin nor swamps the contents
+% page and running header the way a prompt-as-\section title did.
+\newcounter{problem}
+\renewcommand{\theproblem}{\arabic{problem}}
+% What each numbered item is called in the heading, the contents entry,
+% and the running header. A quiz sets \renewcommand{\jhuItemWord}{Question}
+% before \begin{document}.
+\newcommand{\jhuItemWord}{Problem}
+% Problems are the only sectioning unit here, so \autoref{problem-N}
+% should read "Problem N" (or "Question N") rather than "section N".
+\renewcommand{\sectionautorefname}{\jhuItemWord}
+\renewcommand{\subsectionautorefname}{Part}
+
+\newtcolorbox{jhu@problemstatement}{
+  breakable, enhanced, sharp corners,
+  boxrule=0pt, frame hidden,
+  colback=jhublue!5,
+  borderline west={2.5pt}{0pt}{jhuspirit},
+  left=12pt, right=10pt, top=8pt, bottom=8pt,
+  before skip=4pt, after skip=12pt,
+  fontupper=\normalfont
+}
+
+\newenvironment{problem}[1][]{%
+  \refstepcounter{problem}%
+  \def\jhu@problemshort{#1}%
+  \ifx\jhu@problemshort\@empty
+    \def\jhu@problemtoc{\jhuItemWord\space\theproblem}%
+  \else
+    \def\jhu@problemtoc{\jhuItemWord\space\theproblem: #1}%
+  \fi
+  \phantomsection
+  \addcontentsline{toc}{section}{\jhu@problemtoc}%
+  % Mark the right field only: \rightmark then resolves to the first
+  % problem that BEGINS on the page, so a page holding several short
+  % problems is headed by the one it opens with, not the one it ends on.
+  \markboth{}{\jhu@problemtoc}%
+  \section*{\jhuItemWord\space\theproblem}%
+  \jhu@problemstatement
+}{%
+  \endjhu@problemstatement
+}
+
+% ------------------------------------------------------------
+% Multiple choice
+% ------------------------------------------------------------
+% List the options inside or just after a problem statement:
+%
+%   \begin{choices}
+%     \choice $4$
+%     \answer $3$
+%     \choice $2$
+%     \choice $5$
+%   \end{choices}
+%
+% Options auto-letter A, B, C, ...  \choice is an unpicked option (open
+% box, $\square$); \answer is the option you picked -- checked box
+% ($\boxtimes$), label and text in Heritage Blue bold. Both take the
+% option text as their argument, which keeps the emphasis on \answer
+% from leaking into the rest of the list.
+\newcounter{jhuchoice}
+\newenvironment{choices}{%
+  \setcounter{jhuchoice}{0}%
+  \list{}{%
+    \setlength{\leftmargin}{2.6em}%
+    \setlength{\labelwidth}{2.0em}%
+    \setlength{\labelsep}{0.6em}%
+    \setlength{\itemsep}{3pt}%
+    \setlength{\topsep}{4pt}%
+    \setlength{\parsep}{0pt}%
+    \renewcommand{\makelabel}[1]{##1\hfil}%
+  }%
+}{%
+  \endlist
+}
+\newcommand{\choice}[1]{%
+  \stepcounter{jhuchoice}%
+  \item[$\square$~\Alph{jhuchoice}.]#1%
+}
+\newcommand{\answer}[1]{%
+  \stepcounter{jhuchoice}%
+  \item[{\color{jhublue}$\boxtimes$}~{\color{jhublue}\Alph{jhuchoice}.}]%
+    {\color{jhublue}\bfseries #1}%
+}
+
+% ------------------------------------------------------------
+% Running header and footer
+% ------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+
+% A plain \section (outside the problem environment) still updates the
+% header; the problem environment sets its own marks via \markboth.
+\renewcommand{\sectionmark}[1]{\markboth{}{\thesection\quad #1}}
+
+% Left: what the document is. Right: where you are in it. Neither repeats
+% the other.
+\fancyhead[L]{\footnotesize\sffamily\color{jhugray}\jhuRunningHead}
+\fancyhead[R]{\footnotesize\sffamily\color{jhublue}\nouppercase{\rightmark}}
+
+\newcommand{\jhufooterleft}{%
+  \raisebox{-3pt}{\includegraphics[height=13pt]{JHU_LOGO.png}}%
+  \hspace{5pt}%
+  \footnotesize\sffamily\color{jhublue}Whiting School of Engineering%
+}
+\newcommand{\jhufooterright}{%
+  \footnotesize\sffamily\color{jhugray}Page \textbf{\thepage} of \pageref{LastPage}%
+}
+
+\fancyfoot[L]{\jhufooterleft}
+\fancyfoot[R]{\jhufooterright}
+
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\renewcommand{\headrule}{%
+  \vspace{3pt}\noindent\textcolor{jhuspirit}{\rule{\headwidth}{0.6pt}}%
+}
+\renewcommand{\footrule}{%
+  \vspace{-9pt}\noindent\textcolor{jhuspirit}{\rule{\headwidth}{0.6pt}}\vspace{3pt}%
+}
+
+% Keep the footer band on pages that would otherwise use "plain".
+\fancypagestyle{plain}{%
+  \fancyhf{}%
+  \fancyfoot[L]{\jhufooterleft}%
+  \fancyfoot[R]{\jhufooterright}%
+  \renewcommand{\headrulewidth}{0pt}%
+}
+
+% hyperref is loaded last so it can patch the packages above.
+\RequirePackage[
+  colorlinks=true,
+  linkcolor=jhublue,
+  citecolor=jhublue,
+  urlcolor=jhublue
+]{hyperref}
+
+% The document sets its fields after this package loads, so fill the
+% PDF metadata once those values are known rather than at load time.
+\AtBeginDocument{%
+  \hypersetup{pdftitle={\jhuTitle}, pdfauthor={\jhuAuthor}}%
+}
+
+\setcounter{tocdepth}{3}
+
+% ------------------------------------------------------------
+% Title page and contents
+% ------------------------------------------------------------
+\newcommand{\jhutitlepage}{%
+  \begin{titlepage}
+    \centering
+    \vspace*{0.4in}
+
+    \includegraphics[width=0.68\textwidth]{JHU_WHITING_LOGO.png}
+
+    \vfill
+
+    {\color{jhugold}\rule{\textwidth}{2.5pt}}
+
+    \vspace{0.30in}
+    {\sffamily\bfseries\color{jhublue}\Huge \jhuTitle\par}
+
+    \vspace{0.16in}
+    {\sffamily\LARGE\color{jhugray}\jhuDocType\par}
+
+    \vspace{0.28in}
+    {\color{jhugold}\rule{\textwidth}{2.5pt}}
+
+    \vfill
+
+    {\sffamily\Large\color{jhublue}\jhuAuthor\par}
+
+    \vspace{0.18in}
+    {\sffamily\large\color{jhugray}\jhuCourse\par}
+
+    \vspace{0.05in}
+    {\sffamily\normalsize\color{jhugray}\jhuSchool\par}
+
+    \vspace{0.34in}
+    {\sffamily\normalsize\color{jhugray}\today\par}
+
+    \vfill
+
+    \includegraphics[height=0.55in]{JHU_LOGO.png}
+
+    \vspace{0.25in}
+  \end{titlepage}
+  % The titlepage environment resets the page counter, which would make
+  % "Page X of Y" disagree with the physical page count. Count the title
+  % page even though it carries no footer.
+  \setcounter{page}{2}%
+}
+
+\newcommand{\jhucontents}{%
+  \begingroup
+    \hypersetup{hidelinks}%
+    \renewcommand{\contentsname}{\sffamily\color{jhublue}Contents}%
+    \tableofcontents
+  \endgroup
+  \newpage
+}
+
+\endinput

@@ -74,6 +74,7 @@ devol_drive:
 
   ur_velocity_controller:
     ros__parameters:
+      use_sim_time: True
       joints:
         - shoulder_pan_joint
         - shoulder_lift_joint

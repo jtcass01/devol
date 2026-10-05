@@ -101,7 +101,7 @@
         <gazebo>
             <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
                 <ros>
-                    <namespace>${name}</namespace>
+                    <namespace>${namespace}</namespace>
                     <remapping>~/odom:=${namespace}/odom</remapping>
                     <remapping>~/cmd_vel:=${namespace}/cmd_vel</remapping>
                     <remapping>/tf:=tf</remapping>

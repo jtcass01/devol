@@ -1,0 +1,12 @@
+# Latched topics: record and replay them transient_local so a filter started after the single map
+# message still receives it (octomap_server publishes projected_map once, latched).
+/devol_drive/projected_map:
+  history: keep_last
+  depth: 1
+  reliability: reliable
+  durability: transient_local
+/tf_static:
+  history: keep_last
+  depth: 100
+  reliability: reliable
+  durability: transient_local

@@ -35,7 +35,7 @@ GAZEBO_CAMERA_START_POSE: Final[str] = (
 def generate_launch_description():
     # Define file names
     urdf_package = "devol_drive_description"
-    project_gz_package_name: str = "arc_lsi_gazebo"
+    project_gz_package_name: str = "devol_gazebo"
     gz_package_name: str = "ros_gz_sim"
     gz_launch_filename: str = "gz_sim.launch.py"
     urdf_filename = "devol_drive.urdf.xacro"
@@ -256,7 +256,7 @@ def generate_launch_description():
         ]
     )
 
-    arc_lsi_nodes: List[Node] = [
+    devol_nodes: List[Node] = [
         world_state_publisher_node,
         collision_server_node
     ]
@@ -297,7 +297,7 @@ def generate_launch_description():
 
     for node in robot_nodes:
         ld.add_action(node)
-    for node in arc_lsi_nodes:
+    for node in devol_nodes:
         ld.add_action(node)
 
     # Add actions

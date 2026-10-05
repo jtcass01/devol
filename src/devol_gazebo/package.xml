@@ -4,12 +4,10 @@
   <name>devol_gazebo</name>
   <version>0.0.0</version>
   <description>Gazebo-specific implementations for the devol project</description>
-  <maintainer email="jcassad1@jh.edu">Jacob Cassady</maintainer>
+  <maintainer email="jacob.t.cassady@nasa.gov">Jacob Cassady</maintainer>
   <license>Apache 2.0</license>
   <author>Jacob Cassady</author>
-
-  <depend>ros_gz</depend>
-  <depend>ros_gz_bridge</depend>
+  <author>Matthew Vaughan</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
