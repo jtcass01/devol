@@ -1,8 +1,8 @@
 # Builds the ROS 2 workspace on Lyrical and runs every package's tests (colcon build + colcon test).
 # Headless: nothing here launches Gazebo. The MoveIt packages are skipped, as in the README and the
 # Docker image, because Lyrical does not ship what they need.
-# Linter tests (ament flake8/pep257/uncrustify/cpplint...) are excluded: style is owned by the Format
-# workflow (ruff, clang-format), and the ament linters disagree with it (e.g. uncrustify vs clang-format).
+# ament linter tests (ctest label `linter`, e.g. from ament_lint_common) are excluded: style is owned by
+# the Format workflow (ruff, clang-format), and the ament linters disagree with it.
 name: Build and test
 
 on:
@@ -51,7 +51,7 @@ jobs:
           source install/setup.bash
           colcon test --base-paths src --packages-skip $SKIP_PACKAGES \
             --event-handlers console_cohesion+ --return-code-on-test-failure \
-            --ctest-args -LE linter --pytest-args -m "not linter"
+            --ctest-args -LE linter
 
       - name: Test results
         if: always()
