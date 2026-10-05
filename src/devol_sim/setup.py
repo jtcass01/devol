@@ -19,7 +19,11 @@ setup(
     maintainer_email='jacobtaylorcassady@outlook.com',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
             'diffdrive_pid = devol_sim.diffdrive_pid:main',

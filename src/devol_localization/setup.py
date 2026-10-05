@@ -19,7 +19,11 @@ setup(
     maintainer_email='jacobtaylorcassady@outlook.com',
     description='Map-based localization for the devol mobile manipulator (EKF and particle filter).',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
             'ekf_localization = devol_localization.ekf_localization:main',

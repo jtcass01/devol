@@ -64,5 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: build/*/test_results/
+          path: |
+            build/*/pytest.xml
+            build/*/test_results/
           if-no-files-found: ignore

@@ -19,7 +19,11 @@ setup(
     maintainer_email='arc-lsi-dev@todo.todo',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
             'devol_demo = devol_demo_py.devol_demo:main',
