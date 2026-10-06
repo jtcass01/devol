@@ -14,7 +14,7 @@ scoring, kidnapping, live views and the replay runner).
 | `localization_evaluator` | Scores a trial against ground truth: position / heading RMSE, waypoint error, compute time, recovery time to < 0.25 m (global and kidnap). Dead reckoning from the noisy odometry is scored as a third estimator. Writes `trajectory.csv`, `compute.csv`, `summary.json`; for a test case also judges PASS/FAIL (`verdict.txt`) and can end the run at the last goal. |
 | `localization_viz` | Live Matplotlib view (no RViz): map, Gazebo pose vs estimate, lidar projected from the estimate, 2-sigma ellipse, every particle (`mode:=pf`), and error vs time against the filter's own 2-sigma bound. Optional MP4. |
 | `ground_truth_tf` | Publishes `map -> odom` from ground truth so the planner and controller drive on the true pose, as the protocol requires. |
-| `kidnapper` | Teleports the robot in Gazebo (`/world/maze_world/set_pose`) without telling the estimators, at a set sim time or a set delay after reaching a waypoint. |
+| `kidnapper` | Teleports the robot in Gazebo (`/world/maze_world/set_pose`) without telling the estimators, at a set sim time or a set delay after reaching a waypoint. Targets are collision-checked with the planner's 3D body check; `kidnap_target_mode:=random` picks a seeded free pose at least 3 m away from which Goal 2 is reachable. |
 | `localization_study` | `run`: replays the bags through every configuration and seed of the protocol. `analyze`: mean +/- 95% CI tables, Clopper-Pearson recovery rates and the sensitivity figure. |
 
 Ground truth comes from a Gazebo `OdometryPublisher` added to the A200 (`a200.gazebo.xacro`), bridged
@@ -57,6 +57,7 @@ Live run with both views (what the filters see, as they run):
 ros2 launch devol_localization localization_sim.launch.py                       # nominal route
 ros2 launch devol_localization localization_sim.launch.py scenario:=global      # PF uniform, EKF map-wide Gaussian at a seeded random pose
 ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap       # onto Goal 2, 10 s after Goal 1
+ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap kidnap_target_mode:=random seed:=3   # to a random free pose; the planner re-plans
 # extra: output_dir:=~/loc_results/live  video_dir:=~/loc_results/live  viz_headless:=true  num_particles:=500
 ```
 
