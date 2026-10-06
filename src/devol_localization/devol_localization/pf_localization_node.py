@@ -99,9 +99,10 @@ class PFLocalizationNode(Node):
         # Filter
         self.declare_parameter('num_particles', 500)
         self.declare_parameter('alpha1', 0.3)
-        self.declare_parameter('alpha2', 0.1)
-        self.declare_parameter('alpha3', 0.1)
-        self.declare_parameter('alpha4', 0.05)
+        self.declare_parameter('alpha2', 0.22)
+        self.declare_parameter('alpha3', 0.22)
+        self.declare_parameter('alpha4', 0.22)
+        self.declare_parameter('min_translation', 0.01)
         self.declare_parameter('sigma_hit', 0.3)
         self.declare_parameter('z_hit', 0.9)
         self.declare_parameter('z_rand', 0.1)
@@ -143,6 +144,7 @@ class PFLocalizationNode(Node):
             alpha2=float(gp('alpha2').value),
             alpha3=float(gp('alpha3').value),
             alpha4=float(gp('alpha4').value),
+            min_translation=float(gp('min_translation').value),
             sigma_hit=float(gp('sigma_hit').value),
             z_hit=float(gp('z_hit').value),
             z_rand=float(gp('z_rand').value),
