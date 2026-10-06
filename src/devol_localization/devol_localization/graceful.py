@@ -11,8 +11,8 @@ import signal
 import rclpy
 from rclpy.signals import SignalHandlerOptions
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 class StopFlag:

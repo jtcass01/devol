@@ -3,11 +3,10 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
 def generate_launch_description():
     namespace = DeclareLaunchArgument(
-        'namespace',
-        default_value=f'devol/',
-        description='Namespace for topics'
+        'namespace', default_value=f'devol/', description='Namespace for topics'
     )
 
     def launch_setup(context):
@@ -29,27 +28,18 @@ def generate_launch_description():
                 # -----------------
                 # Camera (RGB)
                 # -----------------
-                f'{namespace}/sensors/camera_1/image'
-                '@sensor_msgs/msg/Image[gz.msgs.Image',
-
+                f'{namespace}/sensors/camera_1/image@sensor_msgs/msg/Image[gz.msgs.Image',
                 f'{namespace}/sensors/camera_1/camera_info'
                 '@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-
                 # -----------------
                 # Camera (Depth)
                 # -----------------
-                f'{namespace}/sensors/camera_1/depth_image'
-                '@sensor_msgs/msg/Image[gz.msgs.Image',
-
+                f'{namespace}/sensors/camera_1/depth_image@sensor_msgs/msg/Image[gz.msgs.Image',
                 f'{namespace}/sensors/camera_1/points'
                 '@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
-                ]
+            ],
         )
 
-        return [
-            bridge
-        ]
+        return [bridge]
 
-
-    return LaunchDescription([namespace,
-        OpaqueFunction(function=launch_setup)])
+    return LaunchDescription([namespace, OpaqueFunction(function=launch_setup)])

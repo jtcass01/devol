@@ -46,8 +46,15 @@ class LikelihoodField:
     layout). Values >= occupied_threshold are obstacles; -1 is unknown.
     """
 
-    def __init__(self, grid: np.ndarray, resolution: float, origin_x: float, origin_y: float,
-                 occupied_threshold: int = 50, max_dist: float = 2.0):
+    def __init__(
+        self,
+        grid: np.ndarray,
+        resolution: float,
+        origin_x: float,
+        origin_y: float,
+        occupied_threshold: int = 50,
+        max_dist: float = 2.0,
+    ):
         self.grid = np.asarray(grid)
         self.resolution = float(resolution)
         self.origin_x = float(origin_x)
@@ -116,8 +123,9 @@ class PFParams:
 
 
 class ParticleFilter:
-    def __init__(self, params: PFParams, field: Optional[LikelihoodField] = None,
-                 seed: Optional[int] = None):
+    def __init__(
+        self, params: PFParams, field: Optional[LikelihoodField] = None, seed: Optional[int] = None
+    ):
         self.params = params
         self.field = field
         self.rng = np.random.default_rng(seed)
@@ -176,8 +184,14 @@ class ParticleFilter:
         self.particles[:, 2] = wrap_angle(heading + r2)
 
     # ----------------------------------------------------------- measurement
-    def update(self, ranges: np.ndarray, angles: np.ndarray, range_min: float, range_max: float,
-               laser_pose=(0.0, 0.0, 0.0)) -> float:
+    def update(
+        self,
+        ranges: np.ndarray,
+        angles: np.ndarray,
+        range_min: float,
+        range_max: float,
+        laser_pose=(0.0, 0.0, 0.0),
+    ) -> float:
         """Weight particles with the likelihood field model.
 
         ranges/angles: beam ranges and angles in the laser frame.
@@ -233,7 +247,7 @@ class ParticleFilter:
 
     # ------------------------------------------------------------ resampling
     def effective_sample_size(self) -> float:
-        return float(1.0 / np.sum(self.weights ** 2))
+        return float(1.0 / np.sum(self.weights**2))
 
     def injection_probability(self) -> float:
         if self._w_slow <= 0.0 or self.field is None:
@@ -270,10 +284,17 @@ class ParticleFilter:
         w = self.weights
         mx = float(np.dot(w, self.particles[:, 0]))
         my = float(np.dot(w, self.particles[:, 1]))
-        myaw = float(np.arctan2(np.dot(w, np.sin(self.particles[:, 2])),
-                                np.dot(w, np.cos(self.particles[:, 2]))))
-        dev = np.column_stack((self.particles[:, 0] - mx,
-                               self.particles[:, 1] - my,
-                               wrap_angle(self.particles[:, 2] - myaw)))
+        myaw = float(
+            np.arctan2(
+                np.dot(w, np.sin(self.particles[:, 2])), np.dot(w, np.cos(self.particles[:, 2]))
+            )
+        )
+        dev = np.column_stack(
+            (
+                self.particles[:, 0] - mx,
+                self.particles[:, 1] - my,
+                wrap_angle(self.particles[:, 2] - myaw),
+            )
+        )
         cov = (dev * w[:, None]).T @ dev
         return np.array([mx, my, myaw]), cov

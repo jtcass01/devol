@@ -24,8 +24,8 @@ from sensor_msgs.msg import LaserScan
 from devol_localization.noise_model import OdometryNoiseInjector, add_range_noise
 from devol_localization.pose2d import set_quaternion_yaw, yaw_from_quaternion
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 class NoiseInjectorNode(Node):
@@ -41,25 +41,35 @@ class NoiseInjectorNode(Node):
         self.declare_parameter('seed', 0)
         self.declare_parameter('segment_length', 0.1)
         self.declare_parameter('segment_angle', 0.1)
-        self.declare_parameter('min_translation', 0.01)   # m; shorter segments get pure-rotation noise
+        self.declare_parameter(
+            'min_translation', 0.01
+        )  # m; shorter segments get pure-rotation noise
 
         gp = self.get_parameter
         k = float(gp('k').value)
         self._sigma_r = float(gp('sigma_r').value)
         seed = int(gp('seed').value)
         odom_seq, scan_seq = np.random.SeedSequence(seed).spawn(2)
-        self._odom_noise = OdometryNoiseInjector(k, seed=odom_seq, alpha_nominal=float(gp('alpha_nominal').value),
-                                                 segment_length=float(gp('segment_length').value),
-                                                 segment_angle=float(gp('segment_angle').value),
-                                                 min_translation=float(gp('min_translation').value))
+        self._odom_noise = OdometryNoiseInjector(
+            k,
+            seed=odom_seq,
+            alpha_nominal=float(gp('alpha_nominal').value),
+            segment_length=float(gp('segment_length').value),
+            segment_angle=float(gp('segment_angle').value),
+            min_translation=float(gp('min_translation').value),
+        )
         self._scan_rng = np.random.default_rng(scan_seq)
 
         self._odom_pub = self.create_publisher(Odometry, gp('odom_out').value, 50)
         self._scan_pub = self.create_publisher(LaserScan, gp('scan_out').value, 10)
         self.create_subscription(Odometry, gp('odom_in').value, self._odom_cb, 50)
-        self.create_subscription(LaserScan, gp('scan_in').value, self._scan_cb, qos_profile_sensor_data)
-        self.get_logger().info(f'Noise injection: k={k:g} (alpha={k * float(gp("alpha_nominal").value):g}), '
-                               f'sigma_r={self._sigma_r:g} m, seed={seed}')
+        self.create_subscription(
+            LaserScan, gp('scan_in').value, self._scan_cb, qos_profile_sensor_data
+        )
+        self.get_logger().info(
+            f'Noise injection: k={k:g} (alpha={k * float(gp("alpha_nominal").value):g}), '
+            f'sigma_r={self._sigma_r:g} m, seed={seed}'
+        )
 
     def _odom_cb(self, msg: Odometry) -> None:
         p = msg.pose.pose
@@ -71,8 +81,13 @@ class NoiseInjectorNode(Node):
 
     def _scan_cb(self, msg: LaserScan) -> None:
         if self._sigma_r > 0.0:
-            msg.ranges = add_range_noise(msg.ranges, self._sigma_r, msg.range_min, msg.range_max,
-                                         self._scan_rng).astype(np.float32).tolist()
+            msg.ranges = (
+                add_range_noise(
+                    msg.ranges, self._sigma_r, msg.range_min, msg.range_max, self._scan_rng
+                )
+                .astype(np.float32)
+                .tolist()
+            )
         self._scan_pub.publish(msg)
 
 

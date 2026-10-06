@@ -14,8 +14,8 @@ from numpy import ndarray, asarray, clip, diag, sqrt
 from devol_localization.ekf_core import PoseEKF, odometry_delta, CHI2_3DOF_99
 from devol_localization.scan_matcher import ScanMatcher, MatchResult
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 @dataclass
@@ -29,12 +29,16 @@ class PipelineStats:
 
 
 class EKFPipeline:
-    def __init__(self, ekf: PoseEKF, matcher: Optional[ScanMatcher] = None,
-                 window_xy: Tuple[float, float] = (0.15, 1.5),
-                 window_yaw: Tuple[float, float] = (0.05, 0.8),
-                 gate: Optional[float] = CHI2_3DOF_99,
-                 lost_after: int = 5,
-                 lost_inflation_std: Tuple[float, float] = (0.05, 0.03)) -> None:
+    def __init__(
+        self,
+        ekf: PoseEKF,
+        matcher: Optional[ScanMatcher] = None,
+        window_xy: Tuple[float, float] = (0.15, 1.5),
+        window_yaw: Tuple[float, float] = (0.05, 0.8),
+        gate: Optional[float] = CHI2_3DOF_99,
+        lost_after: int = 5,
+        lost_inflation_std: Tuple[float, float] = (0.05, 0.03),
+    ) -> None:
         """
         :param window_xy: (min, max) half-width of the search window in metres.
         :param window_yaw: (min, max) half-width of the search window in radians.
@@ -84,8 +88,9 @@ class EKFPipeline:
                 return result
             self.stats.gated += 1
         self.stats.failed_in_row += 1
-        if self.stats.failed_in_row >= self.lost_after and (half_xy < self.window_xy[1]
-                                                            or half_yaw < self.window_yaw[1]):
+        if self.stats.failed_in_row >= self.lost_after and (
+            half_xy < self.window_xy[1] or half_yaw < self.window_yaw[1]
+        ):
             pos_std, yaw_std = self.lost_inflation_std
-            self.ekf.P = self.ekf.P + diag(asarray([pos_std ** 2, pos_std ** 2, yaw_std ** 2]))
+            self.ekf.P = self.ekf.P + diag(asarray([pos_std**2, pos_std**2, yaw_std**2]))
         return None
