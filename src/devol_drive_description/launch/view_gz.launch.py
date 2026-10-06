@@ -12,7 +12,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
-from moveit_configs_utils import MoveItConfigsBuilder
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -20,7 +19,6 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     # Define file names
     urdf_package = "devol_drive_description"
-    moveit_package = "devol_moveit_config"
     urdf_pkg_share = get_package_share_directory(urdf_package)
     project_gz_package_name: str = "devol_gazebo"
     gz_package_name: str = "ros_gz_sim"
@@ -98,26 +96,6 @@ def generate_launch_description():
 
     robot_description = {'robot_description': robot_description_content,
                          'use_sim_time': True}
-
-    moveit_config = (
-        MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
-        .to_moveit_configs()
-    )
-
-    start_move_group_cmd: Node = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
-        namespace=namespace,
-        output="screen",
-        parameters=[
-            moveit_config.to_dict(),
-            {
-                "use_sim_time": use_sim_time,
-                "robot_description": robot_description_content,
-                "publish_robot_description_semantic": publish_robot_description_semantic,
-            }
-        ]
-    )
 
     start_robot_state_publisher_cmd: Node = Node(
         package='robot_state_publisher',
@@ -220,7 +198,6 @@ def generate_launch_description():
     # Add actions
     ld.add_action(gz_spawn_entity_cmd)
     ld.add_action(lidar2d_tf)
-    ld.add_action(start_move_group_cmd)
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(declare_gz_sim_resource_path_env_var)
     ld.add_action(start_gz_cmd)
