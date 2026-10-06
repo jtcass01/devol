@@ -24,14 +24,35 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-STACK_ARGS = ['scenario', 'estimators', 'k', 'sigma_r', 'seed', 'num_particles', 'output_dir', 'viz',
-              'viz_headless', 'video_dir', 'viz_window', 'maze', 'test_case', 'finish_on_goal', 'max_duration',
-              'posterior_times', 'posterior_after_kidnap']
+STACK_ARGS = [
+    'scenario',
+    'estimators',
+    'k',
+    'sigma_r',
+    'seed',
+    'num_particles',
+    'output_dir',
+    'viz',
+    'viz_headless',
+    'video_dir',
+    'viz_window',
+    'maze',
+    'test_case',
+    'finish_on_goal',
+    'max_duration',
+    'posterior_times',
+    'posterior_after_kidnap',
+]
 
 RECORD_TOPICS = [
     '/clock',
@@ -53,42 +74,94 @@ def launch_setup(context):
     namespace = '/devol_drive'
     actions = []
 
-    actions.append(IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(sim_share, 'launch', 'motion_planner_sim.launch.py')),
-        launch_arguments={'maze': arg('maze'), 'planner': arg('planner'), 'map_odom_tf': 'none',
-                          # Honored by sim launch files that declare them; ignored otherwise.
-                          'gz_gui': arg('gz_gui'), 'rviz': 'false'}.items()))
+    actions.append(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(sim_share, 'launch', 'motion_planner_sim.launch.py')
+            ),
+            launch_arguments={
+                'maze': arg('maze'),
+                'planner': arg('planner'),
+                'map_odom_tf': 'none',
+                # Honored by sim launch files that declare them; ignored otherwise.
+                'gz_gui': arg('gz_gui'),
+                'rviz': 'false',
+            }.items(),
+        )
+    )
 
-    actions.append(Node(
-        package='ros_gz_bridge', executable='parameter_bridge', name='ground_truth_bridge', output='screen',
-        parameters=[{'use_sim_time': True}],
-        arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry']))
-    actions.append(Node(
-        package='devol_localization', executable='ground_truth_tf', name='ground_truth_tf', output='screen',
-        parameters=[{'use_sim_time': True}]))
+    actions.append(
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='ground_truth_bridge',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+            arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry'],
+        )
+    )
+    actions.append(
+        Node(
+            package='devol_localization',
+            executable='ground_truth_tf',
+            name='ground_truth_tf',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+        )
+    )
 
     if arg('scenario') == 'kidnap':
         target = [float(v) for v in arg('kidnap_target').split(',')]
-        actions.append(Node(
-            package='devol_localization', executable='kidnapper', name='kidnapper', output='screen',
-            parameters=[{'use_sim_time': True, 'kidnap_time': float(arg('kidnap_time')), 'target': target,
-                         'trigger': arg('kidnap_trigger')}]))
+        actions.append(
+            Node(
+                package='devol_localization',
+                executable='kidnapper',
+                name='kidnapper',
+                output='screen',
+                parameters=[
+                    {
+                        'use_sim_time': True,
+                        'kidnap_time': float(arg('kidnap_time')),
+                        'target': target,
+                        'trigger': arg('kidnap_trigger'),
+                    }
+                ],
+            )
+        )
 
     bag = arg('record_bag')
     if bag:
-        actions.append(ExecuteProcess(
-            cmd=['ros2', 'bag', 'record', '-o', os.path.expanduser(bag), '--use-sim-time',
-                 '--qos-profile-overrides-path', os.path.join(share, 'config', 'bag_qos_overrides.yaml'),
-                 '--topics', *RECORD_TOPICS],   # Lyrical's rosbag2 takes topics only after --topics
-            output='screen',
-            # On Ctrl-C launch escalates SIGINT -> SIGTERM -> SIGKILL after 5 s each by default, which can kill
-            # the recorder before it writes metadata.yaml. Give it time to close the bag.
-            sigterm_timeout='30', sigkill_timeout='30'))
+        actions.append(
+            ExecuteProcess(
+                cmd=[
+                    'ros2',
+                    'bag',
+                    'record',
+                    '-o',
+                    os.path.expanduser(bag),
+                    '--use-sim-time',
+                    '--qos-profile-overrides-path',
+                    os.path.join(share, 'config', 'bag_qos_overrides.yaml'),
+                    '--topics',
+                    *RECORD_TOPICS,
+                ],  # Lyrical's rosbag2 takes topics only after --topics
+                output='screen',
+                # On Ctrl-C launch escalates SIGINT -> SIGTERM -> SIGKILL after 5 s each by default, which can kill
+                # the recorder before it writes metadata.yaml. Give it time to close the bag.
+                sigterm_timeout='30',
+                sigkill_timeout='30',
+            )
+        )
 
     if arg('filters').lower() == 'true':
-        actions.append(IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(share, 'launch', 'localization_stack.launch.py')),
-            launch_arguments={name: arg(name) for name in STACK_ARGS}.items()))
+        actions.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(share, 'launch', 'localization_stack.launch.py')
+                ),
+                launch_arguments={name: arg(name) for name in STACK_ARGS}.items(),
+            )
+        )
     return actions
 
 
@@ -99,10 +172,18 @@ def generate_launch_description():
         ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
         ('filters', 'true', 'Run the estimators, scorer and views live'),
         ('record_bag', '', 'Record the raw streams to this bag directory for offline replay'),
-        ('kidnap_trigger', 'after_waypoint', 'scenario:=kidnap: after_waypoint (kidnap_time s after reaching '
-                                             'Goal 1) or time (kidnap_time s after start)'),
+        (
+            'kidnap_trigger',
+            'after_waypoint',
+            'scenario:=kidnap: after_waypoint (kidnap_time s after reaching '
+            'Goal 1) or time (kidnap_time s after start)',
+        ),
         ('kidnap_time', '10.0', 'scenario:=kidnap: delay in sim seconds before the teleport'),
-        ('kidnap_target', '5.45,2.03,0.0', 'scenario:=kidnap: x,y,yaw to teleport to (default Goal 2)'),
+        (
+            'kidnap_target',
+            '5.45,2.03,0.0',
+            'scenario:=kidnap: x,y,yaw to teleport to (default Goal 2)',
+        ),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
         ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf,hybrid (hybrid needs pf)'),
         ('k', '1.0', 'Odometry noise scale (alpha = 0.05 k)'),
@@ -114,12 +195,29 @@ def generate_launch_description():
         ('viz_headless', 'false', 'Render the views off screen (with video_dir)'),
         ('video_dir', '', 'Write <estimator>.mp4 views here'),
         ('viz_window', '16.0', 'Side of the robot-following map view in m; 0 = whole map'),
-        ('test_case', '0', 'Judge test case 1 or 2 and print PASS/FAIL (needs output_dir); 0 = off'),
-        ('finish_on_goal', 'false', 'End the launch once the robot reaches the last waypoint (needs output_dir)'),
-        ('max_duration', '0.0', 'With finish_on_goal: end after this many sim seconds anyway; 0 = never'),
-        ('posterior_times', '', 'Sim seconds to save PF-particles + EKF-covariance figures (needs output_dir)'),
+        (
+            'test_case',
+            '0',
+            'Judge test case 1 or 2 and print PASS/FAIL (needs output_dir); 0 = off',
+        ),
+        (
+            'finish_on_goal',
+            'false',
+            'End the launch once the robot reaches the last waypoint (needs output_dir)',
+        ),
+        (
+            'max_duration',
+            '0.0',
+            'With finish_on_goal: end after this many sim seconds anyway; 0 = never',
+        ),
+        (
+            'posterior_times',
+            '',
+            'Sim seconds to save PF-particles + EKF-covariance figures (needs output_dir)',
+        ),
         ('posterior_after_kidnap', '1,5,15', 'Also save them this many s after a kidnap'),
     ]
     return LaunchDescription(
         [DeclareLaunchArgument(n, default_value=d, description=desc) for n, d, desc in args]
-        + [OpaqueFunction(function=launch_setup)])
+        + [OpaqueFunction(function=launch_setup)]
+    )

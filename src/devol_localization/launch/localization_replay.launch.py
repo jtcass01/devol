@@ -17,15 +17,35 @@ import subprocess
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, EmitEvent, ExecuteProcess, IncludeLaunchDescription,
-                            OpaqueFunction, RegisterEventHandler, TimerAction)
+from launch.actions import (
+    DeclareLaunchArgument,
+    EmitEvent,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    RegisterEventHandler,
+    TimerAction,
+)
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
-STACK_ARGS = ['scenario', 'estimators', 'k', 'sigma_r', 'seed', 'num_particles', 'output_dir', 'viz',
-              'viz_headless', 'video_dir', 'viz_window', 'maze', 'posterior_times']
+STACK_ARGS = [
+    'scenario',
+    'estimators',
+    'k',
+    'sigma_r',
+    'seed',
+    'num_particles',
+    'output_dir',
+    'viz',
+    'viz_headless',
+    'video_dir',
+    'viz_window',
+    'maze',
+    'posterior_times',
+]
 
 
 def check_bag(bag: str, reindex=None) -> None:
@@ -36,13 +56,24 @@ def check_bag(bag: str, reindex=None) -> None:
     """
     meta = os.path.join(bag, 'metadata.yaml')
     if not os.path.isfile(meta) and glob.glob(os.path.join(bag, '*.mcap')):
-        print(f'[localization_replay] {bag} has no metadata.yaml; running ros2 bag reindex', flush=True)
-        (reindex or (lambda d: subprocess.run(['ros2', 'bag', 'reindex', d, '-s', 'mcap'], check=False)))(bag)
+        print(
+            f'[localization_replay] {bag} has no metadata.yaml; running ros2 bag reindex',
+            flush=True,
+        )
+        (
+            reindex
+            or (lambda d: subprocess.run(['ros2', 'bag', 'reindex', d, '-s', 'mcap'], check=False))
+        )(bag)
     if not os.path.isfile(meta):
-        raise RuntimeError(f'{bag} is not a rosbag2 directory (no metadata.yaml, and reindexing did not '
-                           f'create one). Try `ros2 bag reindex {bag} -s mcap`.')
-    counts = [int(line.split(':', 1)[1]) for line in open(meta)
-              if line.strip().startswith('message_count:') and line.split(':', 1)[1].strip().isdigit()]
+        raise RuntimeError(
+            f'{bag} is not a rosbag2 directory (no metadata.yaml, and reindexing did not '
+            f'create one). Try `ros2 bag reindex {bag} -s mcap`.'
+        )
+    counts = [
+        int(line.split(':', 1)[1])
+        for line in open(meta)
+        if line.strip().startswith('message_count:') and line.split(':', 1)[1].strip().isdigit()
+    ]
     if counts and max(counts) == 0:
         raise RuntimeError(f'{bag} contains no messages')
 
@@ -58,19 +89,44 @@ def launch_setup(context):
     check_bag(bag)
 
     stack = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(share, 'launch', 'localization_stack.launch.py')),
-        launch_arguments={**{name: arg(name) for name in STACK_ARGS}, 'use_sim_time': 'true'}.items())
+        PythonLaunchDescriptionSource(
+            os.path.join(share, 'launch', 'localization_stack.launch.py')
+        ),
+        launch_arguments={
+            **{name: arg(name) for name in STACK_ARGS},
+            'use_sim_time': 'true',
+        }.items(),
+    )
 
     # The bag carries its own /clock, so no --clock here.
     play = ExecuteProcess(
-        cmd=['ros2', 'bag', 'play', bag, '--rate', arg('rate'),
-             '--qos-profile-overrides-path', os.path.join(share, 'config', 'bag_qos_overrides.yaml'),
-             '--topics', '/clock', '/tf_static', '/devol_drive/odom', '/devol_drive/sensors/lidar2d_0/scan',
-             '/devol_drive/projected_map', '/devol_drive/ground_truth/odom'],
-        output='screen')
-    stop = RegisterEventHandler(OnProcessExit(
-        target_action=play,
-        on_exit=[TimerAction(period=2.0, actions=[EmitEvent(event=Shutdown(reason='bag finished'))])]))
+        cmd=[
+            'ros2',
+            'bag',
+            'play',
+            bag,
+            '--rate',
+            arg('rate'),
+            '--qos-profile-overrides-path',
+            os.path.join(share, 'config', 'bag_qos_overrides.yaml'),
+            '--topics',
+            '/clock',
+            '/tf_static',
+            '/devol_drive/odom',
+            '/devol_drive/sensors/lidar2d_0/scan',
+            '/devol_drive/projected_map',
+            '/devol_drive/ground_truth/odom',
+        ],
+        output='screen',
+    )
+    stop = RegisterEventHandler(
+        OnProcessExit(
+            target_action=play,
+            on_exit=[
+                TimerAction(period=2.0, actions=[EmitEvent(event=Shutdown(reason='bag finished'))])
+            ],
+        )
+    )
     # Give the nodes time to start and subscribe before the first message.
     return [stack, stop, TimerAction(period=float(arg('start_delay')), actions=[play])]
 
@@ -92,8 +148,13 @@ def generate_launch_description():
         ('video_dir', '', 'Write <estimator>.mp4 views here'),
         ('viz_window', '16.0', 'Side of the robot-following map view in m; 0 = whole map'),
         ('maze', 'factory', 'World the bag was recorded in (spawn pose, waypoints)'),
-        ('posterior_times', '', 'Sim seconds to save PF-particles + EKF-covariance figures (needs output_dir)'),
+        (
+            'posterior_times',
+            '',
+            'Sim seconds to save PF-particles + EKF-covariance figures (needs output_dir)',
+        ),
     ]
     return LaunchDescription(
         [DeclareLaunchArgument(n, default_value=d, description=desc) for n, d, desc in args]
-        + [OpaqueFunction(function=launch_setup)])
+        + [OpaqueFunction(function=launch_setup)]
+    )

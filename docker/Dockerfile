@@ -52,7 +52,7 @@ RUN apt-get update \
     && rosdep install --from-paths src --ignore-src -r -y --rosdistro ${ROS_DISTRO} \
     && rm -rf /var/lib/apt/lists/*
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh \
-    && colcon build --symlink-install --packages-skip devol devol_moveit_config devol_demo_py \
+    && colcon build --symlink-install \
         --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 
 COPY docker/entrypoint.sh /entrypoint.sh

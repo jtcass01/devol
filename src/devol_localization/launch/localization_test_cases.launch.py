@@ -77,11 +77,13 @@ def launch_setup(context):
         if stale:
             raise RuntimeError(
                 'A Gazebo sim or ros_gz bridge from an earlier run is still running, and its clock and ground '
-                'truth would be scored as this run:\n  ' + '\n  '.join(stale) +
-                '\nThis launch aborts rather than waits. Stop them with\n  pkill -f gz-sim; pkill -f "gz sim"; '
+                'truth would be scored as this run:\n  '
+                + '\n  '.join(stale)
+                + '\nThis launch aborts rather than waits. Stop them with\n  pkill -f gz-sim; pkill -f "gz sim"; '
                 'pkill -f parameter_bridge\nconfirm `pgrep -af "gz-sim|gz sim|parameter_bridge"` prints nothing, '
                 'then relaunch. '
-                '(check_running_sim:=false skips this check.)')
+                '(check_running_sim:=false skips this check.)'
+            )
     out = os.path.expanduser(arg('output_dir') or f'~/loc_results/test_case_{case}')
     sim_args = {
         'scenario': 'nominal' if case == '1' else 'kidnap',
@@ -106,9 +108,14 @@ def launch_setup(context):
         'record_bag': os.path.join(out, 'bag') if arg('record_bag') == 'true' else '',
     }
     share = get_package_share_directory('devol_localization')
-    return [IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(share, 'launch', 'localization_sim.launch.py')),
-        launch_arguments=sim_args.items())]
+    return [
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(share, 'launch', 'localization_sim.launch.py')
+            ),
+            launch_arguments=sim_args.items(),
+        )
+    ]
 
 
 def generate_launch_description():
@@ -117,18 +124,43 @@ def generate_launch_description():
         ('output_dir', '', 'Results, videos and screenshots; default ~/loc_results/test_case_<n>'),
         ('viz', 'true', 'Show the EKF and PF views live'),
         ('viz_window', '16.0', 'Side of the robot-following map view in m; 0 = whole map'),
-        ('record_video', 'true', 'Save <filter>.mp4 of each view (ffmpeg or OpenCV) next to the results'),
+        (
+            'record_video',
+            'true',
+            'Save <filter>.mp4 of each view (ffmpeg or OpenCV) next to the results',
+        ),
         ('record_bag', 'false', 'Also record the raw streams for offline replay'),
-        ('check_running_sim', 'true', 'Refuse to start while a Gazebo sim or ros_gz bridge is still running'),
+        (
+            'check_running_sim',
+            'true',
+            'Refuse to start while a Gazebo sim or ros_gz bridge is still running',
+        ),
         ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
-        ('estimators', 'ekf,pf,hybrid', 'Estimators to run and judge (subset of ekf,pf,hybrid; hybrid needs pf)'),
+        (
+            'estimators',
+            'ekf,pf,hybrid',
+            'Estimators to run and judge (subset of ekf,pf,hybrid; hybrid needs pf)',
+        ),
         ('num_particles', '2000', 'PF particle count'),
         ('seed', '0', 'Noise and PF seed'),
-        ('kidnap_delay', '10.0', 'Test case 2: sim seconds after reaching Goal 1 before the teleport'),
-        ('posterior_times', '15,45', 'Sim seconds to save the PF-particles + EKF-covariance figure '
-                                     '(test case 2 also saves 1, 5 and 15 s after the kidnap)'),
-        ('max_duration', '400.0', 'End the run after this many sim seconds even if Goal 3 is not reached'),
+        (
+            'kidnap_delay',
+            '10.0',
+            'Test case 2: sim seconds after reaching Goal 1 before the teleport',
+        ),
+        (
+            'posterior_times',
+            '15,45',
+            'Sim seconds to save the PF-particles + EKF-covariance figure '
+            '(test case 2 also saves 1, 5 and 15 s after the kidnap)',
+        ),
+        (
+            'max_duration',
+            '400.0',
+            'End the run after this many sim seconds even if Goal 3 is not reached',
+        ),
     ]
     return LaunchDescription(
         [DeclareLaunchArgument(n, default_value=d, description=desc) for n, d, desc in args]
-        + [OpaqueFunction(function=launch_setup)])
+        + [OpaqueFunction(function=launch_setup)]
+    )

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-"""
+""" """
 
 import rclpy
 from rclpy.node import Node
@@ -11,7 +10,7 @@ from scipy.ndimage import binary_dilation
 from threading import Lock
 
 
-class MapPublisher(Node):
+class MapPadder(Node):
     def __init__(self):
         super().__init__('map_padder')
 
@@ -22,23 +21,31 @@ class MapPublisher(Node):
         self.declare_parameter('namespace', '/devol_drive')
         self.declare_parameter('robot_width', 0.784)  # in meters
 
-        self._publish_rate: float = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
-        self._namespace: str = str(self.get_parameter('namespace').get_parameter_value().string_value)
-        self._robot_width: float = float(self.get_parameter('robot_width').get_parameter_value().double_value)
+        self._publish_rate: float = float(
+            self.get_parameter('publish_rate').get_parameter_value().double_value
+        )
+        self._namespace: str = str(
+            self.get_parameter('namespace').get_parameter_value().string_value
+        )
+        self._robot_width: float = float(
+            self.get_parameter('robot_width').get_parameter_value().double_value
+        )
 
         # I/O
         self._map_pub = self.create_publisher(OccupancyGrid, f'{self._namespace}/map', 10)
-        self._map_sub = self.create_subscription(OccupancyGrid, f'{self._namespace}/projected_map', self.map_received, 10)
- 
+        self._map_sub = self.create_subscription(
+            OccupancyGrid, f'{self._namespace}/projected_map', self.map_received, 10
+        )
+
         self._map = None
         self._padded_map = None
         self._inflation_radius = None
         self._grid_width = None
         self._grid_height = None
-       
+
         # Publish at 1 Hz (static map)
         self.timer = self.create_timer(1.0, self.publish_map)
-        
+
         self.get_logger().info('Map publisher initialized')
 
     def map_received(self, msg: OccupancyGrid) -> None:
@@ -71,26 +78,26 @@ class MapPublisher(Node):
 
     def pad_map(self, grid: ndarray, inflation_radius: int) -> ndarray:
         """Inflate obstacles in the map by the specified inflation radius.
-        
+
         Args:
             grid: Input occupancy grid (100 = obstacle, 0 = free, -1 = unknown)
             inflation_radius: Radius for obstacle inflation in grid cells
-            
+
         Returns:
             Inflated occupancy grid with same shape and values"""
         obstacles = grid == 100
 
         # Create structuring element for dilation
         structure = ones((inflation_radius, inflation_radius))
-        
+
         # Dilate obstacles
         inflated = binary_dilation(obstacles, structure=structure)
-        
+
         # Create output map
         inflated_map = zeros_like(grid, dtype=int8)
         inflated_map[inflated] = 100  # Set inflated areas as obstacles
         inflated_map[grid == -1] = -1  # Preserve unknown areas
-        
+
         return inflated_map
 
     def publish_map(self):
@@ -99,7 +106,7 @@ class MapPublisher(Node):
         with self._lock:
             if self._padded_map is None:
                 return
-            
+
             padded_map = self._padded_map.copy()
             map_resolution = self._map_resolution
             grid_width = self._grid_width
@@ -108,12 +115,12 @@ class MapPublisher(Node):
             origin_y = self._origin_y
 
         msg = OccupancyGrid()
-        
+
         # Header
         msg.header = Header()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'map'
-        
+
         # Map metadata
         msg.info.resolution = map_resolution
         msg.info.width = grid_width
@@ -122,17 +129,17 @@ class MapPublisher(Node):
         msg.info.origin.position.y = origin_y
         msg.info.origin.position.z = 0.0
         msg.info.origin.orientation.w = 1.0
-        
+
         # Flatten the grid (row-major order) and convert to list
         msg.data = padded_map.flatten().tolist()
-        
+
         self._map_pub.publish(msg)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MapPublisher()
-    
+    node = MapPadder()
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

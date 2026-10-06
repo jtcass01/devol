@@ -9,6 +9,7 @@ from launch_ros.actions import Node
 
 from ament_index_python.packages import get_package_share_directory
 
+
 def generate_launch_description():
     devol_drive_pkg_share = get_package_share_directory('devol_drive_description')
     sim_pkg_share = get_package_share_directory('devol_sim')
@@ -18,25 +19,20 @@ def generate_launch_description():
     maze_arg = DeclareLaunchArgument(
         'maze',
         default_value='factory',
-        choices=["empty", "factory", "moon_terrain"],
-        description='Maze to load: empty, factory or moon_terrain'
+        choices=['empty', 'factory', 'moon_terrain'],
+        description='Maze to load: empty, factory or moon_terrain',
     )
     declare_namespace = DeclareLaunchArgument(
-        'namespace',
-        default_value='/devol_drive',
-        description='Namespace for topics'
+        'namespace', default_value='/devol_drive', description='Namespace for topics'
     )
     declare_gz_gui = DeclareLaunchArgument(
         'gz_gui',
         default_value='true',
         choices=['true', 'false'],
-        description='Open the Gazebo GUI (false runs the server headless)'
+        description='Open the Gazebo GUI (false runs the server headless)',
     )
     declare_rviz = DeclareLaunchArgument(
-        'rviz',
-        default_value='true',
-        choices=['true', 'false'],
-        description='Open RViz'
+        'rviz', default_value='true', choices=['true', 'false'], description='Open RViz'
     )
 
     def launch_setup(context):
@@ -58,7 +54,7 @@ def generate_launch_description():
                     'x': row['x'],
                     'y': row['y'],
                     'z': row['z'],
-                    'yaw': row['yaw']
+                    'yaw': row['yaw'],
                 }
 
         # Spawn the vehicle model in Gazebo
@@ -66,12 +62,16 @@ def generate_launch_description():
 
         # Launch Gazebo with the world
         gazebo = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                os.path.join(
-                    get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
-                )
-            ]),
-            launch_arguments={'gz_args': f'-r {world_file}' if gz_gui else f'-r -s {world_file}'}.items(),
+            PythonLaunchDescriptionSource(
+                [
+                    os.path.join(
+                        get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
+                    )
+                ]
+            ),
+            launch_arguments={
+                'gz_args': f'-r {world_file}' if gz_gui else f'-r -s {world_file}'
+            }.items(),
         )
 
         # Include spawn entities launch file (robot, goals, map, static transforms)
@@ -79,7 +79,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(sim_pkg_share, 'launch', 'spawn_entities.launch.py')
             ),
-            launch_arguments={'maze': maze_folder}.items()
+            launch_arguments={'maze': maze_folder}.items(),
         )
 
         # Bridge, PID, RViz
@@ -87,9 +87,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(devol_drive_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
             ),
-            launch_arguments={
-                'namespace': namespace
-            }.items()
+            launch_arguments={'namespace': namespace}.items(),
         )
 
         system_bridge_cmd = Node(
@@ -97,27 +95,27 @@ def generate_launch_description():
             executable='parameter_bridge',
             name='ros_gz_bridge_system',
             output='screen',
-                parameters=[
-                    {
-                        'use_sim_time': True,
-                        'qos_overrides./tf.publisher.durability': 'transient_local',
-                        'qos_overrides./tf_static.publisher.durability': 'transient_local',
-                    }
-                ],
+            parameters=[
+                {
+                    'use_sim_time': True,
+                    'qos_overrides./tf.publisher.durability': 'transient_local',
+                    'qos_overrides./tf_static.publisher.durability': 'transient_local',
+                }
+            ],
             arguments=[
-                    # -----------------
-                    # Simulation clock
-                    # -----------------
-                    "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-                    '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
-                    # odom -> a200_base_link from the Gazebo DiffDrive plugin
-                    '/model/devol_drive/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
-                    ],
+                # -----------------
+                # Simulation clock
+                # -----------------
+                '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+                '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+                # odom -> a200_base_link from the Gazebo DiffDrive plugin
+                '/model/devol_drive/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
+            ],
             remappings=[
                 ('/model/devol_drive/tf', '/tf'),
                 ('/tf_static', '/tf_static'),
                 ('/model/devol_drive/pose', '/tf'),
-            ]
+            ],
         )
 
         # pid_controller = Node(
@@ -157,7 +155,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', os.path.join(sim_pkg_share, 'rviz', 'rviz_view.rviz')]
+            arguments=['-d', os.path.join(sim_pkg_share, 'rviz', 'rviz_view.rviz')],
         )
 
         return [
@@ -169,10 +167,12 @@ def generate_launch_description():
             # agent_motion_planner,
         ] + ([rviz] if use_rviz else [])
 
-    return LaunchDescription([
-        maze_arg,
-        declare_namespace,
-        declare_gz_gui,
-        declare_rviz,
-        OpaqueFunction(function=launch_setup)
-    ])
+    return LaunchDescription(
+        [
+            maze_arg,
+            declare_namespace,
+            declare_gz_gui,
+            declare_rviz,
+            OpaqueFunction(function=launch_setup),
+        ]
+    )

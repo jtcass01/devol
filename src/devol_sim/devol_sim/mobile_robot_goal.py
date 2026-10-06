@@ -1,4 +1,3 @@
-
 class MobileRobotGoal:
     def __init__(self, name: str, x: float, y: float, z: float, yaw: float):
         self._name: str = name
@@ -28,6 +27,8 @@ class MobileRobotGoal:
         return self._yaw
 
     def __str__(self) -> str:
-        return (f"MobileRobotGoal: {self.name}\n"
-            f"  Position: ({self.x:.2f}, {self.y:.2f}, {self.z:.2f})\n"
-            f"  Yaw: {self.yaw:.2f} rad")
+        return (
+            f'MobileRobotGoal: {self.name}\n'
+            f'  Position: ({self.x:.2f}, {self.y:.2f}, {self.z:.2f})\n'
+            f'  Yaw: {self.yaw:.2f} rad'
+        )

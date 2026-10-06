@@ -34,12 +34,16 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float64
 
 from devol_localization.graceful import init_with_stop_flag
-from devol_localization.pose2d import (covariance_3x3, transform_points, wrap_angle,
-                                       yaw_from_quaternion)
+from devol_localization.pose2d import (
+    covariance_3x3,
+    transform_points,
+    wrap_angle,
+    yaw_from_quaternion,
+)
 from devol_localization.viz_core import LocalizationFigure, VideoRecorder, VizState
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 def stamp_seconds(stamp) -> float:
@@ -62,8 +66,8 @@ class LocalizationViz(Node):
         self.declare_parameter('laser_pose', [0.32825, 0.0, 0.0])
         self.declare_parameter('beam_step', 2)
         self.declare_parameter('rate_hz', 5.0)
-        self.declare_parameter('window', 16.0)        # metres; 0 = whole map
-        self.declare_parameter('history', 0.0)        # seconds of error plot; 0 = whole run
+        self.declare_parameter('window', 16.0)  # metres; 0 = whole map
+        self.declare_parameter('history', 0.0)  # seconds of error plot; 0 = whole run
         self.declare_parameter('headless', False)
         self.declare_parameter('video_file', '')
         self.declare_parameter('snapshot_file', '')
@@ -74,9 +78,16 @@ class LocalizationViz(Node):
         self.rate_hz = float(gp('rate_hz').value)
         self._laser_pose = np.asarray(gp('laser_pose').value, dtype=float)
         self._beam_step = max(1, int(gp('beam_step').value))
-        headless = bool(gp('headless').value) or not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
-        self.figure = LocalizationFigure(mode, title=str(gp('title').value), window=float(gp('window').value),
-                                         history=float(gp('history').value), interactive=not headless)
+        headless = bool(gp('headless').value) or not (
+            os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')
+        )
+        self.figure = LocalizationFigure(
+            mode,
+            title=str(gp('title').value),
+            window=float(gp('window').value),
+            history=float(gp('history').value),
+            interactive=not headless,
+        )
         self.headless = headless
         self._snapshot = str(gp('snapshot_file').value)
         self._writer: Optional[VideoRecorder] = None
@@ -87,7 +98,9 @@ class LocalizationViz(Node):
         if video:
             self._writer = VideoRecorder(self.figure.fig, video, self.rate_hz)
             if self._writer.backend is None:
-                self.get_logger().warning('Neither ffmpeg nor OpenCV is available; not recording video')
+                self.get_logger().warning(
+                    'Neither ffmpeg nor OpenCV is available; not recording video'
+                )
                 self._writer = None
             else:
                 self.get_logger().info(f'Writing video to {video} ({self._writer.backend})')
@@ -95,25 +108,34 @@ class LocalizationViz(Node):
         self._truth: Optional[np.ndarray] = None
         self._estimate: Optional[np.ndarray] = None
         self._cov: Optional[np.ndarray] = None
-        self._scan_base: Optional[np.ndarray] = None   # scan points in the base frame
+        self._scan_base: Optional[np.ndarray] = None  # scan points in the base frame
         self._particles: Optional[np.ndarray] = None
         self._compute_ms: Optional[float] = None
         self._stamp = 0.0
         self._truth_trail = []
         self._est_trail = []
-        self._err = []   # [t, pos_err, pos_bound, yaw_err_deg, yaw_bound_deg]
+        self._err = []  # [t, pos_err, pos_bound, yaw_err_deg, yaw_bound_deg]
         self._map_dirty = None
 
-        map_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        map_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
         self.create_subscription(OccupancyGrid, gp('map_topic').value, self._map_cb, map_qos)
         self.create_subscription(Odometry, gp('ground_truth_topic').value, self._gt_cb, 10)
-        self.create_subscription(PoseWithCovarianceStamped, gp('pose_topic').value, self._pose_cb, 10)
-        self.create_subscription(LaserScan, gp('scan_topic').value, self._scan_cb, qos_profile_sensor_data)
+        self.create_subscription(
+            PoseWithCovarianceStamped, gp('pose_topic').value, self._pose_cb, 10
+        )
+        self.create_subscription(
+            LaserScan, gp('scan_topic').value, self._scan_cb, qos_profile_sensor_data
+        )
         self.create_subscription(Float64, gp('compute_topic').value, self._compute_cb, 10)
         if mode == 'pf':
             self.create_subscription(PoseArray, gp('particles_topic').value, self._particles_cb, 1)
-        self.get_logger().info(f'Visualizing {mode} ({"headless" if headless else "window"}) at {self.rate_hz:g} Hz')
+        self.get_logger().info(
+            f'Visualizing {mode} ({"headless" if headless else "window"}) at {self.rate_hz:g} Hz'
+        )
 
     # ------------------------------------------------------------ callbacks (store only)
     def _map_cb(self, msg: OccupancyGrid) -> None:
@@ -142,15 +164,16 @@ class LocalizationViz(Node):
             self._err.append([self._stamp, pos_err, pos_bound, yaw_err, yaw_bound])
 
     def _scan_cb(self, msg: LaserScan) -> None:
-        r = np.asarray(msg.ranges, dtype=float)[::self._beam_step]
-        a = msg.angle_min + np.arange(len(msg.ranges))[::self._beam_step] * msg.angle_increment
+        r = np.asarray(msg.ranges, dtype=float)[:: self._beam_step]
+        a = msg.angle_min + np.arange(len(msg.ranges))[:: self._beam_step] * msg.angle_increment
         ok = np.isfinite(r) & (r > msg.range_min) & (r < msg.range_max)
         pts = np.column_stack((r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])))
         self._scan_base = transform_points(self._laser_pose, pts)
 
     def _particles_cb(self, msg: PoseArray) -> None:
-        self._particles = np.array([[q.position.x, q.position.y, yaw_from_quaternion(q.orientation)]
-                                    for q in msg.poses]).reshape(-1, 3)
+        self._particles = np.array(
+            [[q.position.x, q.position.y, yaw_from_quaternion(q.orientation)] for q in msg.poses]
+        ).reshape(-1, 3)
 
     def _compute_cb(self, msg: Float64) -> None:
         self._compute_ms = float(msg.data)
@@ -165,13 +188,25 @@ class LocalizationViz(Node):
         if self._scan_base is not None and self._estimate is not None:
             scan = transform_points(self._estimate, self._scan_base)
         status = '' if self._estimate is not None else f'waiting for {self.mode}_pose'
-        self.figure.update(VizState(
-            stamp=self._stamp, truth=self._truth, estimate=self._estimate, covariance=self._cov,
-            scan_points=scan, particles=self._particles if self.mode == 'pf' else None,
-            truth_trail=np.asarray(self._truth_trail).reshape(-1, 2),
-            estimate_trail=np.asarray(self._est_trail).reshape(-1, 2),
-            err_t=err[:, 0], pos_err=err[:, 1], pos_bound=err[:, 2], yaw_err=err[:, 3], yaw_bound=err[:, 4],
-            compute_ms=self._compute_ms, status=status))
+        self.figure.update(
+            VizState(
+                stamp=self._stamp,
+                truth=self._truth,
+                estimate=self._estimate,
+                covariance=self._cov,
+                scan_points=scan,
+                particles=self._particles if self.mode == 'pf' else None,
+                truth_trail=np.asarray(self._truth_trail).reshape(-1, 2),
+                estimate_trail=np.asarray(self._est_trail).reshape(-1, 2),
+                err_t=err[:, 0],
+                pos_err=err[:, 1],
+                pos_bound=err[:, 2],
+                yaw_err=err[:, 3],
+                yaw_bound=err[:, 4],
+                compute_ms=self._compute_ms,
+                status=status,
+            )
+        )
         self.figure.draw()
         if self._writer is not None:
             self._writer.grab()

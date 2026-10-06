@@ -21,11 +21,13 @@ import numpy as np
 
 from devol_localization.pose2d import wrap_angle
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 RECOVERY_THRESHOLD: float = 0.25
-RECOVERY_DWELL: float = 3.0     # s below the threshold, at the end of the trial, to count as recovered
+RECOVERY_DWELL: float = (
+    3.0  # s below the threshold, at the end of the trial, to count as recovered
+)
 
 
 def interpolate_poses(t_ref: np.ndarray, poses_ref: np.ndarray, t_query: np.ndarray) -> np.ndarray:
@@ -40,7 +42,9 @@ def interpolate_poses(t_ref: np.ndarray, poses_ref: np.ndarray, t_query: np.ndar
     return out
 
 
-def detect_jump(t: np.ndarray, poses: np.ndarray, jump: float = 1.0, max_speed: float = 3.0) -> Optional[float]:
+def detect_jump(
+    t: np.ndarray, poses: np.ndarray, jump: float = 1.0, max_speed: float = 3.0
+) -> Optional[float]:
     """Time of the first ground-truth displacement no drive could make (a Gazebo teleport), or None."""
     poses = np.asarray(poses, dtype=float).reshape(-1, 3)
     if len(poses) < 2:
@@ -51,9 +55,14 @@ def detect_jump(t: np.ndarray, poses: np.ndarray, jump: float = 1.0, max_speed: 
     return float(t[idx[0] + 1]) if idx.size else None
 
 
-def recovery_time(t: np.ndarray, pos_err: np.ndarray, event_time: float,
-                  threshold: float = RECOVERY_THRESHOLD, timeout: Optional[float] = None,
-                  dwell: float = RECOVERY_DWELL) -> Optional[float]:
+def recovery_time(
+    t: np.ndarray,
+    pos_err: np.ndarray,
+    event_time: float,
+    threshold: float = RECOVERY_THRESHOLD,
+    timeout: Optional[float] = None,
+    dwell: float = RECOVERY_DWELL,
+) -> Optional[float]:
     """Seconds after event_time until the error drops below threshold for good; None if it never does.
 
     "For good" means until the end of the trial and for at least `dwell` seconds.
@@ -92,7 +101,9 @@ class EstimatorScore:
     recovery_time: Optional[float] = None
 
 
-def errors_against_truth(gt_t, gt_poses, est_t, est_poses) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def errors_against_truth(
+    gt_t, gt_poses, est_t, est_poses
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(times, position errors, wrapped yaw errors) of estimate samples inside the ground-truth span."""
     gt_t = np.asarray(gt_t, dtype=float)
     est_t = np.asarray(est_t, dtype=float)
@@ -105,7 +116,9 @@ def errors_against_truth(gt_t, gt_poses, est_t, est_poses) -> Tuple[np.ndarray, 
     return est_t, pos, yaw
 
 
-def waypoint_times(gt_t, gt_poses, waypoints: Sequence[Sequence[float]], radius: float = 0.5) -> List[Optional[float]]:
+def waypoint_times(
+    gt_t, gt_poses, waypoints: Sequence[Sequence[float]], radius: float = 0.5
+) -> List[Optional[float]]:
     """Time of closest ground-truth approach to each waypoint, or None if it never came within radius."""
     gt_poses = np.asarray(gt_poses, dtype=float).reshape(-1, 3)
     out: List[Optional[float]] = []
@@ -116,10 +129,19 @@ def waypoint_times(gt_t, gt_poses, waypoints: Sequence[Sequence[float]], radius:
     return out
 
 
-def score_estimator(gt_t, gt_poses, est_t, est_poses, compute_ms: Sequence[float] = (),
-                    waypoints: Sequence[Sequence[float]] = (), event_time: Optional[float] = None,
-                    threshold: float = RECOVERY_THRESHOLD, timeout: Optional[float] = None,
-                    waypoint_radius: float = 0.5, dwell: float = RECOVERY_DWELL) -> EstimatorScore:
+def score_estimator(
+    gt_t,
+    gt_poses,
+    est_t,
+    est_poses,
+    compute_ms: Sequence[float] = (),
+    waypoints: Sequence[Sequence[float]] = (),
+    event_time: Optional[float] = None,
+    threshold: float = RECOVERY_THRESHOLD,
+    timeout: Optional[float] = None,
+    waypoint_radius: float = 0.5,
+    dwell: float = RECOVERY_DWELL,
+) -> EstimatorScore:
     s = EstimatorScore()
     if len(gt_t) < 2 or len(est_t) == 0:
         return s
@@ -127,13 +149,15 @@ def score_estimator(gt_t, gt_poses, est_t, est_poses, compute_ms: Sequence[float
     s.samples = int(len(t))
     if s.samples == 0:
         return s
-    s.pos_rmse = float(np.sqrt(np.mean(pos ** 2)))
-    s.yaw_rmse = float(np.sqrt(np.mean(yaw ** 2)))
+    s.pos_rmse = float(np.sqrt(np.mean(pos**2)))
+    s.yaw_rmse = float(np.sqrt(np.mean(yaw**2)))
     s.pos_mean = float(np.mean(pos))
     s.pos_max = float(np.max(pos))
     s.final_pos_err = float(pos[-1])
     for wt in waypoint_times(gt_t, gt_poses, waypoints, waypoint_radius):
-        s.waypoint_errors.append(float('nan') if wt is None else float(pos[int(np.argmin(np.abs(t - wt)))]))
+        s.waypoint_errors.append(
+            float('nan') if wt is None else float(pos[int(np.argmin(np.abs(t - wt)))])
+        )
     c = np.asarray(compute_ms, dtype=float)
     if c.size:
         s.compute_ms_mean = float(c.mean())
@@ -165,7 +189,8 @@ def read_trajectory_csv(path: Path) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
     with open(path, newline='') as f:
         for row in csv.DictReader(f):
             data.setdefault(row['estimator'], []).append(
-                [float(row['t']), float(row['x']), float(row['y']), float(row['yaw'])])
+                [float(row['t']), float(row['x']), float(row['y']), float(row['yaw'])]
+            )
     out = {}
     for name, rows in data.items():
         a = np.asarray(rows)
@@ -181,17 +206,24 @@ def write_summary(path: Path, config: dict, scores: Dict[str, EstimatorScore]) -
         if isinstance(v, list):
             return [clean(x) for x in v]
         return v
-    body = {'config': config,
-            'estimators': {k: {kk: clean(vv) for kk, vv in asdict(s).items()} for k, s in scores.items()}}
+
+    body = {
+        'config': config,
+        'estimators': {
+            k: {kk: clean(vv) for kk, vv in asdict(s).items()} for k, s in scores.items()
+        },
+    }
     with open(path, 'w') as f:
         json.dump(body, f, indent=2)
 
 
 # ------------------------------------------------------------------ aggregation
 
+
 def mean_ci95(values: Sequence[float]) -> Tuple[float, float, int]:
     """(mean, 95% t-interval half-width, n) over the finite values."""
     from scipy.stats import t as student_t
+
     v = np.asarray([x for x in values if x is not None and np.isfinite(x)], dtype=float)
     n = int(v.size)
     if n == 0:
@@ -204,6 +236,7 @@ def mean_ci95(values: Sequence[float]) -> Tuple[float, float, int]:
 
 def clopper_pearson(successes: int, n: int, confidence: float = 0.95) -> Tuple[float, float]:
     from scipy.stats import beta
+
     if n == 0:
         return float('nan'), float('nan')
     a = 1.0 - confidence
@@ -214,9 +247,14 @@ def clopper_pearson(successes: int, n: int, confidence: float = 0.95) -> Tuple[f
 
 # ------------------------------------------------------------------ test cases
 
-def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names: Sequence[str] = (),
-                    threshold: float = RECOVERY_THRESHOLD,
-                    timed_out: str = '') -> Tuple[bool, List[str]]:
+
+def judge_test_case(
+    case: int,
+    scores: Dict[str, EstimatorScore],
+    waypoint_names: Sequence[str] = (),
+    threshold: float = RECOVERY_THRESHOLD,
+    timed_out: str = '',
+) -> Tuple[bool, List[str]]:
     """PASS/FAIL of the verification test cases, with one report line per check.
 
     `timed_out` (e.g. 'max_duration 400 s reached') fails either case: the robot never reached the
@@ -234,8 +272,13 @@ def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names
         ok = False
 
     def wp_text(errs):
-        names = list(waypoint_names) + [f'waypoint {i + 1}' for i in range(len(waypoint_names), len(errs))]
-        return ', '.join(f'{n}: {"not reached" if not np.isfinite(e) else f"{e:.3f} m"}' for n, e in zip(names, errs))
+        names = list(waypoint_names) + [
+            f'waypoint {i + 1}' for i in range(len(waypoint_names), len(errs))
+        ]
+        return ', '.join(
+            f'{n}: {"not reached" if not np.isfinite(e) else f"{e:.3f} m"}'
+            for n, e in zip(names, errs)
+        )
 
     if case == 1:
         worst = 0.0
@@ -243,22 +286,28 @@ def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names
         for name in ('ekf', 'pf') + (('hybrid',) if 'hybrid' in scores else ()):
             s = scores.get(name)
             if s is None or not s.waypoint_errors:
-                lines.append(f'FAIL {name}: no waypoint errors (estimator not running or route not driven)')
+                lines.append(
+                    f'FAIL {name}: no waypoint errors (estimator not running or route not driven)'
+                )
                 ok = False
                 continue
             errs = np.asarray(s.waypoint_errors, dtype=float)
             good = bool(np.all(np.isfinite(errs)) and np.all(errs < threshold))
             worst = max(worst, float(np.nanmax(errs)) if np.isfinite(errs).any() else np.inf)
             ok &= good
-            lines.append(f'{"PASS" if good else "FAIL"} {name}: every waypoint within {threshold} m '
-                         f'({wp_text(errs)}); position RMSE {s.pos_rmse:.3f} m')
+            lines.append(
+                f'{"PASS" if good else "FAIL"} {name}: every waypoint within {threshold} m '
+                f'({wp_text(errs)}); position RMSE {s.pos_rmse:.3f} m'
+            )
         dr = scores.get('dead_reckoning')
         if dr is not None and dr.waypoint_errors:
             dr_mean = float(np.nanmean(dr.waypoint_errors))
             good = dr_mean > worst
             ok &= good
-            lines.append(f'{"PASS" if good else "FAIL"} dead reckoning worse than both filters: mean waypoint '
-                         f'error {dr_mean:.3f} m vs worst filter {worst:.3f} m')
+            lines.append(
+                f'{"PASS" if good else "FAIL"} dead reckoning worse than both filters: mean waypoint '
+                f'error {dr_mean:.3f} m vs worst filter {worst:.3f} m'
+            )
         else:
             ok = False
             lines.append('FAIL dead reckoning: no waypoint errors')
@@ -271,28 +320,50 @@ def judge_test_case(case: int, scores: Dict[str, EstimatorScore], waypoint_names
         lines.append(f'kidnap seen at t = {event:.2f} s')
         good = bool(pf.recovered)
         ok &= good
-        lines.append(f'{"PASS" if good else "FAIL"} pf: ' + (
-            f'back within {threshold} m {pf.recovery_time:.1f} s after the kidnap' if good
-            else f'did not return within {threshold} m (final error {pf.final_pos_err:.2f} m)'))
+        lines.append(
+            f'{"PASS" if good else "FAIL"} pf: '
+            + (
+                f'back within {threshold} m {pf.recovery_time:.1f} s after the kidnap'
+                if good
+                else f'did not return within {threshold} m (final error {pf.final_pos_err:.2f} m)'
+            )
+        )
         ekf = scores.get('ekf')
         if ekf is not None:
-            lines.append('INFO ekf: ' + (f'recovered after {ekf.recovery_time:.1f} s' if ekf.recovered
-                                         else f'did not recover (final error {ekf.final_pos_err:.2f} m)'))
+            lines.append(
+                'INFO ekf: '
+                + (
+                    f'recovered after {ekf.recovery_time:.1f} s'
+                    if ekf.recovered
+                    else f'did not recover (final error {ekf.final_pos_err:.2f} m)'
+                )
+            )
         hybrid = scores.get('hybrid')
         if hybrid is not None:
             # The hybrid exists to recover like the PF, so it is held to the PF's criterion.
             good = bool(hybrid.recovered)
             ok &= good
-            lines.append(f'{"PASS" if good else "FAIL"} hybrid: ' + (
-                f'back within {threshold} m {hybrid.recovery_time:.1f} s after the kidnap' if good
-                else f'did not return within {threshold} m (final error {hybrid.final_pos_err:.2f} m)'))
+            lines.append(
+                f'{"PASS" if good else "FAIL"} hybrid: '
+                + (
+                    f'back within {threshold} m {hybrid.recovery_time:.1f} s after the kidnap'
+                    if good
+                    else f'did not return within {threshold} m (final error {hybrid.final_pos_err:.2f} m)'
+                )
+            )
     else:
         raise ValueError(f'unknown test case {case}')
     return ok, lines
 
 
-def rescore_recovery(trajectory: Path, estimator: str, event_time: float, threshold: float = RECOVERY_THRESHOLD,
-                     timeout: Optional[float] = None, dwell: float = RECOVERY_DWELL) -> Optional[float]:
+def rescore_recovery(
+    trajectory: Path,
+    estimator: str,
+    event_time: float,
+    threshold: float = RECOVERY_THRESHOLD,
+    timeout: Optional[float] = None,
+    dwell: float = RECOVERY_DWELL,
+) -> Optional[float]:
     """Recovery time of one estimator recomputed from a trial's saved trajectory.csv (no re-run needed)."""
     data = read_trajectory_csv(trajectory)
     if 'ground_truth' not in data or estimator not in data:

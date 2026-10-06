@@ -36,8 +36,8 @@ from devol_localization.hybrid import HybridParams, KidnapMonitor, scan_log_like
 from devol_localization.particle_filter import LikelihoodField, PFParams
 from devol_localization.pf_localization_node import set_yaw, yaw_from_quaternion
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 def pose_and_cov(msg: PoseWithCovarianceStamped):
@@ -68,22 +68,38 @@ class HybridSupervisor(Node):
         self.declare_parameter('likelihood_max_dist', 2.0)
         # KidnapMonitor (see HybridParams).
         d = HybridParams()
-        for name in ('gate', 'pf_max_std_xy', 'pf_max_std_yaw', 'cov_floor_xy', 'cov_floor_yaw',
-                     'min_loglik_gain', 'min_pf_loglik'):
+        for name in (
+            'gate',
+            'pf_max_std_xy',
+            'pf_max_std_yaw',
+            'cov_floor_xy',
+            'cov_floor_yaw',
+            'min_loglik_gain',
+            'min_pf_loglik',
+        ):
             self.declare_parameter(name, float(getattr(d, name)))
         self.declare_parameter('confirm_updates', d.confirm_updates)
         self.declare_parameter('cooldown_updates', d.cooldown_updates)
 
-        self._monitor = KidnapMonitor(HybridParams(
-            gate=float(gp('gate').value),
-            pf_max_std_xy=float(gp('pf_max_std_xy').value), pf_max_std_yaw=float(gp('pf_max_std_yaw').value),
-            cov_floor_xy=float(gp('cov_floor_xy').value), cov_floor_yaw=float(gp('cov_floor_yaw').value),
-            min_loglik_gain=float(gp('min_loglik_gain').value),
-            min_pf_loglik=float(gp('min_pf_loglik').value),
-            confirm_updates=int(gp('confirm_updates').value),
-            cooldown_updates=int(gp('cooldown_updates').value)))
-        self._lik = PFParams(sigma_hit=float(gp('sigma_hit').value), z_hit=float(gp('z_hit').value),
-                             z_rand=float(gp('z_rand').value), max_beams=int(gp('max_beams').value))
+        self._monitor = KidnapMonitor(
+            HybridParams(
+                gate=float(gp('gate').value),
+                pf_max_std_xy=float(gp('pf_max_std_xy').value),
+                pf_max_std_yaw=float(gp('pf_max_std_yaw').value),
+                cov_floor_xy=float(gp('cov_floor_xy').value),
+                cov_floor_yaw=float(gp('cov_floor_yaw').value),
+                min_loglik_gain=float(gp('min_loglik_gain').value),
+                min_pf_loglik=float(gp('min_pf_loglik').value),
+                confirm_updates=int(gp('confirm_updates').value),
+                cooldown_updates=int(gp('cooldown_updates').value),
+            )
+        )
+        self._lik = PFParams(
+            sigma_hit=float(gp('sigma_hit').value),
+            z_hit=float(gp('z_hit').value),
+            z_rand=float(gp('z_rand').value),
+            max_beams=int(gp('max_beams').value),
+        )
         self._lik_max_dist = float(gp('likelihood_max_dist').value)
         self._laser_pose = tuple(float(v) for v in gp('laser_pose').value)
         self._map_frame = str(gp('map_frame').value)
@@ -93,20 +109,38 @@ class HybridSupervisor(Node):
         self._ekf: Optional[PoseWithCovarianceStamped] = None
         self._pf_updated = False
 
-        map_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self._reset_pub = self.create_publisher(PoseWithCovarianceStamped, gp('reset_topic').value, 10)
+        map_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self._reset_pub = self.create_publisher(
+            PoseWithCovarianceStamped, gp('reset_topic').value, 10
+        )
         self.create_subscription(OccupancyGrid, gp('map_topic').value, self._map_cb, map_qos)
-        self.create_subscription(LaserScan, gp('scan_topic').value, self._scan_cb, qos_profile_sensor_data)
-        self.create_subscription(PoseWithCovarianceStamped, gp('ekf_pose_topic').value, self._ekf_cb, 10)
+        self.create_subscription(
+            LaserScan, gp('scan_topic').value, self._scan_cb, qos_profile_sensor_data
+        )
+        self.create_subscription(
+            PoseWithCovarianceStamped, gp('ekf_pose_topic').value, self._ekf_cb, 10
+        )
         self.create_subscription(Float64, gp('pf_update_topic').value, self._pf_update_cb, 10)
-        self.create_subscription(PoseWithCovarianceStamped, gp('pf_pose_topic').value, self._pf_pose_cb, 10)
-        self.get_logger().info(f'Hybrid supervisor: re-seeding the EKF on {gp("reset_topic").value}')
+        self.create_subscription(
+            PoseWithCovarianceStamped, gp('pf_pose_topic').value, self._pf_pose_cb, 10
+        )
+        self.get_logger().info(
+            f'Hybrid supervisor: re-seeding the EKF on {gp("reset_topic").value}'
+        )
 
     def _map_cb(self, msg: OccupancyGrid) -> None:
         grid = np.asarray(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
-        self._field = LikelihoodField(grid, msg.info.resolution, msg.info.origin.position.x,
-                                      msg.info.origin.position.y, max_dist=self._lik_max_dist)
+        self._field = LikelihoodField(
+            grid,
+            msg.info.resolution,
+            msg.info.origin.position.x,
+            msg.info.origin.position.y,
+            max_dist=self._lik_max_dist,
+        )
 
     def _scan_cb(self, msg: LaserScan) -> None:
         self._scan = msg
@@ -120,7 +154,7 @@ class HybridSupervisor(Node):
 
     def _pf_pose_cb(self, msg: PoseWithCovarianceStamped) -> None:
         if not self._pf_updated:
-            return   # dead-reckoned between updates; check only on fresh updates
+            return  # dead-reckoned between updates; check only on fresh updates
         self._pf_updated = False
         if self._ekf is None or self._scan is None or self._field is None:
             return
@@ -129,8 +163,16 @@ class HybridSupervisor(Node):
         s = self._scan
         ranges = np.asarray(s.ranges, dtype=float)
         angles = s.angle_min + np.arange(ranges.size) * s.angle_increment
-        ll = scan_log_likelihood(self._field, self._lik, np.vstack((pf_x, ekf_x)), ranges, angles,
-                                 s.range_min, s.range_max, self._laser_pose)
+        ll = scan_log_likelihood(
+            self._field,
+            self._lik,
+            np.vstack((pf_x, ekf_x)),
+            ranges,
+            angles,
+            s.range_min,
+            s.range_max,
+            self._laser_pose,
+        )
         if not self._monitor.check(ekf_x, ekf_P, pf_x, pf_P, float(ll[0] - ll[1]), float(ll[0])):
             return
         x, P = self._monitor.reseed_prior(pf_x, pf_P)
@@ -148,8 +190,10 @@ class HybridSupervisor(Node):
         self._reset_pub.publish(out)
         self._monitor.stats.reseeds += 1
         jump = float(np.hypot(*(x[:2] - ekf_x[:2])))
-        self.get_logger().info(f'Kidnap detected: EKF re-seeded from the PF at x={x[0]:.2f} y={x[1]:.2f} '
-                               f'yaw={x[2]:.2f} ({jump:.2f} m from the EKF; re-seed {self._monitor.stats.reseeds})')
+        self.get_logger().info(
+            f'Kidnap detected: EKF re-seeded from the PF at x={x[0]:.2f} y={x[1]:.2f} '
+            f'yaw={x[2]:.2f} ({jump:.2f} m from the EKF; re-seed {self._monitor.stats.reseeds})'
+        )
 
 
 def main(args=None):

@@ -36,8 +36,8 @@ import numpy as np
 from devol_localization.ekf_core import CHI2_3DOF_99, wrap_angle
 from devol_localization.particle_filter import LikelihoodField, PFParams
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 @dataclass
@@ -75,16 +75,23 @@ def floor_covariance(cov: np.ndarray, floor_xy: float, floor_yaw: float) -> np.n
     """Returns cov with its x, y and yaw variances raised to at least the floors."""
     out = np.asarray(cov, dtype=float).reshape(3, 3).copy()
     out = 0.5 * (out + out.T)
-    floors = (floor_xy ** 2, floor_xy ** 2, floor_yaw ** 2)
+    floors = (floor_xy**2, floor_xy**2, floor_yaw**2)
     for i, f in enumerate(floors):
         if out[i, i] < f:
             out[i, i] = f
     return out
 
 
-def scan_log_likelihood(field: LikelihoodField, params: PFParams, poses: np.ndarray,
-                        ranges: Sequence[float], angles: Sequence[float], range_min: float,
-                        range_max: float, laser_pose=(0.0, 0.0, 0.0)) -> np.ndarray:
+def scan_log_likelihood(
+    field: LikelihoodField,
+    params: PFParams,
+    poses: np.ndarray,
+    ranges: Sequence[float],
+    angles: Sequence[float],
+    range_min: float,
+    range_max: float,
+    laser_pose=(0.0, 0.0, 0.0),
+) -> np.ndarray:
     """Mean per-beam log likelihood of one scan at each pose, with the particle filter's own
     likelihood field model (same beams, sigma_hit, z_hit and z_rand). Returns one value per pose,
     or zeros when the scan has no usable beams."""
@@ -122,12 +129,15 @@ class KidnapMonitor:
         self._streak = 0
         self._cooldown = 0
 
-    def mahalanobis2(self, ekf_x: np.ndarray, ekf_P: np.ndarray, pf_x: np.ndarray,
-                     pf_P: np.ndarray) -> float:
+    def mahalanobis2(
+        self, ekf_x: np.ndarray, ekf_P: np.ndarray, pf_x: np.ndarray, pf_P: np.ndarray
+    ) -> float:
         p = self.params
         y = np.asarray(pf_x, dtype=float) - np.asarray(ekf_x, dtype=float)
         y[2] = wrap_angle(y[2])
-        S = np.asarray(ekf_P, dtype=float) + floor_covariance(pf_P, p.cov_floor_xy, p.cov_floor_yaw)
+        S = np.asarray(ekf_P, dtype=float) + floor_covariance(
+            pf_P, p.cov_floor_xy, p.cov_floor_yaw
+        )
         return float(y @ np.linalg.solve(S, y))
 
     def pf_confident(self, pf_P: np.ndarray) -> bool:
@@ -135,8 +145,15 @@ class KidnapMonitor:
         std_xy = float(np.sqrt(max(pf_P[0, 0], pf_P[1, 1])))
         return std_xy <= p.pf_max_std_xy and float(np.sqrt(pf_P[2, 2])) <= p.pf_max_std_yaw
 
-    def check(self, ekf_x: np.ndarray, ekf_P: np.ndarray, pf_x: np.ndarray, pf_P: np.ndarray,
-              loglik_gain: Optional[float] = None, pf_loglik: Optional[float] = None) -> bool:
+    def check(
+        self,
+        ekf_x: np.ndarray,
+        ekf_P: np.ndarray,
+        pf_x: np.ndarray,
+        pf_P: np.ndarray,
+        loglik_gain: Optional[float] = None,
+        pf_loglik: Optional[float] = None,
+    ) -> bool:
         """Returns True when the EKF should be re-seeded from the particle filter now.
 
         :param loglik_gain: Scan log likelihood at the PF mean minus that at the EKF mean (mean
@@ -189,9 +206,15 @@ class HybridLocalizer:
     def stats(self) -> HybridStats:
         return self.monitor.stats
 
-    def after_pf_update(self, ranges: Sequence[float], angles: Sequence[float], range_min: float,
-                        range_max: float, laser_pose=(0.0, 0.0, 0.0),
-                        stamp: Optional[float] = None) -> bool:
+    def after_pf_update(
+        self,
+        ranges: Sequence[float],
+        angles: Sequence[float],
+        range_min: float,
+        range_max: float,
+        laser_pose=(0.0, 0.0, 0.0),
+        stamp: Optional[float] = None,
+    ) -> bool:
         """Checks the EKF against the particle filter; re-seeds it if needed. Returns True on a
         re-seed."""
         ekf = self.pipeline.ekf
@@ -201,8 +224,16 @@ class HybridLocalizer:
         gain: Optional[float] = None
         pf_ll: Optional[float] = None
         if self.pf.field is not None:
-            ll = scan_log_likelihood(self.pf.field, self.pf.params, np.vstack((pf_x, ekf.x)),
-                                     ranges, angles, range_min, range_max, laser_pose)
+            ll = scan_log_likelihood(
+                self.pf.field,
+                self.pf.params,
+                np.vstack((pf_x, ekf.x)),
+                ranges,
+                angles,
+                range_min,
+                range_max,
+                laser_pose,
+            )
             gain, pf_ll = float(ll[0] - ll[1]), float(ll[0])
         if not self.monitor.check(ekf.x, ekf.P, pf_x, pf_P, gain, pf_ll):
             return False

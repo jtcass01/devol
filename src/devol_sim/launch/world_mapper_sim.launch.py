@@ -9,6 +9,7 @@ from launch_ros.actions import Node
 
 from ament_index_python.packages import get_package_share_directory
 
+
 def generate_launch_description():
     devol_drive_pkg_share = get_package_share_directory('devol_drive_description')
     sim_pkg_share = get_package_share_directory('devol_sim')
@@ -18,24 +19,22 @@ def generate_launch_description():
     maze_arg = DeclareLaunchArgument(
         'maze',
         default_value='factory',
-        choices=["empty", "factory", "moon_terrain"],
-        description='Maze to load: empty, factory or moon_terrain'
+        choices=['empty', 'factory', 'moon_terrain'],
+        description='Maze to load: empty, factory or moon_terrain',
     )
     declare_namespace = DeclareLaunchArgument(
-        'namespace',
-        default_value='/devol_drive',
-        description='Namespace for topics'
+        'namespace', default_value='/devol_drive', description='Namespace for topics'
     )
     declare_octomap_resolution = DeclareLaunchArgument(
-        'octomap_resolution',
-        default_value='0.05',
-        description='Namespace for topics'
+        'octomap_resolution', default_value='0.05', description='Namespace for topics'
     )
-    
+
     def launch_setup(context):
         maze_folder = context.perform_substitution(LaunchConfiguration('maze'))
         namespace = context.perform_substitution(LaunchConfiguration('namespace'))
-        octomap_resolution = float(context.perform_substitution(LaunchConfiguration('octomap_resolution')))
+        octomap_resolution = float(
+            context.perform_substitution(LaunchConfiguration('octomap_resolution'))
+        )
 
         world_file = os.path.join(gz_pkg_share, 'worlds', maze_folder, 'maze_world.sdf')
 
@@ -54,7 +53,7 @@ def generate_launch_description():
                     'x': row['x'],
                     'y': row['y'],
                     'z': row['z'],
-                    'yaw': row['yaw']
+                    'yaw': row['yaw'],
                 }
 
         # Spawn the vehicle model in Gazebo
@@ -62,11 +61,13 @@ def generate_launch_description():
 
         # Launch Gazebo with the world
         gazebo = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                os.path.join(
-                    get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
-                )
-            ]),
+            PythonLaunchDescriptionSource(
+                [
+                    os.path.join(
+                        get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
+                    )
+                ]
+            ),
             launch_arguments={'gz_args': f'-r {world_file}'}.items(),
         )
 
@@ -75,7 +76,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(sim_pkg_share, 'launch', 'spawn_entities.launch.py')
             ),
-            launch_arguments={'maze': maze_folder}.items()
+            launch_arguments={'maze': maze_folder}.items(),
         )
 
         # Bridge, PID, RViz
@@ -83,9 +84,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(devol_drive_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
             ),
-            launch_arguments={
-                'namespace': namespace
-            }.items()
+            launch_arguments={'namespace': namespace}.items(),
         )
 
         system_bridge_cmd = Node(
@@ -93,25 +92,25 @@ def generate_launch_description():
             executable='parameter_bridge',
             name='ros_gz_bridge_system',
             output='screen',
-                parameters=[
-                    {
-                        'use_sim_time': True,
-                        'qos_overrides./tf.publisher.durability': 'transient_local',
-                        'qos_overrides./tf_static.publisher.durability': 'transient_local',
-                    }
-                ],
+            parameters=[
+                {
+                    'use_sim_time': True,
+                    'qos_overrides./tf.publisher.durability': 'transient_local',
+                    'qos_overrides./tf_static.publisher.durability': 'transient_local',
+                }
+            ],
             arguments=[
-                    # -----------------
-                    # Simulation clock
-                    # -----------------
-                    "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-                    '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
-                    ],
+                # -----------------
+                # Simulation clock
+                # -----------------
+                '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+                '/model/devol_drive/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+            ],
             remappings=[
                 ('/model/devol_drive/tf', '/tf'),
                 ('/tf_static', '/tf_static'),
                 ('/model/devol_drive/pose', '/tf'),
-            ]
+            ],
         )
 
         pid_controller = Node(
@@ -119,19 +118,21 @@ def generate_launch_description():
             executable='diffdrive_pid',
             name='diffdrive_pid',
             output='screen',
-            parameters=[{
-                'kp': 0.9,
-                'kd': 0.0,
-                'ki': 0.0,
-                'lookahead': 0.3,
-                'publish_rate': 30.0,
-                'max_linear_vel': 0.75,
-                'max_angular_vel': 1.0,
-                'x': float(robot_pose['x']),
-                'y': float(robot_pose['y']),
-                'yaw': float(robot_pose['yaw']),
-                'namespace': namespace
-            }]
+            parameters=[
+                {
+                    'kp': 0.9,
+                    'kd': 0.0,
+                    'ki': 0.0,
+                    'lookahead': 0.3,
+                    'publish_rate': 30.0,
+                    'max_linear_vel': 0.75,
+                    'max_angular_vel': 1.0,
+                    'x': float(robot_pose['x']),
+                    'y': float(robot_pose['y']),
+                    'yaw': float(robot_pose['yaw']),
+                    'namespace': namespace,
+                }
+            ],
         )
 
         octomap_server = Node(
@@ -139,20 +140,25 @@ def generate_launch_description():
             executable='octomap_server_node',
             name='octomap_server_node',
             output='screen',
-            namespace=namespace, 
-            parameters=[{
-                'occupancy_min_z': 0.0,
-                'resolution': octomap_resolution,
-                'occupancy_max_z': 5.0,
-                'use_sim_time': True
-            }],
+            namespace=namespace,
+            parameters=[
+                {
+                    'occupancy_min_z': 0.0,
+                    'resolution': octomap_resolution,
+                    'occupancy_max_z': 5.0,
+                    'use_sim_time': True,
+                }
+            ],
             remappings=[
-                ('cloud_in', 'static_map_pointcloud') # These topics are namespaced! You will see them on ros2 topics as 
-                                                      # $NAMESPACE/static_map_pointcloud or /devol_drive/static_map_pointcloud
-                                                      # for our sim.
-            ]
+                (
+                    'cloud_in',
+                    'static_map_pointcloud',
+                )  # These topics are namespaced! You will see them on ros2 topics as
+                # $NAMESPACE/static_map_pointcloud or /devol_drive/static_map_pointcloud
+                # for our sim.
+            ],
         )
-        
+
         # Pointcloud publisher -- ADD YOUR PUBLISHER IN THIS PLACE! Note the topic name listed here is namespaced.
         # pointcloud_publisher = Node(
         #     package='devol_sim',
@@ -172,8 +178,7 @@ def generate_launch_description():
             executable='goal_points_publisher',
             name='goal_points_publisher',
             output='screen',
-            parameters=[{'maze': maze_folder,
-                         'namespace': namespace}]
+            parameters=[{'maze': maze_folder, 'namespace': namespace}],
         )
 
         rviz = Node(
@@ -181,7 +186,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', os.path.join(sim_pkg_share, 'rviz', 'rviz_view.rviz')]
+            arguments=['-d', os.path.join(sim_pkg_share, 'rviz', 'rviz_view.rviz')],
         )
 
         return [
@@ -193,12 +198,14 @@ def generate_launch_description():
             octomap_server,
             # pointcloud_publisher, ADD YOUR MAP PUBLISHER HERE TOO
             goal_points_publisher,
-            rviz
+            rviz,
         ]
 
-    return LaunchDescription([
-        maze_arg,
-        declare_namespace,
-        declare_octomap_resolution,
-        OpaqueFunction(function=launch_setup)
-    ])
+    return LaunchDescription(
+        [
+            maze_arg,
+            declare_namespace,
+            declare_octomap_resolution,
+            OpaqueFunction(function=launch_setup),
+        ]
+    )
