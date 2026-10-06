@@ -18,8 +18,8 @@ from typing import Optional, Sequence, Tuple
 from numpy import ndarray, array, asarray, cos, sin, arctan2, pi, eye, diag, zeros
 from numpy.linalg import inv
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 # Chi-square 99% quantile for 3 degrees of freedom.
 CHI2_3DOF_99: float = 11.345
@@ -30,7 +30,9 @@ def wrap_angle(angle: float) -> float:
     return float((angle + pi) % (2.0 * pi) - pi)
 
 
-def odometry_delta(prev_pose: Sequence[float], pose: Sequence[float]) -> Tuple[float, float, float]:
+def odometry_delta(
+    prev_pose: Sequence[float], pose: Sequence[float]
+) -> Tuple[float, float, float]:
     """Decomposes the motion between two odometry poses into (rot1, trans, rot2).
 
     Reverse motion is folded into a negative translation so that a robot
@@ -84,9 +86,13 @@ class PoseEKF:
         G[1, 2] = trans * cos(heading)
 
         # Jacobian w.r.t. the control (rot1, trans, rot2).
-        V: ndarray = array([[-trans * sin(heading), cos(heading), 0.0],
-                            [trans * cos(heading), sin(heading), 0.0],
-                            [1.0, 0.0, 1.0]])
+        V: ndarray = array(
+            [
+                [-trans * sin(heading), cos(heading), 0.0],
+                [trans * cos(heading), sin(heading), 0.0],
+                [1.0, 0.0, 1.0],
+            ]
+        )
 
         r1, t, r2 = abs(rot1), abs(trans), abs(rot2)
         var_rot1: float = a1 * r1 + 0.5 * a2 * t
@@ -104,8 +110,9 @@ class PoseEKF:
         d2: float = float(y @ inv(S) @ y)
         return y, S, d2
 
-    def correct(self, z: Sequence[float], R: ndarray,
-                gate: Optional[float] = CHI2_3DOF_99) -> bool:
+    def correct(
+        self, z: Sequence[float], R: ndarray, gate: Optional[float] = CHI2_3DOF_99
+    ) -> bool:
         """Fuses a pose observation z = [x, y, yaw] with covariance R.
 
         Returns False and leaves the state untouched if the observation fails the
@@ -123,7 +130,9 @@ class PoseEKF:
         return True
 
 
-def global_initial_state(free_xy: ndarray, rng=None, mean: str = 'random') -> Tuple[ndarray, ndarray]:
+def global_initial_state(
+    free_xy: ndarray, rng=None, mean: str = 'random'
+) -> Tuple[ndarray, ndarray]:
     """Single-Gaussian stand-in for a uniform prior over the free space, for global localization.
 
     `mean='random'` draws the mean from the free cells and the heading uniformly (pass a seeded
@@ -135,6 +144,7 @@ def global_initial_state(free_xy: ndarray, rng=None, mean: str = 'random') -> Tu
     """
     from numpy import outer
     from numpy.random import default_rng
+
     xy = asarray(free_xy, dtype=float).reshape(-1, 2)
     centroid = xy.mean(axis=0)
     if mean == 'centroid':

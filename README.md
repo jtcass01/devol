@@ -17,7 +17,6 @@ world's point cloud, and are scored against Gazebo's ground-truth pose.
 | `devol_gazebo` | Worlds (`factory`, `empty`, `moon_terrain`), their waypoints (`poses.csv`) and static point clouds |
 | `devol_sim` | Sim launch files, octomap map pipeline, RRT\* / A\* planners, PID path follower |
 | `devol_localization` | EKF and PF nodes, plus the study tooling: noise injection, ground truth, scoring, kidnapping, live views and the replay runner (see [its README](src/devol_localization/README.md)) |
-| `devol_moveit_config`, `devol_demo_py`, `devol` | Earlier MoveIt pick-and-place work. Not used by the study and not built. |
 
 The recommended way to run everything is the Docker image in [`docker/`](docker/), which bundles
 Ubuntu 26.04, ROS 2 Lyrical, Gazebo Jetty and the built workspace. A native install is described in
@@ -68,10 +67,6 @@ docker compose -f docker/compose.yaml build
 The first build downloads ROS 2 and Gazebo and takes 15 to 20 minutes; later builds reuse those layers
 and only rebuild the workspace. The image is tagged `devol-sim:lyrical`. It contains `src/` as it was at
 build time, so **rebuild the image after changing code** (or use the development shell in step 8).
-
-The three MoveIt packages are skipped in the build: they need packages Lyrical does not ship
-(`warehouse_ros_mongo`, and `devol_msgs`, which is not in this repository). Nothing in the simulation or
-the study uses them.
 
 ## 4. Check the install
 
@@ -211,7 +206,7 @@ after a rebuild inside it. Build outputs are kept in Docker volumes between sess
 
 ```bash
 docker compose -f docker/compose.yaml run --rm dev
-colcon build --symlink-install --packages-skip devol devol_moveit_config devol_demo_py
+colcon build --symlink-install
 source install/setup.bash
 ```
 
@@ -243,7 +238,7 @@ The same stack can be installed directly on **Ubuntu 26.04**, native or as a WSL
    git clone https://github.com/jtcass01/devol.git ~/devol
    cd ~/devol
    source /opt/ros/lyrical/setup.bash
-   colcon build --symlink-install --packages-skip devol devol_moveit_config devol_demo_py
+   colcon build --symlink-install
    ```
 
 3. Set up every terminal that runs the simulation (adding these to `~/.bashrc` saves retyping them):
