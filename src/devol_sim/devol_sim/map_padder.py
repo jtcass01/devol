@@ -11,7 +11,7 @@ from scipy.ndimage import binary_dilation
 from threading import Lock
 
 
-class MapPublisher(Node):
+class MapPadder(Node):
     def __init__(self):
         super().__init__('map_padder')
 
@@ -131,7 +131,7 @@ class MapPublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MapPublisher()
+    node = MapPadder()
     
     try:
         rclpy.spin(node)
