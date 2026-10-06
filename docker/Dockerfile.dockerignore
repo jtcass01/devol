@@ -1,0 +1,8 @@
+.git
+.vscode
+build
+install
+log
+results
+docs
+**/__pycache__

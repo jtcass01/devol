@@ -11,6 +11,7 @@ checks the robot's body against octomap_server's map:
 * map_source 'projected_map': the 2D projected_map, checked against one
   rectangular footprint.
 """
+
 from __future__ import annotations
 
 from math import atan2, hypot
@@ -29,14 +30,24 @@ from rclpy.qos import QoSProfile
 from visualization_msgs.msg import Marker, MarkerArray
 
 from devol_sim.mobile_robot_goal import MobileRobotGoal
-from devol_sim.rrt_planner import (DEFAULT_BODY, FootprintCollisionChecker, GoalInCollision,
-                                   MultiFootprintChecker, PlannerConfig, PlanResult, RRTPlanner,
-                                   StartInCollision, body_checker_from_voxels, body_from_flat,
-                                   densify, wrap_to_pi)
+from devol_sim.rrt_planner import (
+    DEFAULT_BODY,
+    FootprintCollisionChecker,
+    GoalInCollision,
+    MultiFootprintChecker,
+    PlannerConfig,
+    PlanResult,
+    RRTPlanner,
+    StartInCollision,
+    body_checker_from_voxels,
+    body_from_flat,
+    densify,
+    wrap_to_pi,
+)
 from devol_sim.utils import euler_to_quaternion, quaternion_to_euler
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 class RRTMotionPlanner(RCLPY_Node):
@@ -92,26 +103,32 @@ class RRTMotionPlanner(RCLPY_Node):
         self._from_frame = f'{self._namespace[1:]}/{p("tf_from_frame")}'
         self._map_source = str(p('map_source'))
         if self._map_source not in ('octomap_3d', 'projected_map'):
-            raise ValueError(f"map_source must be 'octomap_3d' or 'projected_map', got {self._map_source!r}")
+            raise ValueError(
+                f"map_source must be 'octomap_3d' or 'projected_map', got {self._map_source!r}"
+            )
         boxes = [float(v) for v in p('body_boxes')]
         self._body = body_from_flat(boxes) if len(boxes) > 1 else DEFAULT_BODY
         self._ground_z = float(p('ground_z'))
         self._unknown_is_occupied = bool(p('unknown_is_occupied'))
         self._padding = float(p('footprint_padding'))
-        self._footprint = dict(length=float(p('footprint_length')),
-                               width=float(p('footprint_width')),
-                               padding=self._padding,
-                               offset=(float(p('footprint_offset')), 0.0))
-        self._config = PlannerConfig(algorithm=str(p('algorithm')),
-                                     step_size=float(p('step_size')),
-                                     goal_bias=float(p('goal_bias')),
-                                     goal_tolerance=float(p('step_size')),
-                                     max_iterations=int(p('max_iterations')),
-                                     max_planning_time=float(p('max_planning_time')),
-                                     patience=int(p('patience')),
-                                     shortcut_attempts=int(p('shortcut_attempts')),
-                                     require_goal_yaw=bool(p('require_goal_yaw')),
-                                     goal_approach_distance=float(p('goal_approach_distance')))
+        self._footprint = dict(
+            length=float(p('footprint_length')),
+            width=float(p('footprint_width')),
+            padding=self._padding,
+            offset=(float(p('footprint_offset')), 0.0),
+        )
+        self._config = PlannerConfig(
+            algorithm=str(p('algorithm')),
+            step_size=float(p('step_size')),
+            goal_bias=float(p('goal_bias')),
+            goal_tolerance=float(p('step_size')),
+            max_iterations=int(p('max_iterations')),
+            max_planning_time=float(p('max_planning_time')),
+            patience=int(p('patience')),
+            shortcut_attempts=int(p('shortcut_attempts')),
+            require_goal_yaw=bool(p('require_goal_yaw')),
+            goal_approach_distance=float(p('goal_approach_distance')),
+        )
         self._waypoint_spacing = float(p('waypoint_spacing'))
         self._corner_tolerance = float(p('corner_tolerance'))
         self._turn_in_place_threshold = float(p('turn_in_place_threshold'))
@@ -125,14 +142,21 @@ class RRTMotionPlanner(RCLPY_Node):
         map_topic = str(p('voxel_topic') if self._map_source == 'octomap_3d' else p('map_topic'))
         if not map_topic.startswith('/'):
             map_topic = f'{self._namespace}/{map_topic}'
-        self._goal_pub = self.create_publisher(PoseStamped, f'{self._namespace}/goal_pose', qos_profile)
+        self._goal_pub = self.create_publisher(
+            PoseStamped, f'{self._namespace}/goal_pose', qos_profile
+        )
         self._path_pub = self.create_publisher(Path, f'{self._namespace}/rrt_path', qos_profile)
         if self._map_source == 'octomap_3d':
-            self._map_sub = self.create_subscription(MarkerArray, map_topic, self.voxels_received, 10)
+            self._map_sub = self.create_subscription(
+                MarkerArray, map_topic, self.voxels_received, 10
+            )
         else:
-            self._map_sub = self.create_subscription(OccupancyGrid, map_topic, self.map_received, 10)
-        self._goals_sub = self.create_subscription(MarkerArray, f'{self._namespace}/goal_points',
-                                                   self.goal_points_received, 10)
+            self._map_sub = self.create_subscription(
+                OccupancyGrid, map_topic, self.map_received, 10
+            )
+        self._goals_sub = self.create_subscription(
+            MarkerArray, f'{self._namespace}/goal_points', self.goal_points_received, 10
+        )
 
         # State
         self._lock = Lock()
@@ -152,8 +176,10 @@ class RRTMotionPlanner(RCLPY_Node):
             self._viz_thread.start()
 
         self.timer = self.create_timer(1.0 / self._publish_rate, self.plan_to_goals)
-        self.get_logger().info(f'RRTMotionPlanner ({self._config.algorithm}, {self._map_source}) started, '
-                               f'map: {map_topic}')
+        self.get_logger().info(
+            f'RRTMotionPlanner ({self._config.algorithm}, {self._map_source}) started, '
+            f'map: {map_topic}'
+        )
 
     def stop(self):
         self._stop_event.set()
@@ -169,40 +195,64 @@ class RRTMotionPlanner(RCLPY_Node):
             return
         # The map is republished with every cloud insertion; skip unchanged ones
         # cheaply (converting every point is the expensive part).
-        key = tuple((round(m.scale.x, 6), len(m.points),
-                     m.points[0].x, m.points[0].y, m.points[0].z,
-                     m.points[-1].x, m.points[-1].y, m.points[-1].z) for m in markers)
+        key = tuple(
+            (
+                round(m.scale.x, 6),
+                len(m.points),
+                m.points[0].x,
+                m.points[0].y,
+                m.points[0].z,
+                m.points[-1].x,
+                m.points[-1].y,
+                m.points[-1].z,
+            )
+            for m in markers
+        )
         if key == self._map_key:
             return
         centers = np.concatenate([np.array([(q.x, q.y, q.z) for q in m.points]) for m in markers])
         sizes = np.concatenate([np.full(len(m.points), m.scale.x) for m in markers])
         resolution = float(min(m.scale.x for m in markers))
-        checker = body_checker_from_voxels(centers, sizes, resolution, self._body,
-                                           ground_z=self._ground_z, padding=self._padding)
+        checker = body_checker_from_voxels(
+            centers, sizes, resolution, self._body, ground_z=self._ground_z, padding=self._padding
+        )
         with self._lock:
             self._checker = checker
             self._map_key = key
         part = checker.parts[0]
-        self.get_logger().info(f'3D map updated: {len(centers)} occupied voxels, '
-                               f'{part.n_cols}x{part.n_rows} @ {resolution:.3f} m, {len(checker.parts)} body boxes')
+        self.get_logger().info(
+            f'3D map updated: {len(centers)} occupied voxels, '
+            f'{part.n_cols}x{part.n_rows} @ {resolution:.3f} m, {len(checker.parts)} body boxes'
+        )
 
     def map_received(self, msg: OccupancyGrid) -> None:
         info = msg.info
         data = np.asarray(msg.data, dtype=np.int8)
-        key = (info.width, info.height, info.resolution,
-               info.origin.position.x, info.origin.position.y, hash(data.tobytes()))
+        key = (
+            info.width,
+            info.height,
+            info.resolution,
+            info.origin.position.x,
+            info.origin.position.y,
+            hash(data.tobytes()),
+        )
         if key == self._map_key:
             return  # octomap_server republishes the same projection with every cloud
         grid = data.reshape((info.height, info.width))
-        checker = FootprintCollisionChecker(grid, info.resolution,
-                                            (info.origin.position.x, info.origin.position.y),
-                                            occupied_threshold=50,
-                                            unknown_is_occupied=self._unknown_is_occupied,
-                                            **self._footprint)
+        checker = FootprintCollisionChecker(
+            grid,
+            info.resolution,
+            (info.origin.position.x, info.origin.position.y),
+            occupied_threshold=50,
+            unknown_is_occupied=self._unknown_is_occupied,
+            **self._footprint,
+        )
         with self._lock:
             self._checker = checker
             self._map_key = key
-        self.get_logger().info(f'Map updated: {info.width}x{info.height} @ {info.resolution:.3f} m')
+        self.get_logger().info(
+            f'Map updated: {info.width}x{info.height} @ {info.resolution:.3f} m'
+        )
 
     def goal_points_received(self, msg: MarkerArray) -> None:
         if len(self._goals) > 0:
@@ -210,11 +260,13 @@ class RRTMotionPlanner(RCLPY_Node):
         for marker in reversed(msg.markers):
             marker: Marker = marker
             _, _, yaw = quaternion_to_euler(marker.pose.orientation)
-            goal = MobileRobotGoal(name=marker.text,
-                                   x=marker.pose.position.x,
-                                   y=marker.pose.position.y,
-                                   z=marker.pose.position.z,
-                                   yaw=yaw)
+            goal = MobileRobotGoal(
+                name=marker.text,
+                x=marker.pose.position.x,
+                y=marker.pose.position.y,
+                z=marker.pose.position.z,
+                yaw=yaw,
+            )
             self.get_logger().info(f'Received {goal}')
             self._goals.append(goal)
 
@@ -249,10 +301,13 @@ class RRTMotionPlanner(RCLPY_Node):
 
     def lookup_robot_pose(self) -> Optional[Tuple[float, float, float]]:
         try:
-            trans = self._tf_buffer.lookup_transform(self._to_frame, self._from_frame,
-                                                     rclpy.time.Time(), timeout=Duration(seconds=0.5))
+            trans = self._tf_buffer.lookup_transform(
+                self._to_frame, self._from_frame, rclpy.time.Time(), timeout=Duration(seconds=0.5)
+            )
         except tf2_ros.LookupException:
-            self.get_logger().warning('Transform isn\'t available, waiting...', throttle_duration_sec=5.0)
+            self.get_logger().warning(
+                "Transform isn't available, waiting...", throttle_duration_sec=5.0
+            )
             return None
         except Exception as e:
             self.get_logger().warning(f'TF lookup failed: {e}', throttle_duration_sec=5.0)
@@ -267,20 +322,27 @@ class RRTMotionPlanner(RCLPY_Node):
         try:
             result = planner.plan(start, (goal.x, goal.y, goal.yaw))
         except (StartInCollision, GoalInCollision) as e:
-            self.get_logger().warning(f'Cannot plan to {goal.name}: {e}', throttle_duration_sec=5.0)
+            self.get_logger().warning(
+                f'Cannot plan to {goal.name}: {e}', throttle_duration_sec=5.0
+            )
             return None
         self._last_result = result
         if result.freed_start_cells:
-            self.get_logger().info(f'Treated {result.freed_start_cells} unknown map cells under the robot as free')
+            self.get_logger().info(
+                f'Treated {result.freed_start_cells} unknown map cells under the robot as free'
+            )
         if not result.success:
             self.get_logger().warning(
                 f'No path to {goal.name} after {result.iterations} iterations '
-                f'({result.planning_time:.2f} s), retrying', throttle_duration_sec=5.0)
+                f'({result.planning_time:.2f} s), retrying',
+                throttle_duration_sec=5.0,
+            )
             return None
         self.get_logger().info(
             f'{self._config.algorithm} path to {goal.name}: {result.cost:.2f} m, {len(result.path)} waypoints, '
             f'{result.nodes} nodes, first solution {result.first_solution_time:.2f} s, '
-            f'total {result.planning_time:.2f} s')
+            f'total {result.planning_time:.2f} s'
+        )
         return densify(result.path, self._waypoint_spacing)
 
     # Main loop
@@ -329,27 +391,32 @@ class RRTMotionPlanner(RCLPY_Node):
             # The plan turns in place at corners; do the same before driving off,
             # otherwise the follower swings wide or cuts the corner.
             heading = atan2(wy - y, wx - x)
-            if dist > self._intermediate_goal_tolerance and \
-                    abs(wrap_to_pi(heading - yaw)) > self._turn_in_place_threshold:
+            if (
+                dist > self._intermediate_goal_tolerance
+                and abs(wrap_to_pi(heading - yaw)) > self._turn_in_place_threshold
+            ):
                 self.send_goal_pose(self.world_shift_trailer_hitch(x, y, yaw), heading)
             else:
                 # Hold the heading of the segment being driven. Asking for the next
                 # segment's heading here makes diffdrive_pid's yaw term cancel its
                 # steering term short of the waypoint (the robot stalls).
                 px, py, _ = self._path[self._path_index - 1]
-                self.send_goal_pose(self.world_shift_trailer_hitch(wx, wy, yaw), atan2(wy - py, wx - px))
+                self.send_goal_pose(
+                    self.world_shift_trailer_hitch(wx, wy, yaw), atan2(wy - py, wx - px)
+                )
 
     def is_corner(self, i: int) -> bool:
         """Does the path turn by more than turn_in_place_threshold at waypoint i?"""
         if i <= 0 or i >= len(self._path) - 1:
             return False
-        (x0, y0, _), (x1, y1, _), (x2, y2, _) = self._path[i - 1:i + 2]
+        (x0, y0, _), (x1, y1, _), (x2, y2, _) = self._path[i - 1 : i + 2]
         turn = wrap_to_pi(atan2(y2 - y1, x2 - x1) - atan2(y1 - y0, x1 - x0))
         return abs(turn) > self._turn_in_place_threshold
 
     def visualization_loop(self):
         from matplotlib.patches import Polygon
         from matplotlib.pyplot import close as plt_close, ion, pause, subplots
+
         ion()
         fig, ax = subplots(figsize=(6, 8))
         while not self._stop_event.is_set():
@@ -364,13 +431,17 @@ class RRTMotionPlanner(RCLPY_Node):
             shade = np.zeros(parts[0].occupied.shape)
             for k, part in reversed(list(enumerate(parts))):
                 shade[part.occupied] = 1.0 - 0.5 * k / max(1, len(parts) - 1)
-            ax.imshow(shade, cmap='gray_r', origin='lower', extent=(x0, x1, y0, y1), vmin=0, vmax=1)
+            ax.imshow(
+                shade, cmap='gray_r', origin='lower', extent=(x0, x1, y0, y1), vmin=0, vmax=1
+            )
             result = self._last_result
             if result is not None and result.tree is not None:
                 nodes, parents = result.tree
                 for i in range(1, len(nodes)):
                     j = parents[i]
-                    ax.plot([nodes[j, 0], nodes[i, 0]], [nodes[j, 1], nodes[i, 1]], color='0.7', lw=0.4)
+                    ax.plot(
+                        [nodes[j, 0], nodes[i, 0]], [nodes[j, 1], nodes[i, 1]], color='0.7', lw=0.4
+                    )
             if self._path is not None:
                 path = np.array(self._path)
                 ax.plot(path[:, 0], path[:, 1], 'b.-', label='Path')
@@ -379,10 +450,17 @@ class RRTMotionPlanner(RCLPY_Node):
                 c, s = np.cos(ryaw), np.sin(ryaw)
                 for part in parts:
                     hl, hw = part.half_length, part.half_width
-                    corners = [(part.offset_x + a * hl, part.offset_y + b * hw)
-                               for a, b in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
-                    ax.add_patch(Polygon([(rx + c * u - s * v, ry + s * u + c * v) for u, v in corners],
-                                         fill=False, color='r'))
+                    corners = [
+                        (part.offset_x + a * hl, part.offset_y + b * hw)
+                        for a, b in ((1, 1), (-1, 1), (-1, -1), (1, -1))
+                    ]
+                    ax.add_patch(
+                        Polygon(
+                            [(rx + c * u - s * v, ry + s * u + c * v) for u, v in corners],
+                            fill=False,
+                            color='r',
+                        )
+                    )
             for goal in self._goals:
                 ax.plot(goal.x, goal.y, 'gs', markersize=8)
             ax.set_title(f'{self._config.algorithm} planner')

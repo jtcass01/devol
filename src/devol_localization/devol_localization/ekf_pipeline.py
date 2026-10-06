@@ -23,8 +23,8 @@ from numpy import ndarray, asarray, clip, diag, sqrt
 from devol_localization.ekf_core import PoseEKF, odometry_delta, wrap_angle, CHI2_3DOF_99
 from devol_localization.scan_matcher import ScanMatcher, MatchResult
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 @dataclass
@@ -35,8 +35,8 @@ class PipelineStats:
     gated: int = 0
     failed_in_row: int = 0
     reacquired: int = 0
-    rewound: int = 0   # scans fused after rewinding past newer odometry
-    stale: int = 0     # scans dropped: older than the history, or superseded while waiting
+    rewound: int = 0  # scans fused after rewinding past newer odometry
+    stale: int = 0  # scans dropped: older than the history, or superseded while waiting
 
 
 @dataclass
@@ -48,18 +48,26 @@ class _HistoryEntry:
 
 
 def _interpolate(p0: Sequence[float], p1: Sequence[float], f: float) -> Tuple[float, float, float]:
-    return (p0[0] + f * (p1[0] - p0[0]), p0[1] + f * (p1[1] - p0[1]),
-            wrap_angle(p0[2] + f * wrap_angle(p1[2] - p0[2])))
+    return (
+        p0[0] + f * (p1[0] - p0[0]),
+        p0[1] + f * (p1[1] - p0[1]),
+        wrap_angle(p0[2] + f * wrap_angle(p1[2] - p0[2])),
+    )
 
 
 class EKFPipeline:
-    def __init__(self, ekf: PoseEKF, matcher: Optional[ScanMatcher] = None,
-                 window_xy: Tuple[float, float] = (0.15, 1.5),
-                 window_yaw: Tuple[float, float] = (0.05, 0.8),
-                 gate: Optional[float] = CHI2_3DOF_99,
-                 lost_after: int = 5,
-                 lost_inflation_std: Tuple[float, float] = (0.05, 0.03),
-                 history: float = 2.0, max_scan_lead: float = 0.5) -> None:
+    def __init__(
+        self,
+        ekf: PoseEKF,
+        matcher: Optional[ScanMatcher] = None,
+        window_xy: Tuple[float, float] = (0.15, 1.5),
+        window_yaw: Tuple[float, float] = (0.05, 0.8),
+        gate: Optional[float] = CHI2_3DOF_99,
+        lost_after: int = 5,
+        lost_inflation_std: Tuple[float, float] = (0.05, 0.03),
+        history: float = 2.0,
+        max_scan_lead: float = 0.5,
+    ) -> None:
         """
         :param window_xy: (min, max) half-width of the search window in metres.
         :param window_yaw: (min, max) half-width of the search window in radians.
@@ -93,7 +101,9 @@ class EKFPipeline:
         self._history.clear()
         self._pending = None
 
-    def on_odom(self, odom_pose: Sequence[float], stamp: Optional[float] = None) -> Optional[MatchResult]:
+    def on_odom(
+        self, odom_pose: Sequence[float], stamp: Optional[float] = None
+    ) -> Optional[MatchResult]:
         """Predicts with the odometry increment. Returns the fused match of a scan that was
         waiting for this message, if any."""
         pose = (float(odom_pose[0]), float(odom_pose[1]), float(odom_pose[2]))
@@ -160,9 +170,11 @@ class EKFPipeline:
         self.stats.rewound += 1
         result: Optional[MatchResult] = self._match_and_fuse(points)
         # Keep the corrected state, so a later scan that rewinds past this one keeps its correction.
-        self._history.insert(j + 1, _HistoryEntry(stamp, odom_at_scan, self.ekf.x.copy(), self.ekf.P.copy()))
+        self._history.insert(
+            j + 1, _HistoryEntry(stamp, odom_at_scan, self.ekf.x.copy(), self.ekf.P.copy())
+        )
         prev = odom_at_scan
-        for later in list(self._history)[j + 2:]:
+        for later in list(self._history)[j + 2 :]:
             self.ekf.predict(*odometry_delta(prev, later.odom))
             later.x, later.P = self.ekf.x.copy(), self.ekf.P.copy()
             prev = later.odom
@@ -181,8 +193,9 @@ class EKFPipeline:
                 return result
             self.stats.gated += 1
         self.stats.failed_in_row += 1
-        if self.stats.failed_in_row >= self.lost_after and (half_xy < self.window_xy[1]
-                                                            or half_yaw < self.window_yaw[1]):
+        if self.stats.failed_in_row >= self.lost_after and (
+            half_xy < self.window_xy[1] or half_yaw < self.window_yaw[1]
+        ):
             pos_std, yaw_std = self.lost_inflation_std
-            self.ekf.P = self.ekf.P + diag(asarray([pos_std ** 2, pos_std ** 2, yaw_std ** 2]))
+            self.ekf.P = self.ekf.P + diag(asarray([pos_std**2, pos_std**2, yaw_std**2]))
         return None

@@ -1,0 +1,57 @@
+# Run from the repository root, in PowerShell or a WSL shell (Docker Desktop, WSL 2 backend):
+#   docker compose -f docker/compose.yaml build
+#   docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization localization_test_cases.launch.py test_case:=1
+#   docker compose -f docker/compose.yaml run --rm sim            # interactive shell
+#   docker compose -f docker/compose.yaml run --rm dev            # shell with ../src mounted for edit + colcon build
+# Full instructions are in the repository README.
+name: devol
+
+x-sim: &sim
+  image: devol-sim:${DEVOL_TAG:-lyrical}
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  # GPU: `gpus` passes /dev/dxg; the d3d12/dxcore user-mode driver is mounted from /usr/lib/wsl.
+  gpus: all
+  ipc: host
+  stdin_open: true
+  tty: true
+  environment:
+    # WSLg display (paths are inside Docker Desktop's VM, so they work from PowerShell and WSL alike)
+    DISPLAY: ":0"
+    WAYLAND_DISPLAY: wayland-0
+    XDG_RUNTIME_DIR: /mnt/wslg/runtime-dir
+    PULSE_SERVER: /mnt/wslg/PulseServer
+    QT_QPA_PLATFORM: xcb
+    # Render Gazebo and RViz on the RTX GPU through Mesa's d3d12 driver
+    GALLIUM_DRIVER: d3d12
+    MESA_D3D12_DEFAULT_ADAPTER_NAME: NVIDIA
+    # Keep ROS and Gazebo traffic separate from a sim running natively in WSL at the same time
+    ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-42}
+    GZ_PARTITION: ${GZ_PARTITION:-devol_docker}
+  volumes:
+    - /run/desktop/mnt/host/wslg:/mnt/wslg
+    - /run/desktop/mnt/host/wslg/.X11-unix:/tmp/.X11-unix
+    - /usr/lib/wsl:/usr/lib/wsl:ro
+    - ../results/docker:/root/loc_results
+
+services:
+  sim:
+    <<: *sim
+
+  dev:
+    <<: *sim
+    volumes:
+      - /run/desktop/mnt/host/wslg:/mnt/wslg
+      - /run/desktop/mnt/host/wslg/.X11-unix:/tmp/.X11-unix
+      - /usr/lib/wsl:/usr/lib/wsl:ro
+      - ../results/docker:/root/loc_results
+      - ../src:/opt/devol_ws/src
+      - devol_build:/opt/devol_ws/build
+      - devol_install:/opt/devol_ws/install
+      - devol_log:/opt/devol_ws/log
+
+volumes:
+  devol_build:
+  devol_install:
+  devol_log:

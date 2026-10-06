@@ -8,8 +8,7 @@ setup(
     version='0.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
+        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.py')),
         ('share/' + package_name + '/rviz', glob('rviz/*.rviz')),
@@ -20,14 +19,19 @@ setup(
     maintainer_email='jacobtaylorcassady@outlook.com',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
             'diffdrive_pid = devol_sim.diffdrive_pid:main',
             'agent_motion_planner = devol_sim.agent_motion_planner:main',
             'rrt_motion_planner = devol_sim.rrt_motion_planner:main',
-            'map_publisher = devol_sim.map_publisher:main',
             'goal_points_publisher = devol_sim.goal_points_publisher:main',
+            'map_padder = devol_sim.map_padder:main',
+            'pointcloud_publisher = devol_sim.pointcloud_publisher:main',
         ],
     },
 )

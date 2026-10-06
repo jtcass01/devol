@@ -12,60 +12,63 @@ from launch_ros.substitutions import FindPackageShare
 
 
 ARGUMENTS = [
-    DeclareLaunchArgument('name', default_value='devol',
-                          description='Prefix for all joint names'),
+    DeclareLaunchArgument('name', default_value='devol', description='Prefix for all joint names'),
 ]
 
 
 def generate_launch_description():
     # Define file names
-    urdf_package = "a200_description"
-    urdf_filename = "a200.urdf.xacro"
-    rviz_config_filename = "a200.rviz"
+    urdf_package = 'a200_description'
+    urdf_filename = 'a200.urdf.xacro'
+    rviz_config_filename = 'a200.rviz'
 
     # Define paths
     pkg_share_description = FindPackageShare(urdf_package)
-    default_urdf_path = PathJoinSubstitution(
-        [pkg_share_description, "urdf", urdf_filename]
-    )
-    default_rviz_path = PathJoinSubstitution(
-        [pkg_share_description, "rviz", rviz_config_filename]
-    )
+    default_urdf_path = PathJoinSubstitution([pkg_share_description, 'urdf', urdf_filename])
+    default_rviz_path = PathJoinSubstitution([pkg_share_description, 'rviz', rviz_config_filename])
 
     # Launch configuration variables
-    rviz_config_file = LaunchConfiguration("rviz_config_file")
-    urdf_model = LaunchConfiguration("urdf_model")
-    use_sim_time = LaunchConfiguration("use_sim_time")
+    rviz_config_file = LaunchConfiguration('rviz_config_file')
+    urdf_model = LaunchConfiguration('urdf_model')
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
     # Declare launch arguments
     declare_jsp_gui_cmd = DeclareLaunchArgument(
-        "jsp_gui",
-        default_value="false",
-        choices=["true", "false"],
-        description="Launch the Joint State Publisher GUI",
+        'jsp_gui',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Launch the Joint State Publisher GUI',
     )
     declare_rviz_config_cmd = DeclareLaunchArgument(
-        "rviz_config_file",
+        'rviz_config_file',
         default_value=default_rviz_path,
-        description="Path to RViz config file",
+        description='Path to RViz config file',
     )
     declare_urdf_model_cmd = DeclareLaunchArgument(
-        "urdf_model",
+        'urdf_model',
         default_value=default_urdf_path,
-        description="Path to the URDF model file",
+        description='Path to the URDF model file',
     )
     declare_use_sim_time_cmd = DeclareLaunchArgument(
-        "use_sim_time",
-        default_value="false",
-        choices=["true", "false"],
-        description="Use Gazebo simulation clock",
+        'use_sim_time',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Use Gazebo simulation clock',
     )
 
-    robot_description_content: ParameterValue = ParameterValue(Command([
-        'xacro', ' ', urdf_model, ' ',
-        'parent:=world ',
-        'use_gazebo:=false ',
-    ]), value_type=str)
+    robot_description_content: ParameterValue = ParameterValue(
+        Command(
+            [
+                'xacro',
+                ' ',
+                urdf_model,
+                ' ',
+                'parent:=world ',
+                'use_gazebo:=false ',
+            ]
+        ),
+        value_type=str,
+    )
 
     # Subscribe to the joint states of the robot, and publish them to the robot state publisher
     start_robot_state_publisher_cmd: Node = Node(
@@ -74,8 +77,10 @@ def generate_launch_description():
         name='robot_state_publisher',
         namespace='a200_0000',
         output='screen',
-        parameters=[{'use_sim_time': use_sim_time,
-                     'robot_description': robot_description_content}])
+        parameters=[
+            {'use_sim_time': use_sim_time, 'robot_description': robot_description_content}
+        ],
+    )
 
     # Publish the joint state values for the non-fixed joints in the URDF file.
     start_joint_state_publisher_cmd: Node = Node(

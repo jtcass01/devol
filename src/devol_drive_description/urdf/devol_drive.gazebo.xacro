@@ -6,11 +6,12 @@
     wheel_radius
     max_linear_acceleration
     tf_prefix
-    namespace:=/devol_drive">
+    namespace:=/devol_drive
+    use_cameras:=true">
 
     <!-- Gazebo Parameters -->
     <xacro:include filename="$(find devol_description)/urdf/devol.gazebo.xacro"/>
 
-    <xacro:devol_gazebo tf_prefix="${tf_prefix}" namespace="${namespace}" />
+    <xacro:devol_gazebo tf_prefix="${tf_prefix}" namespace="${namespace}" use_cameras="${use_cameras}" />
   </xacro:macro>
 </robot>

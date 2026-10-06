@@ -16,3 +16,6 @@ log
 *.aux
 __pycache__/
 *.pyc
+
+# Docker test-case output (docker/compose.yaml)
+results/

@@ -1,0 +1,76 @@
+# Formats C/C++ with clang-format and Python with ruff.
+# - Pull requests from branches in this repository: the formatted code is committed back to the PR branch.
+# - Pushes to main and pull requests from forks: check only; the job fails if anything is unformatted.
+# Tool versions are pinned so CI and local runs agree:
+#   pip install clang-format==18.1.8 ruff==0.15.20
+name: Format
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: format-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide whether to apply or only check
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && \
+             [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
+            echo "apply=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apply=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          # On a PR, check out the branch itself (not the merge commit) so fixes can be pushed to it.
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install formatters
+        run: pip install clang-format==18.1.8 ruff==0.15.20
+
+      - name: clang-format
+        run: |
+          files=$(git ls-files '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hh' '*.hpp' '*.hxx')
+          [ -z "$files" ] && exit 0
+          if [ "${{ steps.mode.outputs.apply }}" = "true" ]; then
+            clang-format -i $files
+          else
+            clang-format --dry-run -Werror $files
+          fi
+
+      - name: ruff format
+        run: |
+          if [ "${{ steps.mode.outputs.apply }}" = "true" ]; then
+            ruff format .
+          else
+            ruff format --check --diff .
+          fi
+
+      - name: Commit formatting changes
+        if: steps.mode.outputs.apply == 'true'
+        run: |
+          if git diff --quiet; then
+            echo "Already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Apply clang-format and ruff format"
+          git push
+          echo "::notice::Pushed a formatting commit to ${{ github.event.pull_request.head.ref }}."
