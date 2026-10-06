@@ -1,0 +1,22 @@
+# C/C++ style: the ROS 2 (ament_clang_format) configuration.
+# Applied by .github/workflows/format.yaml; run locally with
+#   clang-format -i $(git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hh' '*.hpp')
+---
+Language: Cpp
+BasedOnStyle: Google
+
+AccessModifierOffset: -2
+AlignAfterOpenBracket: AlwaysBreak
+BraceWrapping:
+  AfterClass: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterEnum: true
+BreakBeforeBraces: Custom
+ColumnLimit: 100
+ConstructorInitializerIndentWidth: 0
+ContinuationIndentWidth: 2
+DerivePointerAlignment: false
+PointerAlignment: Middle
+ReflowComments: false

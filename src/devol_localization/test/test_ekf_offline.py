@@ -1,7 +1,20 @@
 """Offline tests for the EKF and scan matcher: synthetic trajectory and scans against a toy grid."""
 
-from numpy import (ndarray, array, zeros, arange, cos, sin, sqrt, mean, diag, full, inf,
-                   minimum, int8)
+from numpy import (
+    ndarray,
+    array,
+    zeros,
+    arange,
+    cos,
+    sin,
+    sqrt,
+    mean,
+    diag,
+    full,
+    inf,
+    minimum,
+    int8,
+)
 from numpy.linalg import inv
 from numpy.random import default_rng
 
@@ -42,7 +55,12 @@ def raycast(grid: ndarray, pose, rng=None, sigma: float = 0.0) -> ndarray:
     c, s = cos(pose[2]), sin(pose[2])
     lx = pose[0] + c * LASER_POSE[0] - s * LASER_POSE[1]
     ly = pose[1] + s * LASER_POSE[0] + c * LASER_POSE[1]
-    angles = pose[2] + LASER_POSE[2] + ANGLE_MIN + (ANGLE_MAX - ANGLE_MIN) / (N_BEAMS - 1) * arange(N_BEAMS)
+    angles = (
+        pose[2]
+        + LASER_POSE[2]
+        + ANGLE_MIN
+        + (ANGLE_MAX - ANGLE_MIN) / (N_BEAMS - 1) * arange(N_BEAMS)
+    )
     steps = arange(RANGE_MIN, RANGE_MAX, RES / 2)
     xs = lx + cos(angles)[:, None] * steps[None, :]
     ys = ly + sin(angles)[:, None] * steps[None, :]
@@ -61,8 +79,15 @@ def raycast(grid: ndarray, pose, rng=None, sigma: float = 0.0) -> ndarray:
 
 
 def scan_points(ranges: ndarray, beam_step: int = 4) -> ndarray:
-    return scan_to_points(ranges, ANGLE_MIN, (ANGLE_MAX - ANGLE_MIN) / (N_BEAMS - 1),
-                          RANGE_MIN, RANGE_MAX, beam_step, LASER_POSE)
+    return scan_to_points(
+        ranges,
+        ANGLE_MIN,
+        (ANGLE_MAX - ANGLE_MIN) / (N_BEAMS - 1),
+        RANGE_MIN,
+        RANGE_MAX,
+        beam_step,
+        LASER_POSE,
+    )
 
 
 def trajectory(dt: float = 0.05):
@@ -70,16 +95,28 @@ def trajectory(dt: float = 0.05):
     poses = [array([0.0, 0.2, 0.0])]
     # (v, wz, duration): straights, two left turns, a turn in place, a reverse and a gentle arc.
     # Stays at least 0.7 m clear of every obstacle in toy_grid().
-    segments = [(0.4, 0.0, 15.0), (0.25, 0.3, 5.24), (0.4, 0.0, 3.5), (0.25, 0.3, 5.24),
-                (0.4, 0.0, 12.0), (0.0, 0.4, 4.0), (-0.2, 0.0, 4.0), (0.4, -0.1, 6.0)]
+    segments = [
+        (0.4, 0.0, 15.0),
+        (0.25, 0.3, 5.24),
+        (0.4, 0.0, 3.5),
+        (0.25, 0.3, 5.24),
+        (0.4, 0.0, 12.0),
+        (0.0, 0.4, 4.0),
+        (-0.2, 0.0, 4.0),
+        (0.4, -0.1, 6.0),
+    ]
     for v, wz, duration in segments:
         for _ in range(int(duration / dt)):
             x, y, th = poses[-1]
-            poses.append(array([x + v * dt * cos(th), y + v * dt * sin(th), wrap_angle(th + wz * dt)]))
+            poses.append(
+                array([x + v * dt * cos(th), y + v * dt * sin(th), wrap_angle(th + wz * dt)])
+            )
     return poses
 
 
-def noisy_odometry(truth, rng, alphas=(0.05, 0.005, 0.05, 0.005), bias_yaw_rate: float = 0.002, slip=(1.0, 1.0)):
+def noisy_odometry(
+    truth, rng, alphas=(0.05, 0.005, 0.05, 0.005), bias_yaw_rate: float = 0.002, slip=(1.0, 1.0)
+):
     """Corrupts true increments with Probabilistic Robotics odometry noise, a small heading bias,
     and optional systematic (distance, yaw) scale errors."""
     a1, a2, a3, a4 = alphas
@@ -87,11 +124,13 @@ def noisy_odometry(truth, rng, alphas=(0.05, 0.005, 0.05, 0.005), bias_yaw_rate:
     for prev, cur in zip(truth[:-1], truth[1:]):
         r1, t, r2 = odometry_delta(prev, cur)
         r1, t, r2 = r1 * slip[1], t * slip[0], r2 * slip[1]
-        r1n = r1 + rng.normal(0, sqrt(a1 * r1 ** 2 + a2 * t ** 2))
-        tn = t + rng.normal(0, sqrt(a3 * t ** 2 + a4 * (r1 ** 2 + r2 ** 2)))
-        r2n = r2 + rng.normal(0, sqrt(a1 * r2 ** 2 + a2 * t ** 2)) + bias_yaw_rate * abs(t)
+        r1n = r1 + rng.normal(0, sqrt(a1 * r1**2 + a2 * t**2))
+        tn = t + rng.normal(0, sqrt(a3 * t**2 + a4 * (r1**2 + r2**2)))
+        r2n = r2 + rng.normal(0, sqrt(a1 * r2**2 + a2 * t**2)) + bias_yaw_rate * abs(t)
         x, y, th = odom[-1]
-        odom.append(array([x + tn * cos(th + r1n), y + tn * sin(th + r1n), wrap_angle(th + r1n + r2n)]))
+        odom.append(
+            array([x + tn * cos(th + r1n), y + tn * sin(th + r1n), wrap_angle(th + r1n + r2n)])
+        )
     return odom
 
 
@@ -137,15 +176,25 @@ def test_scan_matcher_search_finds_large_heading_error():
     truth = array([4.5, 3.0, 0.4])
     pts = scan_points(raycast(grid, truth))
     prior = truth + array([0.6, -0.5, 0.35])  # 20 deg off
-    assert matcher.match(pts, prior) is None or abs(matcher.match(pts, prior).pose[2] - truth[2]) > 0.05
+    assert (
+        matcher.match(pts, prior) is None
+        or abs(matcher.match(pts, prior).pose[2] - truth[2]) > 0.05
+    )
     result = matcher.match(pts, prior, half_xy=1.0, half_yaw=0.5)
     assert result is not None
     assert sqrt((result.pose[0] - truth[0]) ** 2 + (result.pose[1] - truth[1]) ** 2) < 0.03
     assert abs(wrap_angle(result.pose[2] - truth[2])) < 0.01
 
 
-def run_trial(seed: int, range_sigma: float = 0.01, scan_every: int = 2, slip=(1.0, 1.0),
-              initial_error=(0.0, 0.0, 0.0), initial_std=(0.1, 0.1, 0.05), blackout=(0, 0)):
+def run_trial(
+    seed: int,
+    range_sigma: float = 0.01,
+    scan_every: int = 2,
+    slip=(1.0, 1.0),
+    initial_error=(0.0, 0.0, 0.0),
+    initial_std=(0.1, 0.1, 0.05),
+    blackout=(0, 0),
+):
     """Runs dead reckoning and the EKF pipeline over one synthetic run.
 
     :param slip: (distance scale, yaw scale) systematic odometry error, like skid-steer slip.
@@ -165,19 +214,31 @@ def run_trial(seed: int, range_sigma: float = 0.01, scan_every: int = 2, slip=(1
     dr_err, ekf_err, yaw_err, nees = [], [], [], []
     for k in range(1, len(truth)):
         pipeline.on_odom(odom[k])
-        if k % scan_every == 0 and not blackout[0] <= k < blackout[1]:  # odometry 20 Hz, scans 10 Hz
+        if (
+            k % scan_every == 0 and not blackout[0] <= k < blackout[1]
+        ):  # odometry 20 Hz, scans 10 Hz
             pipeline.on_scan(scan_points(raycast(grid, truth[k], rng, range_sigma)))
         c, s = cos(map_to_odom[2]), sin(map_to_odom[2])
-        dr = array([map_to_odom[0] + c * odom[k][0] - s * odom[k][1],
-                    map_to_odom[1] + s * odom[k][0] + c * odom[k][1]])
+        dr = array(
+            [
+                map_to_odom[0] + c * odom[k][0] - s * odom[k][1],
+                map_to_odom[1] + s * odom[k][0] + c * odom[k][1],
+            ]
+        )
         err = ekf.x - truth[k]
         err[2] = wrap_angle(err[2])
         dr_err.append(((dr - truth[k][:2]) ** 2).sum())
         ekf_err.append((err[:2] ** 2).sum())
         yaw_err.append(err[2] ** 2)
         nees.append(float(err @ inv(ekf.P) @ err))
-    return {'dr_rmse': sqrt(mean(dr_err)), 'rmse': sqrt(mean(ekf_err)), 'yaw_rmse': sqrt(mean(yaw_err)),
-            'final': sqrt(ekf_err[-1]), 'nees': mean(nees[50:]), 'stats': pipeline.stats}
+    return {
+        'dr_rmse': sqrt(mean(dr_err)),
+        'rmse': sqrt(mean(ekf_err)),
+        'yaw_rmse': sqrt(mean(yaw_err)),
+        'final': sqrt(ekf_err[-1]),
+        'nees': mean(nees[50:]),
+        'stats': pipeline.stats,
+    }
 
 
 def test_ekf_beats_dead_reckoning():
@@ -214,12 +275,18 @@ def test_ekf_covariance_is_consistent():
 if __name__ == '__main__':
     for sigma in (0.01, 0.03, 0.10):
         rows = [run_trial(seed, sigma) for seed in range(5)]
-        print(f'range sigma {sigma:.2f} m: dead reckoning RMSE '
-              f'{mean([r["dr_rmse"] for r in rows]):.3f} m, EKF RMSE {mean([r["rmse"] for r in rows]):.3f} m, '
-              f'EKF yaw RMSE {mean([r["yaw_rmse"] for r in rows]):.4f} rad, NEES {mean([r["nees"] for r in rows]):.1f}')
-    for label, kw in (('slip + 20 deg start error', dict(slip=(1.05, 1.08), initial_error=(0.3, -0.3, 0.35))),
-                      ('slip + 15 s scan blackout', dict(slip=(1.05, 1.08), blackout=(250, 550)))):
+        print(
+            f'range sigma {sigma:.2f} m: dead reckoning RMSE '
+            f'{mean([r["dr_rmse"] for r in rows]):.3f} m, EKF RMSE {mean([r["rmse"] for r in rows]):.3f} m, '
+            f'EKF yaw RMSE {mean([r["yaw_rmse"] for r in rows]):.4f} rad, NEES {mean([r["nees"] for r in rows]):.1f}'
+        )
+    for label, kw in (
+        ('slip + 20 deg start error', dict(slip=(1.05, 1.08), initial_error=(0.3, -0.3, 0.35))),
+        ('slip + 15 s scan blackout', dict(slip=(1.05, 1.08), blackout=(250, 550))),
+    ):
         r = run_trial(0, **kw)
-        print(f'{label}: dead reckoning RMSE {r["dr_rmse"]:.3f} m, EKF RMSE {r["rmse"]:.3f} m, '
-              f'final {r["final"]:.3f} m, NEES {r["nees"]:.1f}, fused {r["stats"].fused}/{r["stats"].scans}, '
-              f're-acquired {r["stats"].reacquired}')
+        print(
+            f'{label}: dead reckoning RMSE {r["dr_rmse"]:.3f} m, EKF RMSE {r["rmse"]:.3f} m, '
+            f'final {r["final"]:.3f} m, NEES {r["nees"]:.1f}, fused {r["stats"].fused}/{r["stats"].scans}, '
+            f're-acquired {r["stats"].reacquired}'
+        )

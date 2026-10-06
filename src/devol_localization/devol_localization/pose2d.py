@@ -7,8 +7,8 @@ from typing import Sequence
 
 import numpy as np
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 def wrap_angle(a):
@@ -30,7 +30,9 @@ def set_quaternion_yaw(q, yaw: float) -> None:
 def compose(a: Sequence[float], b: Sequence[float]) -> np.ndarray:
     """a (+) b."""
     c, s = np.cos(a[2]), np.sin(a[2])
-    return np.array([a[0] + c * b[0] - s * b[1], a[1] + s * b[0] + c * b[1], float(wrap_angle(a[2] + b[2]))])
+    return np.array(
+        [a[0] + c * b[0] - s * b[1], a[1] + s * b[0] + c * b[1], float(wrap_angle(a[2] + b[2]))]
+    )
 
 
 def inverse(a: Sequence[float]) -> np.ndarray:
@@ -47,7 +49,9 @@ def transform_points(pose: Sequence[float], points: np.ndarray) -> np.ndarray:
     """Maps (N, 2) points from the frame of `pose` into the parent frame."""
     c, s = np.cos(pose[2]), np.sin(pose[2])
     pts = np.asarray(points, dtype=float).reshape(-1, 2)
-    return np.column_stack((pose[0] + c * pts[:, 0] - s * pts[:, 1], pose[1] + s * pts[:, 0] + c * pts[:, 1]))
+    return np.column_stack(
+        (pose[0] + c * pts[:, 0] - s * pts[:, 1], pose[1] + s * pts[:, 0] + c * pts[:, 1])
+    )
 
 
 def covariance_3x3(cov36: Sequence[float]) -> np.ndarray:

@@ -1,0 +1,7 @@
+# Python formatting, applied by .github/workflows/format.yaml; run locally with `ruff format`.
+# 99 columns and single quotes, the usual ROS 2 Python conventions.
+line-length = 99
+extend-exclude = ["build", "install", "log"]
+
+[format]
+quote-style = "single"

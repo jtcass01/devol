@@ -16,6 +16,7 @@ Ported from the Robot Motion Planning (535.622) final project MATLAB code
 
 The module is ROS-free so it can be unit tested offline.
 """
+
 from __future__ import annotations
 
 import time
@@ -26,8 +27,8 @@ from typing import List, Optional, Tuple
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 Pose = Tuple[float, float, float]
 
@@ -44,16 +45,18 @@ class FootprintCollisionChecker:
     values 0 free, 100 occupied, -1 unknown.
     """
 
-    def __init__(self,
-                 grid: np.ndarray,
-                 resolution: float,
-                 origin: Tuple[float, float],
-                 length: float = 0.99,
-                 width: float = 0.67,
-                 padding: float = 0.05,
-                 offset: Tuple[float, float] = (0.0, 0.0),
-                 occupied_threshold: int = 50,
-                 unknown_is_occupied: bool = True):
+    def __init__(
+        self,
+        grid: np.ndarray,
+        resolution: float,
+        origin: Tuple[float, float],
+        length: float = 0.99,
+        width: float = 0.67,
+        padding: float = 0.05,
+        offset: Tuple[float, float] = (0.0, 0.0),
+        occupied_threshold: int = 50,
+        unknown_is_occupied: bool = True,
+    ):
         self.resolution = float(resolution)
         self.origin_x = float(origin[0])
         self.origin_y = float(origin[1])
@@ -67,7 +70,10 @@ class FootprintCollisionChecker:
 
         self.half_length = 0.5 * length + padding
         self.half_width = 0.5 * width + padding
-        self.offset_x, self.offset_y = float(offset[0]), float(offset[1])  # footprint centre in base_link (m)
+        self.offset_x, self.offset_y = (
+            float(offset[0]),
+            float(offset[1]),
+        )  # footprint centre in base_link (m)
 
         # Circle radii about the footprint centre. A cell is a square, so its
         # centre may sit up to half a diagonal from an occupied area.
@@ -134,7 +140,9 @@ class FootprintCollisionChecker:
     def y_bounds(self) -> Tuple[float, float]:
         return self.origin_y, self.origin_y + self.n_rows * self.resolution
 
-    def world_to_cells(self, xs: np.ndarray, ys: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def world_to_cells(
+        self, xs: np.ndarray, ys: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         cols = np.floor((xs - self.origin_x) / self.resolution).astype(np.int64)
         rows = np.floor((ys - self.origin_y) / self.resolution).astype(np.int64)
         inside = (rows >= 0) & (rows < self.n_rows) & (cols >= 0) & (cols < self.n_cols)
@@ -178,14 +186,16 @@ class FootprintCollisionChecker:
             return True
         return bool(self.occupied[rows, cols].any())
 
-    def segment_poses(self, x0: float, y0: float, x1: float, y1: float, heading: float) -> np.ndarray:
+    def segment_poses(
+        self, x0: float, y0: float, x1: float, y1: float, heading: float
+    ) -> np.ndarray:
         """Poses along a straight drive from (x0, y0) to (x1, y1) facing `heading`."""
         dist = hypot(x1 - x0, y1 - y0)
         n = max(1, int(ceil(dist / self.translation_step)))
         alpha = np.linspace(0.0, 1.0, n + 1)
-        return np.stack([x0 + alpha * (x1 - x0),
-                         y0 + alpha * (y1 - y0),
-                         np.full(n + 1, heading)], axis=1)
+        return np.stack(
+            [x0 + alpha * (x1 - x0), y0 + alpha * (y1 - y0), np.full(n + 1, heading)], axis=1
+        )
 
     def rotation_poses(self, x: float, y: float, theta0: float, theta1: float) -> np.ndarray:
         """Poses for an in-place rotation from theta0 to theta1 (shortest direction)."""
@@ -203,7 +213,7 @@ class FootprintCollisionChecker:
         return self.poses_in_collision(self.rotation_poses(x, y, theta0, theta1))
 
     def free_area(self) -> float:
-        return float((~self.occupied).sum()) * self.resolution ** 2
+        return float((~self.occupied).sum()) * self.resolution**2
 
     def surely_blocked(self, x: float, y: float) -> bool:
         """True if base_link at (x, y) collides at every heading (cheap sample rejection)."""
@@ -258,6 +268,7 @@ class MultiFootprintChecker:
 @dataclass
 class BodyBox:
     """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
+
     x_min: float
     x_max: float
     y_min: float
@@ -273,9 +284,9 @@ class BodyBox:
 # lidar at 0.72-0.76 m; its x/y extent is an estimate.
 # The base box starts 5 cm up so the floor's own voxel layer never counts.
 DEFAULT_BODY = [
-    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),   # chassis, wheels, top plate
-    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),       # 300 mm sensor arch + VLP-16
-    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),        # stowed UR5e + Robotiq, offset to +y
+    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),  # chassis, wheels, top plate
+    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),  # 300 mm sensor arch + VLP-16
+    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),  # stowed UR5e + Robotiq, offset to +y
 ]
 
 
@@ -283,14 +294,16 @@ def body_from_flat(values: List[float]) -> List[BodyBox]:
     """Six numbers per box: x_min, x_max, y_min, y_max, z_min, z_max."""
     if len(values) == 0 or len(values) % 6:
         raise ValueError('body boxes need 6 values each (x_min x_max y_min y_max z_min z_max)')
-    return [BodyBox(*map(float, values[i:i + 6])) for i in range(0, len(values), 6)]
+    return [BodyBox(*map(float, values[i : i + 6])) for i in range(0, len(values), 6)]
 
 
-def layer_grids_from_voxels(centers: np.ndarray,
-                            sizes: np.ndarray,
-                            resolution: float,
-                            z_bands: List[Tuple[float, float]],
-                            margin: float = 0.0):
+def layer_grids_from_voxels(
+    centers: np.ndarray,
+    sizes: np.ndarray,
+    resolution: float,
+    z_bands: List[Tuple[float, float]],
+    margin: float = 0.0,
+):
     """Rasterise occupied octomap voxels into one 2D grid per height band.
 
     centers: N x 3 voxel centres; sizes: N edge lengths (octomap prunes uniform
@@ -305,8 +318,10 @@ def layer_grids_from_voxels(centers: np.ndarray,
     lo = centers - half
     hi = centers + half
     eps = 1e-6 * resolution
-    origin = (np.floor((lo[:, 0].min() - margin) / resolution) * resolution,
-              np.floor((lo[:, 1].min() - margin) / resolution) * resolution)
+    origin = (
+        np.floor((lo[:, 0].min() - margin) / resolution) * resolution,
+        np.floor((lo[:, 1].min() - margin) / resolution) * resolution,
+    )
     n_cols = int(np.ceil((hi[:, 0].max() + margin - origin[0]) / resolution - eps))
     n_rows = int(np.ceil((hi[:, 1].max() + margin - origin[1]) / resolution - eps))
 
@@ -322,18 +337,20 @@ def layer_grids_from_voxels(centers: np.ndarray,
         single = sel[(c1[sel] - c0[sel] == 1) & (r1[sel] - r0[sel] == 1)]
         grid[r0[single], c0[single]] = 100
         for i in np.setdiff1d(sel, single):
-            grid[r0[i]:r1[i], c0[i]:c1[i]] = 100
+            grid[r0[i] : r1[i], c0[i] : c1[i]] = 100
         grids.append(grid)
     return grids, origin
 
 
-def body_checker_from_voxels(centers: np.ndarray,
-                             sizes: np.ndarray,
-                             resolution: float,
-                             body: Optional[List[BodyBox]] = None,
-                             ground_z: float = 0.0,
-                             padding: float = 0.05,
-                             margin: float = 1.0) -> MultiFootprintChecker:
+def body_checker_from_voxels(
+    centers: np.ndarray,
+    sizes: np.ndarray,
+    resolution: float,
+    body: Optional[List[BodyBox]] = None,
+    ground_z: float = 0.0,
+    padding: float = 0.05,
+    margin: float = 1.0,
+) -> MultiFootprintChecker:
     """3D collision checker: each body box against the voxels in its height band.
 
     For a robot on flat ground at height ground_z that only yaws, this is the
@@ -345,44 +362,53 @@ def body_checker_from_voxels(centers: np.ndarray,
     # Pad upward only: padding downward would pull floor voxels into the lowest band.
     bands = [(ground_z + b.z_min, ground_z + b.z_max + padding) for b in body]
     grids, origin = layer_grids_from_voxels(centers, sizes, resolution, bands, margin)
-    parts = [FootprintCollisionChecker(grid, resolution, origin,
-                                       length=b.x_max - b.x_min, width=b.y_max - b.y_min,
-                                       padding=padding,
-                                       offset=(0.5 * (b.x_min + b.x_max), 0.5 * (b.y_min + b.y_max)),
-                                       unknown_is_occupied=False)
-             for b, grid in zip(body, grids)]
+    parts = [
+        FootprintCollisionChecker(
+            grid,
+            resolution,
+            origin,
+            length=b.x_max - b.x_min,
+            width=b.y_max - b.y_min,
+            padding=padding,
+            offset=(0.5 * (b.x_min + b.x_max), 0.5 * (b.y_min + b.y_max)),
+            unknown_is_occupied=False,
+        )
+        for b, grid in zip(body, grids)
+    ]
     return MultiFootprintChecker(parts)
 
 
 @dataclass
 class PlannerConfig:
-    algorithm: str = 'rrt_star'      # 'rrt' or 'rrt_star'
-    step_size: float = 1.0           # max edge length (m)
-    goal_bias: float = 0.1           # probability of sampling the goal
-    goal_tolerance: float = 1.0      # try to connect to the goal from nodes this close (m)
+    algorithm: str = 'rrt_star'  # 'rrt' or 'rrt_star'
+    step_size: float = 1.0  # max edge length (m)
+    goal_bias: float = 0.1  # probability of sampling the goal
+    goal_tolerance: float = 1.0  # try to connect to the goal from nodes this close (m)
     max_iterations: int = 20000
-    max_planning_time: float = 2.0   # s; RRT* returns its best path when this runs out
-    patience: int = 1500             # RRT*: stop after this many iterations without improvement
-    gamma_scale: float = 1.2         # RRT*: multiple of the theoretical gamma*
-    max_rewire_radius: float = 3.0   # m
+    max_planning_time: float = 2.0  # s; RRT* returns its best path when this runs out
+    patience: int = 1500  # RRT*: stop after this many iterations without improvement
+    gamma_scale: float = 1.2  # RRT*: multiple of the theoretical gamma*
+    max_rewire_radius: float = 3.0  # m
     shortcut_attempts: int = 200
-    require_goal_yaw: bool = True    # rotate to the goal yaw at the end of the path
+    require_goal_yaw: bool = True  # rotate to the goal yaw at the end of the path
     free_unknown_at_start: bool = True  # unknown cells under the robot's start footprint are free
-    goal_approach_distance: float = 1.0  # final straight run along the goal heading (m); 0 disables
+    goal_approach_distance: float = (
+        1.0  # final straight run along the goal heading (m); 0 disables
+    )
     seed: Optional[int] = None
 
 
 @dataclass
 class PlanResult:
-    path: List[Pose] = field(default_factory=list)   # (x, y, heading) waypoints, start first
+    path: List[Pose] = field(default_factory=list)  # (x, y, heading) waypoints, start first
     raw_path: List[Pose] = field(default_factory=list)
     cost: float = float('inf')
     iterations: int = 0
     nodes: int = 0
     planning_time: float = 0.0
     first_solution_time: Optional[float] = None
-    freed_start_cells: int = 0       # unknown cells under the start footprint treated as free
-    tree: Optional[Tuple[np.ndarray, np.ndarray]] = None   # (nodes N x 3, parents N)
+    freed_start_cells: int = 0  # unknown cells under the start footprint treated as free
+    tree: Optional[Tuple[np.ndarray, np.ndarray]] = None  # (nodes N x 3, parents N)
 
     @property
     def success(self) -> bool:
@@ -396,7 +422,9 @@ class RRTPlanner:
         self.checker = checker
         self.config = config or PlannerConfig()
         if self.config.algorithm not in ('rrt', 'rrt_star'):
-            raise ValueError(f"algorithm must be 'rrt' or 'rrt_star', got {self.config.algorithm!r}")
+            raise ValueError(
+                f"algorithm must be 'rrt' or 'rrt_star', got {self.config.algorithm!r}"
+            )
         self._rng = np.random.default_rng(self.config.seed)
         self._require_yaw = self.config.require_goal_yaw
         # Karaman & Frazzoli gamma* for d = 2 using the free area of the map
@@ -410,7 +438,7 @@ class RRTPlanner:
     # Tree storage helpers
     def _reset(self, start: Pose, capacity: int) -> None:
         self._xy = np.zeros((capacity, 2))
-        self._heading = np.zeros(capacity)       # arrival heading at each node
+        self._heading = np.zeros(capacity)  # arrival heading at each node
         self._parent = np.full(capacity, -1, dtype=np.int64)
         self._cost = np.full(capacity, np.inf)
         self._children: List[List[int]] = [[] for _ in range(capacity)]
@@ -527,7 +555,7 @@ class RRTPlanner:
         capacity = cfg.max_iterations + 2
         self._reset(start, capacity)
         if approach is not None:
-            self._require_yaw = True   # the turn onto the lead-in must be checked
+            self._require_yaw = True  # the turn onto the lead-in must be checked
         self._goal = goal
         goal_xy = np.array(goal[:2])
         best_goal_parent = -1
@@ -553,7 +581,7 @@ class RRTPlanner:
             no_improve += 1
 
             q_rand = self._sample(goal)
-            d2 = np.sum((self._xy[:self._n] - q_rand) ** 2, axis=1)
+            d2 = np.sum((self._xy[: self._n] - q_rand) ** 2, axis=1)
             nearest = int(np.argmin(d2))
             q_new = self._steer(self._xy[nearest], q_rand)
             if hypot(*(q_new - self._xy[nearest])) < 1e-6:
@@ -568,7 +596,7 @@ class RRTPlanner:
             if cfg.algorithm == 'rrt_star':
                 n = max(self._n, 2)
                 radius = min(self._gamma * sqrt(log(n) / n), cfg.max_rewire_radius)
-                dists = np.sqrt(np.sum((self._xy[:self._n] - q_new) ** 2, axis=1))
+                dists = np.sqrt(np.sum((self._xy[: self._n] - q_new) ** 2, axis=1))
                 neighbors = np.nonzero(dists <= radius)[0]
                 # Choose the cheapest collision-free parent.
                 order = neighbors[np.argsort(self._cost[neighbors] + dists[neighbors])]
@@ -603,8 +631,11 @@ class RRTPlanner:
                     self._update_subtree_costs(j)
                 # Rewiring may have lowered the cost of the current best solution.
                 if best_goal_parent >= 0:
-                    best_cost = min(best_cost, self._cost[best_goal_parent] +
-                                    hypot(*(goal_xy - self._xy[best_goal_parent])))
+                    best_cost = min(
+                        best_cost,
+                        self._cost[best_goal_parent]
+                        + hypot(*(goal_xy - self._xy[best_goal_parent])),
+                    )
 
             dist_goal = hypot(*(goal_xy - q_new))
             if dist_goal <= cfg.goal_tolerance:
@@ -619,8 +650,10 @@ class RRTPlanner:
 
         result.iterations = it
         result.nodes = self._n
-        result.tree = (np.column_stack([self._xy[:self._n], self._heading[:self._n]]).copy(),
-                       self._parent[:self._n].copy())
+        result.tree = (
+            np.column_stack([self._xy[: self._n], self._heading[: self._n]]).copy(),
+            self._parent[: self._n].copy(),
+        )
 
         if best_goal_parent >= 0:
             raw = self._reconstruct(best_goal_parent, goal)
@@ -642,8 +675,9 @@ class RRTPlanner:
         c, s = cos(gyaw), sin(gyaw)
         while d >= 2.0 * self.checker.translation_step:
             px, py = gx - d * c, gy - d * s
-            if not self.checker.is_collision(px, py, gyaw) and \
-                    not self.checker.segment_in_collision(px, py, gx, gy, gyaw):
+            if not self.checker.is_collision(
+                px, py, gyaw
+            ) and not self.checker.segment_in_collision(px, py, gx, gy, gyaw):
                 return (px, py, gyaw)
             d *= 0.5
         return None
@@ -688,7 +722,7 @@ class RRTPlanner:
                 break
             i = int(self._rng.integers(0, n - 2))
             j = int(self._rng.integers(i + 2, n))
-            candidate = points[:i + 1] + points[j:]
+            candidate = points[: i + 1] + points[j:]
             if self.path_valid(poses_from_points(candidate, start_yaw, goal[2])):
                 points = candidate
         return poses_from_points(points, start_yaw, goal[2])
@@ -702,7 +736,9 @@ class GoalInCollision(RuntimeError):
     pass
 
 
-def poses_from_points(points: List[Tuple[float, float]], start_yaw: float, goal_yaw: float) -> List[Pose]:
+def poses_from_points(
+    points: List[Tuple[float, float]], start_yaw: float, goal_yaw: float
+) -> List[Pose]:
     """Attach headings to waypoints: each one faces the next, the last uses goal_yaw.
     The first waypoint (the start) keeps start_yaw so path_valid sees the initial turn."""
     poses: List[Pose] = []
@@ -742,5 +778,9 @@ def distance_to_segment(x: float, y: float, x0: float, y0: float, x1: float, y1:
     """Distance from (x, y) to the segment (x0, y0)-(x1, y1)."""
     dx, dy = x1 - x0, y1 - y0
     length_sq = dx * dx + dy * dy
-    a = 0.0 if length_sq == 0.0 else min(1.0, max(0.0, ((x - x0) * dx + (y - y0) * dy) / length_sq))
+    a = (
+        0.0
+        if length_sq == 0.0
+        else min(1.0, max(0.0, ((x - x0) * dx + (y - y0) * dy) / length_sq))
+    )
     return hypot(x - (x0 + a * dx), y - (y0 + a * dy))

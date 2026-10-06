@@ -22,8 +22,8 @@ from sensor_msgs.msg import LaserScan
 
 from devol_localization.pose2d import covariance_3x3, transform_points, yaw_from_quaternion
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 def stamp_seconds(stamp) -> float:
@@ -60,27 +60,41 @@ class PosteriorSnapshot(Node):
         self._map = None
         self._truth: Optional[np.ndarray] = None
         self._t0: Optional[float] = None
-        self._due: List[float] = []          # absolute sim times still to capture
+        self._due: List[float] = []  # absolute sim times still to capture
         self._kidnap_seen = False
         self._ekf = self._ekf_cov = self._pf = self._pf_cov = None
         self._particles: Optional[np.ndarray] = None
         self._scan = None
 
-        map_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        map_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
         self.create_subscription(OccupancyGrid, gp('map_topic').value, self._map_cb, map_qos)
         self.create_subscription(Odometry, gp('ground_truth_topic').value, self._gt_cb, 50)
-        self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self._ekf_cb, 10)
-        self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/pf_pose', self._pf_cb, 10)
+        self.create_subscription(
+            PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self._ekf_cb, 10
+        )
+        self.create_subscription(
+            PoseWithCovarianceStamped, '/devol_drive/pf_pose', self._pf_cb, 10
+        )
         self.create_subscription(PoseArray, '/devol_drive/pf_particles', self._particles_cb, 1)
-        self.create_subscription(LaserScan, gp('scan_topic').value, self._scan_cb, qos_profile_sensor_data)
-        self.get_logger().info(f'Posterior snapshots at t0 + {self._times} s and kidnap + {self._after_kidnap} s '
-                               f'into {self._out}')
+        self.create_subscription(
+            LaserScan, gp('scan_topic').value, self._scan_cb, qos_profile_sensor_data
+        )
+        self.get_logger().info(
+            f'Posterior snapshots at t0 + {self._times} s and kidnap + {self._after_kidnap} s '
+            f'into {self._out}'
+        )
 
     def _map_cb(self, msg: OccupancyGrid) -> None:
         info = msg.info
-        self._map = (np.asarray(msg.data, dtype=np.int8).reshape((info.height, info.width)), info.resolution,
-                     (info.origin.position.x, info.origin.position.y))
+        self._map = (
+            np.asarray(msg.data, dtype=np.int8).reshape((info.height, info.width)),
+            info.resolution,
+            (info.origin.position.x, info.origin.position.y),
+        )
 
     def _ekf_cb(self, msg: PoseWithCovarianceStamped) -> None:
         self._ekf, self._ekf_cov = planar(msg.pose.pose), covariance_3x3(msg.pose.covariance)
@@ -95,7 +109,9 @@ class PosteriorSnapshot(Node):
         r = np.asarray(msg.ranges, dtype=float)
         a = msg.angle_min + np.arange(r.size) * msg.angle_increment
         ok = np.isfinite(r) & (r > msg.range_min) & (r < msg.range_max)
-        self._scan = transform_points(self._laser, np.column_stack((r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok]))))
+        self._scan = transform_points(
+            self._laser, np.column_stack((r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])))
+        )
 
     def _gt_cb(self, msg: Odometry) -> None:
         t = stamp_seconds(msg.header.stamp)
@@ -117,11 +133,24 @@ class PosteriorSnapshot(Node):
             self.get_logger().warning(f'No map yet; skipping the snapshot at t = {t:.1f} s')
             return
         from devol_localization.viz_core import posterior_figure
+
         grid, res, origin = self._map
         scan = transform_points(self._truth, self._scan) if self._scan is not None else None
-        fig = posterior_figure(grid, res, origin, self._truth, self._ekf, self._ekf_cov, self._pf, self._pf_cov,
-                               self._particles, scan, stamp=t, window=self._window,
-                               title=f'{self._title} t = {t:.1f} s'.strip())
+        fig = posterior_figure(
+            grid,
+            res,
+            origin,
+            self._truth,
+            self._ekf,
+            self._ekf_cov,
+            self._pf,
+            self._pf_cov,
+            self._particles,
+            scan,
+            stamp=t,
+            window=self._window,
+            title=f'{self._title} t = {t:.1f} s'.strip(),
+        )
         path = os.path.join(self._out, f'posterior_t{t:06.1f}.png')
         fig.savefig(path, dpi=120)
         self.get_logger().info(f'Saved {path}')

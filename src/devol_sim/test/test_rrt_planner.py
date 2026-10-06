@@ -1,17 +1,28 @@
 """Offline tests for the RRT / RRT* planner and its footprint collision check."""
+
 import os
 from math import hypot, pi
 
 import numpy as np
 import pytest
 
-from devol_sim.rrt_planner import (DEFAULT_BODY, FootprintCollisionChecker, PlannerConfig,
-                                   RRTPlanner, StartInCollision, body_checker_from_voxels, densify,
-                                   distance_to_segment, layer_grids_from_voxels, path_length)
+from devol_sim.rrt_planner import (
+    DEFAULT_BODY,
+    FootprintCollisionChecker,
+    PlannerConfig,
+    RRTPlanner,
+    StartInCollision,
+    body_checker_from_voxels,
+    densify,
+    distance_to_segment,
+    layer_grids_from_voxels,
+    path_length,
+)
 
 RES = 0.05
-FACTORY_PCD = os.path.join(os.path.dirname(__file__), '..', '..', 'devol_gazebo', 'worlds',
-                           'factory', 'static_world.pcd')
+FACTORY_PCD = os.path.join(
+    os.path.dirname(__file__), '..', '..', 'devol_gazebo', 'worlds', 'factory', 'static_world.pcd'
+)
 
 
 def empty_grid(width_m, height_m):
@@ -28,8 +39,10 @@ def projected_grid_from_pcd(path, resolution=RES, min_z=0.1, max_z=5.0):
     """Approximates octomap_server's projected_map for a static cloud:
     any point between min_z and max_z marks its column occupied."""
     pts = np.loadtxt(path, skiprows=11)
-    origin = (np.floor(pts[:, 0].min() / resolution) * resolution,
-              np.floor(pts[:, 1].min() / resolution) * resolution)
+    origin = (
+        np.floor(pts[:, 0].min() / resolution) * resolution,
+        np.floor(pts[:, 1].min() / resolution) * resolution,
+    )
     cols = np.floor((pts[:, 0] - origin[0]) / resolution).astype(int)
     rows = np.floor((pts[:, 1] - origin[1]) / resolution).astype(int)
     grid = np.zeros((rows.max() + 1, cols.max() + 1), dtype=np.int8)
@@ -104,7 +117,7 @@ def test_footprint_detects_cell_in_interior_and_corner():
     grid = empty_grid(4, 4)
     checker_free = FootprintCollisionChecker(grid.copy(), RES, (0.0, 0.0))
     assert not checker_free.is_collision(2.0, 2.0, 0.3)
-    fill(grid, 2.0, 2.0, 2.05, 2.05)          # single cell under the robot
+    fill(grid, 2.0, 2.0, 2.05, 2.05)  # single cell under the robot
     assert FootprintCollisionChecker(grid, RES, (0.0, 0.0)).is_collision(2.0, 2.0, 0.3)
 
     grid = empty_grid(4, 4)
@@ -118,18 +131,21 @@ def test_footprint_detects_cell_in_interior_and_corner():
 def test_footprint_off_map_and_unknown():
     grid = empty_grid(4, 4)
     checker = FootprintCollisionChecker(grid, RES, (0.0, 0.0))
-    assert checker.is_collision(0.3, 2.0, 0.0)     # rear hangs off the map
+    assert checker.is_collision(0.3, 2.0, 0.0)  # rear hangs off the map
     fill(grid, 1.9, 1.9, 2.1, 2.1, value=-1)
     assert FootprintCollisionChecker(grid, RES, (0.0, 0.0)).is_collision(2.0, 2.0, 0.0)
-    assert not FootprintCollisionChecker(grid, RES, (0.0, 0.0),
-                                         unknown_is_occupied=False).is_collision(2.0, 2.0, 0.0)
+    assert not FootprintCollisionChecker(
+        grid, RES, (0.0, 0.0), unknown_is_occupied=False
+    ).is_collision(2.0, 2.0, 0.0)
 
 
 def test_fast_paths_agree_with_exact_check():
     rng = np.random.default_rng(0)
     grid = (rng.random((80, 80)) < 0.01).astype(np.int8) * 100
     checker = FootprintCollisionChecker(grid, RES, (0.0, 0.0))
-    poses = np.column_stack([rng.uniform(0, 4, 2000), rng.uniform(0, 4, 2000), rng.uniform(-pi, pi, 2000)])
+    poses = np.column_stack(
+        [rng.uniform(0, 4, 2000), rng.uniform(0, 4, 2000), rng.uniform(-pi, pi, 2000)]
+    )
     bx, by = checker._body_points
     for x, y, th in poses:
         c, s = np.cos(th), np.sin(th)
@@ -155,7 +171,9 @@ def corridor_world():
 @pytest.mark.parametrize('algorithm', ['rrt', 'rrt_star'])
 def test_plans_through_door(algorithm):
     checker = FootprintCollisionChecker(corridor_world(), RES, (0.0, 0.0))
-    planner = RRTPlanner(checker, PlannerConfig(algorithm=algorithm, seed=1, max_planning_time=10.0))
+    planner = RRTPlanner(
+        checker, PlannerConfig(algorithm=algorithm, seed=1, max_planning_time=10.0)
+    )
     start, goal = (1.5, 1.5, pi / 2), (6.5, 4.5, 0.0)
     result = planner.plan(start, goal)
     assert result.success
@@ -178,10 +196,26 @@ def test_rrt_star_not_worse_than_rrt():
     start, goal = (1.5, 1.5, 0.0), (6.5, 4.5, 0.0)
     rrt, star = [], []
     for seed in range(5):
-        rrt.append(RRTPlanner(checker, PlannerConfig(algorithm='rrt', seed=seed, shortcut_attempts=0,
-                                                     max_planning_time=10.0)).plan(start, goal).cost)
-        star.append(RRTPlanner(checker, PlannerConfig(algorithm='rrt_star', seed=seed, shortcut_attempts=0,
-                                                      max_planning_time=10.0)).plan(start, goal).cost)
+        rrt.append(
+            RRTPlanner(
+                checker,
+                PlannerConfig(
+                    algorithm='rrt', seed=seed, shortcut_attempts=0, max_planning_time=10.0
+                ),
+            )
+            .plan(start, goal)
+            .cost
+        )
+        star.append(
+            RRTPlanner(
+                checker,
+                PlannerConfig(
+                    algorithm='rrt_star', seed=seed, shortcut_attempts=0, max_planning_time=10.0
+                ),
+            )
+            .plan(start, goal)
+            .cost
+        )
     assert np.mean(star) <= np.mean(rrt)
 
 
@@ -196,7 +230,7 @@ def test_unknown_cells_under_start_are_freed():
     # which is exactly where the robot spawns.
     grid = corridor_world()
     fill(grid, 1.45, 1.45, 1.6, 1.6, value=-1)
-    fill(grid, 6.0, 1.0, 6.2, 1.2, value=-1)        # unknown pocket elsewhere stays blocked
+    fill(grid, 6.0, 1.0, 6.2, 1.2, value=-1)  # unknown pocket elsewhere stays blocked
     start, goal = (1.5, 1.5, 0.0), (6.5, 4.5, 0.0)
 
     checker = FootprintCollisionChecker(grid, RES, (0.0, 0.0))
@@ -217,7 +251,9 @@ def test_unknown_cells_under_start_are_freed():
 
 def test_straight_shot_in_open_space():
     checker = FootprintCollisionChecker(empty_grid(6, 6), RES, (0.0, 0.0))
-    result = RRTPlanner(checker, PlannerConfig(seed=0, goal_approach_distance=0.0)).plan((1.0, 1.0, 0.0), (5.0, 5.0, pi))
+    result = RRTPlanner(checker, PlannerConfig(seed=0, goal_approach_distance=0.0)).plan(
+        (1.0, 1.0, 0.0), (5.0, 5.0, pi)
+    )
     assert len(result.path) == 2
     assert result.cost == pytest.approx(hypot(4.0, 4.0))
 
@@ -245,10 +281,14 @@ def box_voxels(x0, x1, y0, y1, z0, z1, res=RES):
 
 
 def walled_room_voxels(width=8.0, height=6.0, wall_top=2.0):
-    return np.vstack([box_voxels(0, width, 0, 0.1, 0.1, wall_top),
-                      box_voxels(0, width, height - 0.1, height, 0.1, wall_top),
-                      box_voxels(0, 0.1, 0, height, 0.1, wall_top),
-                      box_voxels(width - 0.1, width, 0, height, 0.1, wall_top)])
+    return np.vstack(
+        [
+            box_voxels(0, width, 0, 0.1, 0.1, wall_top),
+            box_voxels(0, width, height - 0.1, height, 0.1, wall_top),
+            box_voxels(0, 0.1, 0, height, 0.1, wall_top),
+            box_voxels(width - 0.1, width, 0, height, 0.1, wall_top),
+        ]
+    )
 
 
 def test_pruned_leaves_fill_all_their_cells():
@@ -257,25 +297,29 @@ def test_pruned_leaves_fill_all_their_cells():
     grids, origin = layer_grids_from_voxels(centers, [0.2, 0.05], RES, [(0.05, 0.4), (0.4, 1.5)])
     low, high = grids
     assert origin == (1.0, 1.0)
-    assert (low == 100).sum() == 16 and (high == 100).sum() == 1   # the big leaf tops out at 0.4 m
+    assert (low == 100).sum() == 16 and (high == 100).sum() == 1  # the big leaf tops out at 0.4 m
     assert low[0:4, 0:4].all() and high[20, 20] == 100 and low[20, 20] == 0
 
 
 def test_3d_drives_under_overhang_but_not_into_low_obstacle():
     room = walled_room_voxels()
-    beam = box_voxels(3.9, 4.1, 0.1, 5.9, 1.8, 2.0)        # overhead beam across the room at 1.8-2.0 m
+    beam = box_voxels(3.9, 4.1, 0.1, 5.9, 1.8, 2.0)  # overhead beam across the room at 1.8-2.0 m
     checker = body_checker_from_voxels(np.vstack([room, beam]), RES, RES, margin=0.0)
-    assert not checker.is_collision(4.0, 3.0, 0.0)          # robot (<= 1.5 m tall) fits under it
+    assert not checker.is_collision(4.0, 3.0, 0.0)  # robot (<= 1.5 m tall) fits under it
     planner = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0))
     result = planner.plan((1.5, 3.0, 0.0), (6.5, 3.0, 0.0))
-    assert result.success and result.cost == pytest.approx(5.0)   # straight across, under the beam
+    assert result.success and result.cost == pytest.approx(5.0)  # straight across, under the beam
 
     # The same beam lowered to table height blocks the arm, and a 20 cm curb blocks the base.
-    for obstacle in (box_voxels(3.9, 4.1, 0.1, 5.9, 0.6, 0.7), box_voxels(3.9, 4.1, 0.1, 5.9, 0.1, 0.2)):
+    for obstacle in (
+        box_voxels(3.9, 4.1, 0.1, 5.9, 0.6, 0.7),
+        box_voxels(3.9, 4.1, 0.1, 5.9, 0.1, 0.2),
+    ):
         checker = body_checker_from_voxels(np.vstack([room, obstacle]), RES, RES, margin=0.0)
         assert checker.is_collision(4.0, 3.0, 0.0)
         result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=1.0)).plan(
-            (1.5, 3.0, 0.0), (6.5, 3.0, 0.0))
+            (1.5, 3.0, 0.0), (6.5, 3.0, 0.0)
+        )
         assert not result.success
 
 
@@ -285,10 +329,12 @@ def test_arm_box_overhangs_under_a_table():
     room = walled_room_voxels()
     table = box_voxels(0.1, 8.0, 0.1, 0.4, 0.6, 0.7)
     checker = body_checker_from_voxels(np.vstack([room, table]), RES, RES, margin=0.0)
-    base_only = body_checker_from_voxels(np.vstack([room, table]), RES, RES, body=DEFAULT_BODY[:1], margin=0.0)
-    pose = (4.0, 0.57, 0.0)                     # padded base reaches 0.185 m, under the table
+    base_only = body_checker_from_voxels(
+        np.vstack([room, table]), RES, RES, body=DEFAULT_BODY[:1], margin=0.0
+    )
+    pose = (4.0, 0.57, 0.0)  # padded base reaches 0.185 m, under the table
     assert not base_only.is_collision(*pose)
-    assert checker.is_collision(*pose)           # the arm box (padded to 0.27 m) hits the table top
+    assert checker.is_collision(*pose)  # the arm box (padded to 0.27 m) hits the table top
     assert not checker.is_collision(4.0, 0.75, 0.0)
 
 
@@ -299,8 +345,13 @@ def test_factory_3d_check_matches_exact_voxel_test():
     voxel_keys = voxel_key_array(voxels)
     rng = np.random.default_rng(1)
     (x0, x1), (y0, y1) = checker.x_bounds, checker.y_bounds
-    poses = np.column_stack([rng.uniform(x0 + 1.5, x1 - 1.5, 300), rng.uniform(y0 + 1.5, y1 - 1.5, 300),
-                             rng.uniform(-pi, pi, 300)])
+    poses = np.column_stack(
+        [
+            rng.uniform(x0 + 1.5, x1 - 1.5, 300),
+            rng.uniform(y0 + 1.5, y1 - 1.5, 300),
+            rng.uniform(-pi, pi, 300),
+        ]
+    )
     hits = 0
     for pose in poses:
         expected = exact_3d_collision(voxel_keys, DEFAULT_BODY, pose)
@@ -324,7 +375,9 @@ def test_factory_world_goals_3d():
 def test_path_ends_with_straight_run_along_goal_heading():
     checker = FootprintCollisionChecker(corridor_world(), RES, (0.0, 0.0))
     goal = (6.5, 4.5, pi / 2)
-    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan((1.5, 1.5, 0.0), goal)
+    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan(
+        (1.5, 1.5, 0.0), goal
+    )
     assert result.success and result.path[-1] == goal
     (x0, y0, _), (x1, y1, _) = result.path[-2:]
     assert np.arctan2(y1 - y0, x1 - x0) == pytest.approx(goal[2], abs=1e-9)
@@ -333,7 +386,9 @@ def test_path_ends_with_straight_run_along_goal_heading():
 
     # Lead-in shortened when the full 1 m would hit the wall behind the goal.
     goal = (6.5, 1.1, -pi / 2)
-    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan((1.5, 4.5, 0.0), goal)
+    result = RRTPlanner(checker, PlannerConfig(seed=0, max_planning_time=10.0)).plan(
+        (1.5, 4.5, 0.0), goal
+    )
     (x0, y0, _), (x1, y1, _) = result.path[-2:]
     assert np.arctan2(y1 - y0, x1 - x0) == pytest.approx(goal[2], abs=1e-9)
     assert not checker.poses_in_collision(dense_path_poses(checker, result.path))

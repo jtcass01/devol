@@ -34,36 +34,60 @@ from nav_msgs.msg import Odometry
 from devol_localization import kidnap_targets
 from devol_localization.pose2d import set_quaternion_yaw
 
-__author__ = "Jacob Taylor Cassady"
-__email__ = "jcassad1@jh.edu"
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
-def set_pose_command(world: str, entity: str, x: float, y: float, z: float, yaw: float, timeout_ms: int = 3000):
-    req = (f'name: "{entity}", position: {{x: {x}, y: {y}, z: {z}}}, '
-           f'orientation: {{x: 0, y: 0, z: {math.sin(yaw / 2.0)}, w: {math.cos(yaw / 2.0)}}}')
-    return ['gz', 'service', '-s', f'/world/{world}/set_pose', '--reqtype', 'gz.msgs.Pose',
-            '--reptype', 'gz.msgs.Boolean', '--timeout', str(timeout_ms), '--req', req]
+def set_pose_command(
+    world: str, entity: str, x: float, y: float, z: float, yaw: float, timeout_ms: int = 3000
+):
+    req = (
+        f'name: "{entity}", position: {{x: {x}, y: {y}, z: {z}}}, '
+        f'orientation: {{x: 0, y: 0, z: {math.sin(yaw / 2.0)}, w: {math.cos(yaw / 2.0)}}}'
+    )
+    return [
+        'gz',
+        'service',
+        '-s',
+        f'/world/{world}/set_pose',
+        '--reqtype',
+        'gz.msgs.Pose',
+        '--reptype',
+        'gz.msgs.Boolean',
+        '--timeout',
+        str(timeout_ms),
+        '--req',
+        req,
+    ]
 
 
 class Kidnapper(Node):
     def __init__(self) -> None:
         super().__init__('kidnapper')
-        self.declare_parameter('trigger', 'time')             # time | after_waypoint
+        self.declare_parameter('trigger', 'time')  # time | after_waypoint
         self.declare_parameter('kidnap_time', 30.0)
-        self.declare_parameter('waypoint', [-4.7, 9.2])        # Goal 1
+        self.declare_parameter('waypoint', [-4.7, 9.2])  # Goal 1
         self.declare_parameter('waypoint_radius', 0.5)
         self.declare_parameter('ground_truth_topic', '/devol_drive/ground_truth/odom')
-        self.declare_parameter('target', [5.45, 2.03, 0.0])   # x, y, yaw in the world (= map) frame; Goal 2
+        self.declare_parameter(
+            'target', [5.45, 2.03, 0.0]
+        )  # x, y, yaw in the world (= map) frame; Goal 2
         self.declare_parameter('z', 0.2)
         self.declare_parameter('world', 'maze_world')
         self.declare_parameter('entity', 'devol_drive')
         self.declare_parameter('event_topic', '/devol_drive/kidnap_event')
-        self.declare_parameter('target_mode', 'fixed')        # fixed | random
-        self.declare_parameter('seed', 0)                     # target_mode:=random
-        self.declare_parameter('world_pcd', '')               # static cloud for the collision check; '' = no check
-        self.declare_parameter('clearance', 0.15)             # m of padding around the body boxes
-        self.declare_parameter('min_distance', 3.0)           # target_mode:=random, m from robot and reach_goal
-        self.declare_parameter('reach_goal', [5.45, 2.03, 0.0])  # random: the planner must reach this (Goal 2)
+        self.declare_parameter('target_mode', 'fixed')  # fixed | random
+        self.declare_parameter('seed', 0)  # target_mode:=random
+        self.declare_parameter(
+            'world_pcd', ''
+        )  # static cloud for the collision check; '' = no check
+        self.declare_parameter('clearance', 0.15)  # m of padding around the body boxes
+        self.declare_parameter(
+            'min_distance', 3.0
+        )  # target_mode:=random, m from robot and reach_goal
+        self.declare_parameter(
+            'reach_goal', [5.45, 2.03, 0.0]
+        )  # random: the planner must reach this (Goal 2)
         gp = self.get_parameter
         self._delay = float(gp('kidnap_time').value)
         self._trigger = str(gp('trigger').value)
@@ -83,7 +107,9 @@ class Kidnapper(Node):
         pcd = str(gp('world_pcd').value)
         self._checker = None
         if pcd:
-            self._checker = kidnap_targets.world_checker(pcd, clearance=float(gp('clearance').value))
+            self._checker = kidnap_targets.world_checker(
+                pcd, clearance=float(gp('clearance').value)
+            )
             self.get_logger().info(f'Kidnap targets are collision-checked against {pcd}')
         elif self._target_mode == 'random':
             raise ValueError('target_mode:=random needs world_pcd')
@@ -97,8 +123,11 @@ class Kidnapper(Node):
         if shutil.which('gz') is None:
             self.get_logger().error('`gz` command not found; the kidnap cannot run')
         target = 'a random free pose' if self._target_mode == 'random' else str(self._target)
-        when = (f'{self._delay:.1f} s after reaching {self._waypoint}' if self._trigger == 'after_waypoint'
-                else f't+{self._delay:.1f} s')
+        when = (
+            f'{self._delay:.1f} s after reaching {self._waypoint}'
+            if self._trigger == 'after_waypoint'
+            else f't+{self._delay:.1f} s'
+        )
         self.get_logger().info(f'Kidnap to {target} {when} (sim time)')
 
     def _gt_cb(self, msg: Odometry) -> None:
@@ -118,10 +147,13 @@ class Kidnapper(Node):
                 return None
             return target
         robot_xy = self._robot_xy or (float('nan'), float('nan'))
-        target = kidnap_targets.sample_target(self._checker, self._rng, robot_xy, self._min_distance,
-                                              reach_goal=self._reach_goal)
+        target = kidnap_targets.sample_target(
+            self._checker, self._rng, robot_xy, self._min_distance, reach_goal=self._reach_goal
+        )
         if target is None:
-            self.get_logger().error('No collision-free, reachable kidnap target found; not teleporting')
+            self.get_logger().error(
+                'No collision-free, reachable kidnap target found; not teleporting'
+            )
         return target
 
     def _tick(self) -> None:
@@ -145,8 +177,10 @@ class Kidnapper(Node):
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=10.0)
             ok = out.returncode == 0 and 'true' in out.stdout
             log = self.get_logger().info if ok else self.get_logger().error
-            log(f'Teleported {self._entity} to ({x:.2f}, {y:.2f}, {yaw:.2f}) at t={now:.2f} s: '
-                f'{out.stdout.strip() or out.stderr.strip()}')
+            log(
+                f'Teleported {self._entity} to ({x:.2f}, {y:.2f}, {yaw:.2f}) at t={now:.2f} s: '
+                f'{out.stdout.strip() or out.stderr.strip()}'
+            )
         except (OSError, subprocess.TimeoutExpired) as e:
             self.get_logger().error(f'Teleport failed: {e}')
             return
