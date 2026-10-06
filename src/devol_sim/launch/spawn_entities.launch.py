@@ -8,7 +8,6 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Comm
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
-from moveit_configs_utils import MoveItConfigsBuilder
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -18,7 +17,6 @@ def generate_launch_description():
     gz_pkg_share = get_package_share_directory('devol_gazebo')
     urdf_package = "devol_drive_description"
     urdf_filename = "devol_drive.urdf.xacro"
-    moveit_package = "devol_moveit_config"
 
     pkg_share_description = FindPackageShare(urdf_package)
     urdf_path = PathJoinSubstitution(
@@ -32,7 +30,8 @@ def generate_launch_description():
             PathJoinSubstitution([FindExecutable(name="xacro")]), 
             ' ', urdf_path, ' ',
             "use_gazebo:=true ",
-            "wheel_slip_compliance:=", LaunchConfiguration('wheel_slip_compliance'),
+            "use_cameras:=", LaunchConfiguration("use_cameras"),
+            " wheel_slip_compliance:=", LaunchConfiguration('wheel_slip_compliance'),
         ]
     ), value_type=str)
 
@@ -52,10 +51,11 @@ def generate_launch_description():
         choices=["true", "false"],
         description="Use Gazebo simulation clock",
     )
-    declare_namespace = DeclareLaunchArgument(
-        'namespace',
-        default_value='/devol_drive',
-        description='Namespace for topics'
+    declare_use_cameras_cmd = DeclareLaunchArgument(
+        "use_cameras",
+        default_value="false",
+        choices=["true", "false"],
+        description="Simulate the RGB-D cameras (costly; not needed for localization)",
     )
     declare_map_odom_tf = DeclareLaunchArgument(
         'map_odom_tf',
@@ -68,16 +68,16 @@ def generate_launch_description():
         default_value='0.5',
         description='Unitless WheelSlip compliance for all four wheels (lateral and longitudinal); 0 = no slip'
     )
-    declare_publish_robot_description_semantic_cmd = DeclareLaunchArgument(
-        "publish_robot_description_semantic",
-        default_value="true",
-        choices=["true", "false"],
-        description="Publish the robot description semantic",
+    declare_namespace = DeclareLaunchArgument(
+        'namespace',
+        default_value='/devol_drive',
+        description='Namespace for topics'
     )
     
     def launch_setup(context):
         maze_folder = context.perform_substitution(LaunchConfiguration('maze'))
         namespace = context.perform_substitution(LaunchConfiguration('namespace'))
+        static_map_odom = context.perform_substitution(LaunchConfiguration('map_odom_tf')) == 'static'
 
         # Goal sphere SDF file
         goal_sphere_file = join(gz_pkg_share, 'sdf', 'goal_sphere.sdf')
@@ -132,62 +132,41 @@ def generate_launch_description():
             )
             goal_spawners.append(spawn_goal)
 
-        # MoveIt
-        moveit_config = (
-            MoveItConfigsBuilder(robot_name="devol", package_name=moveit_package)
-            .to_moveit_configs()
-        )
-
-        start_move_group_cmd: Node = Node(
-            package="moveit_ros_move_group",
-            executable="move_group",
-            namespace=namespace,
-            output="screen",
-            parameters=[
-                moveit_config.to_dict(),
-                {
-                    "use_sim_time": use_sim_time,
-                    "robot_description": robot_description_content,
-                    "publish_robot_description_semantic": LaunchConfiguration(
-                        "publish_robot_description_semantic"
-                    ),
-                }
-            ]
-        )
-
         # Static transform publishers
         base_link_to_diff_drive_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0',  '0', '0',  '0', '0', f'{namespace}/a200_base_link', 'a200_base_link'],
+            # Alias for nodes that look up '<namespace>/a200_base_link' (planners, PID); odom -> a200_base_link comes from Gazebo DiffDrive.
+            arguments=['--frame-id', 'a200_base_link', '--child-frame-id', f'{namespace.lstrip("/")}/a200_base_link'],
             output='screen'
         )
 
         odom_to_diff_drive_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=[str(g0.x), str(g0.y),  str(g0.z), str(g0.yaw),  '0', '0', 'map', 'odom'],
+            arguments=['--x', str(g0.x), '--y', str(g0.y), '--z', str(g0.z), '--yaw', str(g0.yaw),
+                       '--frame-id', 'map', '--child-frame-id', 'odom'],
             output='screen'
         )
 
         maze_world_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'map', 'maze_world'],
+            arguments=['--frame-id', 'map', '--child-frame-id', 'maze_world'],
             output='screen'
         )
 
         lidar2d_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'lidar2d_0_link', f'{namespace}/robot/base_link/lidar2d_0'],
+            arguments=['--frame-id', 'lidar2d_0_link', '--child-frame-id', f'{namespace}/robot/base_link/lidar2d_0'],
             output='screen'
         )
 
         lidar3d_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'lidar3d_0_link', f'{namespace}/robot/base_link/lidar3d_0'],
+            arguments=['--frame-id', 'lidar3d_0_link', '--child-frame-id', f'{namespace}/robot/base_link/lidar3d_0'],
             output='screen'
         )
 
@@ -205,21 +184,19 @@ def generate_launch_description():
             spawn_robot,
             *goal_spawners,
             base_link_to_diff_drive_tf,
-            *([odom_to_diff_drive_tf]
-              if context.perform_substitution(LaunchConfiguration('map_odom_tf')) == 'static' else []),
+        ] + ([odom_to_diff_drive_tf] if static_map_odom else []) + [
             maze_world_tf,
             lidar2d_tf,
             lidar3d_tf,
-            robot_state_publisher,
-            start_move_group_cmd
+            robot_state_publisher
         ]
 
     return LaunchDescription([
         declare_use_sim_time_cmd,
-        declare_namespace,
-        declare_publish_robot_description_semantic_cmd,
-        maze_arg,
+        declare_use_cameras_cmd,
         declare_map_odom_tf,
         declare_wheel_slip_compliance,
+        declare_namespace,
+        maze_arg,
         OpaqueFunction(function=launch_setup)
     ])

@@ -5,9 +5,10 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 -->
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <xacro:macro name="devol_gazebo" params="tf_prefix namespace:=/devol">
+  <xacro:macro name="devol_gazebo" params="tf_prefix namespace:=/devol use_cameras:=true">
 
     <!-- Camera -->
+    <xacro:if value="${use_cameras}">
     <gazebo reference="${tf_prefix}_camera_color_frame">
       <sensor type="rgbd_camera" name="${tf_prefix}realsense_d405_camera">
         <topic>${namespace}/sensors/camera_1</topic>
@@ -32,6 +33,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 
       </sensor>
     </gazebo>
+    </xacro:if>
 
   </xacro:macro>
 

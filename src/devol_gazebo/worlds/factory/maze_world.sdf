@@ -225,13 +225,5 @@
       <direction>0.1 0.1 -1</direction>
     </light>
 
-    <model name="longeron_strut">
-      <static>false</static>
-      <include merge='true'>
-        <uri>/workspace/devol/src/devol/devol_parts/llf/llf_concept2_parts/models/struts/longeron/model.sdf</uri>
-      </include>
-      <pose>-5.7 9.2 1.1 1.570796 0 1.570796</pose>
-    </model>
-
   </world>
 </sdf>
