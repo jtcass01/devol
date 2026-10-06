@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 # ===============================================================================
-# Add to package devol_demo_py (in src/devol/devol_demo_py/setup.py )
-#
 # Build
 #
-# colcon build --packages-select devol_demo_py
+# colcon build --packages-select devol_sim
 # source install/setup.bash
 #
 # To Run
@@ -15,8 +13,6 @@
 #   -p pointcloud_file:=/absolute/path/to/file.pcd \
 #   -p frame_id:=map                               \
 #   -p publish_rate:=1.0
-#
-# ros2 run devol_demo_py pointcloud_publisher --ros-args -p pointcloud_file:=/workspace/devol/src/devol/devol_demo_py/devol_demo_py/simple.pcd
 #
 #
 # To Visualize
