@@ -216,7 +216,7 @@ def test_figure_renders_offscreen(tmp_path):
     grid[:3, :] = 100
     grid[:, :3] = 100
     grid[50:60, 100:110] = -1
-    for mode in ('ekf', 'pf'):
+    for mode in ('ekf', 'pf', 'hybrid'):
         fig = LocalizationFigure(mode, window=8.0, interactive=False)
         fig.set_map(grid, 0.05, -1.0, -1.0)
         t = np.linspace(0, 10, 50)
@@ -264,6 +264,18 @@ def test_test_case_verdicts():
     ok, lines = judge_test_case(2, kid)
     assert ok and lines[-1].startswith('INFO ekf: did not recover')
     assert not judge_test_case(2, {'pf': EstimatorScore()})[0]
+    # The hybrid, when it runs, is held to the PF's criteria.
+    ok, lines = judge_test_case(
+        1, dict(good, hybrid=EstimatorScore(waypoint_errors=[0.05, 0.1, 0.3], pos_rmse=0.1))
+    )
+    assert not ok and lines[2].startswith('FAIL hybrid')
+    ok, lines = judge_test_case(
+        2, dict(kid, hybrid=EstimatorScore(event_time=40.0, recovered=True, recovery_time=7.0))
+    )
+    assert ok and lines[-1].startswith('PASS hybrid')
+    assert not judge_test_case(
+        2, dict(kid, hybrid=EstimatorScore(event_time=40.0, recovered=False))
+    )[0]
     # A run cut off by max_duration before the last goal fails even if every other check passes.
     for case, scores in ((1, good), (2, kid)):
         ok, lines = judge_test_case(case, scores, timed_out='max_duration 400 s reached')
@@ -385,7 +397,7 @@ def _load_launch(monkeypatch, filename='localization_stack.launch.py'):
 def test_stack_sets_filter_init_per_scenario(monkeypatch, scenario):
     stack = _load_launch(monkeypatch)
     values = {name: default for name, (default, _) in stack.ARGS.items()}
-    values.update(scenario=scenario, seed='7', viz='false')
+    values.update(scenario=scenario, seed='7', viz='false', estimators='ekf,pf,hybrid')
 
     class Context:
         def perform_substitution(self, lc):
@@ -394,10 +406,23 @@ def test_stack_sets_filter_init_per_scenario(monkeypatch, scenario):
     params = {}
     for action in stack.launch_setup(Context()):
         if type(action).__name__ == 'Node':
-            params[action.k['executable']] = {
+            params[action.k['name']] = {
                 k: v for p in action.k['parameters'] if isinstance(p, dict) for k, v in p.items()
             }
     ekf, pf = params['ekf_localization'], params['pf_localization']
+    # The hybrid's EKF starts like the EKF, with the EKF's tuning, on its own pose and reset topics.
+    hybrid = params['hybrid_ekf']
+    assert hybrid['init_mode'] == ekf['init_mode'] and hybrid['odom_alphas'] == [
+        0.02,
+        0.01,
+        0.01,
+        0.002,
+    ]
+    assert (hybrid['pose_topic'], hybrid['initial_pose_topic']) == (
+        'hybrid_pose',
+        'hybrid_initialpose',
+    )
+    assert params['hybrid_supervisor']['reset_topic'] == '/devol_drive/hybrid_initialpose'
     if scenario == 'global':
         assert (
             ekf['init_mode'] == 'global'

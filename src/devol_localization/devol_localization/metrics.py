@@ -282,7 +282,8 @@ def judge_test_case(
 
     if case == 1:
         worst = 0.0
-        for name in ('ekf', 'pf'):
+        # The hybrid is judged like the filters when it runs (estimators include it).
+        for name in ('ekf', 'pf') + (('hybrid',) if 'hybrid' in scores else ()):
             s = scores.get(name)
             if s is None or not s.waypoint_errors:
                 lines.append(
@@ -335,6 +336,19 @@ def judge_test_case(
                     f'recovered after {ekf.recovery_time:.1f} s'
                     if ekf.recovered
                     else f'did not recover (final error {ekf.final_pos_err:.2f} m)'
+                )
+            )
+        hybrid = scores.get('hybrid')
+        if hybrid is not None:
+            # The hybrid exists to recover like the PF, so it is held to the PF's criterion.
+            good = bool(hybrid.recovered)
+            ok &= good
+            lines.append(
+                f'{"PASS" if good else "FAIL"} hybrid: '
+                + (
+                    f'back within {threshold} m {hybrid.recovery_time:.1f} s after the kidnap'
+                    if good
+                    else f'did not return within {threshold} m (final error {hybrid.final_pos_err:.2f} m)'
                 )
             )
     else:
