@@ -17,7 +17,7 @@ from geometry_msgs.msg import Twist, PoseStamped
 from tf2_ros import TransformListener, Buffer, LookupException
 from std_msgs.msg import Float64MultiArray
 
-from devol_sim.utils import quaternion_to_euler
+from devol_local_planner.utils import quaternion_to_euler
 
 __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'

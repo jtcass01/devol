@@ -11,7 +11,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 from ament_index_python.packages import get_package_share_directory
 
-from devol_sim.mobile_robot_goal import MobileRobotGoal
+from devol_local_planner.mobile_robot_goal import MobileRobotGoal
 
 
 def generate_launch_description():

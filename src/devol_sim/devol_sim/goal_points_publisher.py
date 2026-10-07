@@ -12,10 +12,10 @@ from visualization_msgs.msg import MarkerArray, Marker
 from ament_index_python.packages import get_package_share_directory
 import os
 import csv
-from devol_sim.utils import euler_to_quaternion
+from devol_local_planner.utils import euler_to_quaternion
 from typing import Tuple
 
-from devol_sim.mobile_robot_goal import MobileRobotGoal
+from devol_local_planner.mobile_robot_goal import MobileRobotGoal
 
 
 class GoalPointsPublisher(Node):

@@ -6,7 +6,7 @@ from math import hypot, pi
 import numpy as np
 import pytest
 
-from devol_sim.rrt_planner import (
+from devol_local_planner.rrt_planner import (
     DEFAULT_BODY,
     FootprintCollisionChecker,
     PlannerConfig,

@@ -19,6 +19,7 @@
   <exec_depend>python3-scipy</exec_depend>
   <exec_depend>python3-matplotlib</exec_depend>
   <!-- Experiment launch files: sim, ground-truth bridge, bag record/replay. -->
+  <exec_depend>devol_local_planner</exec_depend>
   <exec_depend>devol_sim</exec_depend>
   <exec_depend>devol_gazebo</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
