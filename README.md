@@ -126,10 +126,10 @@ simulation running natively in WSL at the same time. Set `ROS_DOMAIN_ID` in the 
 
 Both test cases have a preconfigured launch file. Each one starts the factory simulation headless,
 drives the robot on Gazebo's ground-truth pose (so estimator error never changes the route), runs the
-EKF and the PF at the study's nominal settings (2,000 particles, odometry noise k = 1, lidar noise
+EKF, the PF and the hybrid (an EKF that the PF re-seeds after a kidnap) at the study's nominal settings (2,000 particles, odometry noise k = 1, lidar noise
 σ = 0.03 m, seed 0), and opens one live Matplotlib window per filter. Each window shows the map, the
 ground-truth pose against the estimate, the lidar scan drawn from the estimate, the 2σ covariance
-ellipse (EKF) or the particle cloud (PF), and position error over time against the filter's own 2σ
+ellipse (EKF and hybrid) or the particle cloud (PF), and position error over time against the filter's own 2σ
 bound.
 
 ```bash
@@ -146,16 +146,17 @@ from `~/loc_results` in the container). A run that has not reached Goal 3 after 
 (`max_duration`) ends and FAILs.
 
 - `verdict.txt`: the PASS/FAIL report, one line per check.
-- `summary.json`: for the EKF, the PF and an odometry-only (dead reckoning) baseline, the position and
+- `summary.json`: for the EKF, the PF, the hybrid and an odometry-only (dead reckoning) baseline, the position and
   heading RMSE, the error at each waypoint, the compute time per update, and (test case 2) the time to
   recover to within 0.25 m of the true pose. `trajectory.csv` and `compute.csv` hold the per-update data.
-- `ekf.mp4`, `pf.mp4` and `ekf.png`, `pf.png`: a video and a final screenshot of each live view.
+- `ekf.mp4`, `pf.mp4`, `hybrid.mp4` and the matching `.png` files: a video and a final screenshot of each live view.
 - `posterior_t<sim time>.png`: the intermediate posterior (PF particles and EKF 2σ ellipse at the same
   instant), saved at 15 s and 45 s, and for test case 2 also 1, 5 and 15 s after the kidnap.
 
 Useful arguments: `output_dir` (results folder; keep it under `/root/loc_results` so it lands on the
 host), `viz:=false` (no windows), `record_video:=false`, `gz_gui:=true` (show Gazebo), `num_particles`,
-`seed`, `max_duration`, and for test case 2 `kidnap_delay` (default 10 s).
+`seed`, `max_duration`, `estimators` (default `ekf,pf,hybrid`; `ekf,pf` leaves the hybrid out), and for
+test case 2 `kidnap_delay` (default 10 s).
 
 ### Test case 1: nominal route
 
@@ -168,8 +169,8 @@ from `src/devol_gazebo/worlds/factory/poses.csv`, derived independently of eithe
 | Goal 2: Place | 5.45 | 2.03 | 0.0 |
 | Goal 3: Drive | 1.87 | −8.06 | −1.5708 |
 
-**PASS** when the EKF and the PF are both within 0.25 m of the ground-truth pose at every goal, and
-dead reckoning from odometry alone is worse than both.
+**PASS** when the EKF, the PF and the hybrid are all within 0.25 m of the ground-truth pose at every
+goal, and dead reckoning from odometry alone is worse than all of them.
 
 ### Test case 2: kidnapped robot
 
@@ -177,8 +178,8 @@ dead reckoning from odometry alone is worse than both.
 without the filters being told, then the planner drives on to Goal 3. The expected output is that
 teleport pose.
 
-**PASS** when, within 60 s of the kidnap, the PF returns to within 0.25 m of the true pose and stays
-there for at least 3 s. The EKF's outcome is reported either way: it keeps a single Gaussian with no re-seeding, so it
+**PASS** when, within 60 s of the kidnap, the PF and the hybrid each return to within 0.25 m of the
+true pose and stay there for at least 3 s. The EKF's outcome is reported either way: it keeps a single Gaussian with no re-seeding, so it
 is not expected to recover, and that contrast is part of the study.
 
 ## 7. Full study (optional)

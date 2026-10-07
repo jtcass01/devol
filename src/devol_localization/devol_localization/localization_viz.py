@@ -2,7 +2,8 @@
 """Live view of one localization filter against Gazebo ground truth (rclpy + Matplotlib, no RViz).
 
 mode:=ekf shows the EKF estimate, its 2-sigma ellipse, the lidar scan projected from the estimate
-and the ground-truth pose; mode:=pf adds every particle. See viz_core.py for the layout.
+and the ground-truth pose; mode:=pf adds every particle; mode:=hybrid draws the hybrid EKF+PF like
+the EKF. See viz_core.py for the layout.
 
 Inputs (defaults for mode ekf; pf swaps ekf for pf)
   map_topic          /devol_drive/projected_map           nav_msgs/OccupancyGrid (transient local)
@@ -54,8 +55,8 @@ class LocalizationViz(Node):
         super().__init__('localization_viz')
         self.declare_parameter('mode', 'ekf')
         mode = str(self.get_parameter('mode').value)
-        if mode not in ('ekf', 'pf'):
-            raise ValueError(f'mode must be ekf or pf, got {mode}')
+        if mode not in ('ekf', 'pf', 'hybrid'):
+            raise ValueError(f'mode must be ekf, pf or hybrid, got {mode}')
         self.declare_parameter('map_topic', '/devol_drive/projected_map')
         self.declare_parameter('ground_truth_topic', '/devol_drive/ground_truth/odom')
         self.declare_parameter('pose_topic', f'/devol_drive/{mode}_pose')

@@ -60,10 +60,12 @@ def study_configs() -> List[dict]:
             if key in seen:
                 continue
             seen.add(key)
-            estimators = 'pf' if c['num_particles'] != NOMINAL['num_particles'] else 'ekf,pf'
+            estimators = (
+                'pf' if c['num_particles'] != NOMINAL['num_particles'] else 'ekf,pf,hybrid'
+            )
             runs.append({'scenario': 'nominal', **c, 'estimators': estimators})
-    runs.append({'scenario': 'global', **NOMINAL, 'estimators': 'ekf,pf'})
-    runs.append({'scenario': 'kidnap', **NOMINAL, 'estimators': 'ekf,pf'})
+    runs.append({'scenario': 'global', **NOMINAL, 'estimators': 'ekf,pf,hybrid'})
+    runs.append({'scenario': 'kidnap', **NOMINAL, 'estimators': 'ekf,pf,hybrid'})
     return runs
 
 
@@ -271,7 +273,7 @@ def plot_sensitivity(out: Path, table: List[dict]) -> None:
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    colors = {'ekf': '#2a78d6', 'pf': '#eb6834', 'dead_reckoning': '#52514e'}
+    colors = {'ekf': '#2a78d6', 'pf': '#eb6834', 'hybrid': '#8a3ec2', 'dead_reckoning': '#52514e'}
     nominal = [r for r in table if r['scenario'] == 'nominal']
 
     def series(est, factor):
@@ -295,18 +297,18 @@ def plot_sensitivity(out: Path, table: List[dict]) -> None:
         ('num_particles', 'k', 'sigma_r'),
         ('particle count N', 'odometry noise scale k', 'lidar range noise σr (m)'),
     ):
-        for est in ('dead_reckoning', 'ekf', 'pf'):
+        for est in ('dead_reckoning', 'ekf', 'pf', 'hybrid'):
             pts = series(est, factor)
             if not pts:
                 continue
             if factor == 'num_particles' and est != 'pf':
-                if est == 'ekf':
+                if est in ('ekf', 'hybrid'):
                     ax.axhline(
                         pts[0]['pos_rmse'],
                         color=colors[est],
                         lw=1.5,
                         ls='--',
-                        label='EKF (nominal)',
+                        label=f'{est.upper() if est == "ekf" else "hybrid"} (nominal N)',
                     )
                 continue
             x = [p[factor] for p in pts]

@@ -6,6 +6,8 @@ it starts no simulator and no bag itself. Data flow:
   /devol_drive/odom, /devol_drive/sensors/lidar2d_0/scan
       -> noise_injector (k, sigma_r, seed)   -> /devol_drive/noisy/odom, /devol_drive/noisy/scan
       -> ekf_localization, pf_localization   -> /devol_drive/{ekf,pf}_pose, *_compute_time_ms
+      -> hybrid_ekf + hybrid_supervisor       -> /devol_drive/hybrid_pose (an EKF the supervisor re-seeds
+                                                 from pf_pose after a kidnap; see devol_localization/hybrid.py)
       -> localization_evaluator (vs /devol_drive/ground_truth/odom) -> output_dir/{trajectory,compute}.csv,
                                                                       summary.json
       -> localization_viz (one window per filter)
@@ -22,6 +24,8 @@ import csv
 import json
 import os
 
+import yaml
+
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, EmitEvent, OpaqueFunction, RegisterEventHandler
@@ -32,7 +36,7 @@ from launch_ros.actions import Node
 
 ARGS = {
     'scenario': ('nominal', 'nominal | global | kidnap'),
-    'estimators': ('ekf,pf', 'Comma-separated subset of ekf,pf'),
+    'estimators': ('ekf,pf', 'Comma-separated subset of ekf,pf,hybrid (hybrid needs pf)'),
     'k': ('1.0', 'Odometry noise scale: alpha1..4 = k * 0.05 (study grid 0, 1, 2, 4)'),
     'sigma_r': ('0.03', 'Lidar range noise std in m (study grid 0.01, 0.03, 0.10)'),
     'seed': ('0', 'Trial seed: injected noise and PF sampling'),
@@ -85,6 +89,13 @@ def read_poses(maze: str):
     return start, goals
 
 
+def ekf_init_for(scenario, start, seed):
+    """EKF start parameters, shared by the EKF and the hybrid's EKF."""
+    if scenario == 'global':
+        return {'init_mode': 'global', 'global_init_mean': 'random', 'global_init_seed': seed}
+    return {'init_mode': 'pose', 'initial_pose': list(start)}
+
+
 def launch_setup(context):
     a = {name: context.perform_substitution(LaunchConfiguration(name)) for name in ARGS}
     for path_arg in ('output_dir', 'video_dir'):
@@ -118,11 +129,7 @@ def launch_setup(context):
     if 'ekf' in estimators:
         # Seeded per trial: the factory's free-space centroid is the spawn pose, so a centroid start
         # would begin on the truth.
-        ekf_init = (
-            {'init_mode': 'global', 'global_init_mean': 'random', 'global_init_seed': seed}
-            if scenario == 'global'
-            else {'init_mode': 'pose', 'initial_pose': list(start)}
-        )
+        ekf_init = ekf_init_for(scenario, start, seed)
         nodes.append(
             Node(
                 package='devol_localization',
@@ -138,6 +145,49 @@ def launch_setup(context):
                         'publish_tf': False,
                         **ekf_init,
                     },
+                ],
+            )
+        )
+    if 'hybrid' in estimators:
+        if 'pf' not in estimators:
+            raise RuntimeError('estimators: hybrid needs pf (it is re-seeded from the PF)')
+        with open(os.path.join(share, 'config', 'ekf_localization.yaml')) as f:
+            hybrid_params = yaml.safe_load(f)['ekf_localization']['ros__parameters']
+        hybrid_params.update(
+            {
+                'use_sim_time': use_sim_time,
+                'odom_topic': 'noisy/odom',
+                'scan_topic': 'noisy/scan',
+                'publish_tf': False,
+                'pose_topic': 'hybrid_pose',
+                'compute_time_topic': 'hybrid_compute_time_ms',
+                'initial_pose_topic': 'hybrid_initialpose',
+                **ekf_init_for(scenario, start, seed),
+            }
+        )
+        nodes.append(
+            Node(
+                package='devol_localization',
+                executable='ekf_localization',
+                name='hybrid_ekf',
+                output='screen',
+                parameters=[hybrid_params],
+            )
+        )
+        nodes.append(
+            Node(
+                package='devol_localization',
+                executable='hybrid_supervisor',
+                name='hybrid_supervisor',
+                output='screen',
+                parameters=[
+                    {
+                        'use_sim_time': use_sim_time,
+                        'ekf_pose_topic': '/devol_drive/hybrid_pose',
+                        'pf_pose_topic': '/devol_drive/pf_pose',
+                        'scan_topic': '/devol_drive/noisy/scan',
+                        'reset_topic': '/devol_drive/hybrid_initialpose',
+                    }
                 ],
             )
         )
@@ -263,7 +313,7 @@ def launch_setup(context):
                             'window': float(a['viz_window']),
                             'title': f'{est.upper()} vs Gazebo ground truth ({scenario}, k={a["k"]}, '
                             f'sigma_r={a["sigma_r"]} m, seed {seed}'
-                            + (f', N={a["num_particles"]})' if est == 'pf' else ')'),
+                            + (f', N={a["num_particles"]})' if est in ('pf', 'hybrid') else ')'),
                         }
                     ],
                 )
