@@ -37,6 +37,7 @@ class PipelineStats:
     reacquired: int = 0
     rewound: int = 0  # scans fused after rewinding past newer odometry
     stale: int = 0  # scans dropped: older than the history, or superseded while waiting
+    match_calls: int = 0  # matcher runs, successful or not
 
 
 @dataclass
@@ -181,6 +182,7 @@ class EKFPipeline:
         return result
 
     def _match_and_fuse(self, points: ndarray) -> Optional[MatchResult]:
+        self.stats.match_calls += 1
         half_xy, half_yaw = self.search_window()
         result: Optional[MatchResult] = self.matcher.match(points, self.ekf.x, half_xy, half_yaw)
         if result is not None:

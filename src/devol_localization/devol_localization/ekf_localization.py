@@ -268,11 +268,20 @@ class EKFLocalization(Node):
             if not self._ekf.initialized and not self._initialize(odom_pose, msg):
                 return
             lost_before: bool = self._pipeline.stats.failed_in_row >= self._pipeline.lost_after
+            calls: int = self._pipeline.stats.match_calls
+            t0: float = perf_counter()
+            # A scan stamped after the previous odometry is matched here, once this message arrives.
             result = self._pipeline.on_odom(odom_pose, self._stamp(msg) if self._align else None)
+            if self._pipeline.stats.match_calls > calls:
+                self._record_match_time((perf_counter() - t0) * 1e3)
             if result is not None and lost_before:
                 self.get_logger().info('Scan match re-acquired')
             self._last_odom_msg = msg
             self._publish(msg.header.stamp)
+
+    def _record_match_time(self, dt_ms: float) -> None:
+        self._match_ms += dt_ms
+        self._compute_pub.publish(Float64(data=dt_ms))
 
     def scan_received(self, msg: LaserScan) -> None:
         with self._lock:
@@ -287,12 +296,12 @@ class EKFLocalization(Node):
                 self._beam_step,
                 self._laser_pose,
             )
+            calls: int = self._pipeline.stats.match_calls
             t0: float = perf_counter()
             lost_before: bool = self._pipeline.stats.failed_in_row >= self._pipeline.lost_after
-            result = self._pipeline.on_scan(points)
-            dt_ms: float = (perf_counter() - t0) * 1e3
-            self._match_ms += dt_ms
-            self._compute_pub.publish(Float64(data=dt_ms))
+            result = self._pipeline.on_scan(points, self._stamp(msg) if self._align else None)
+            if self._pipeline.stats.match_calls > calls:
+                self._record_match_time((perf_counter() - t0) * 1e3)
             if result is not None and lost_before:
                 self.get_logger().info('Scan match re-acquired')
             if self._last_odom_msg is not None:
@@ -390,7 +399,7 @@ class EKFLocalization(Node):
             x = self._ekf.x.copy()
             std = self._ekf.P.diagonal() ** 0.5
             ready = self._ekf.initialized
-            avg_ms = self._match_ms / s.scans if s.scans else 0.0
+            avg_ms = self._match_ms / s.match_calls if s.match_calls else 0.0
             line = (
                 f'pose=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}) std=({std[0]:.2f}, {std[1]:.2f}, {std[2]:.3f}) '
                 f'scans={s.scans} matched={s.matched} fused={s.fused} gated={s.gated} '
