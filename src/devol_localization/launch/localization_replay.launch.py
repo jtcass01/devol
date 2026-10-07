@@ -137,7 +137,7 @@ def generate_launch_description():
         ('rate', '1.0', 'Playback rate; keep 1.0 for compute-time measurements'),
         ('start_delay', '4.0', 'Seconds to wait for the nodes before playing'),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
-        ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf'),
+        ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf,hybrid (hybrid needs pf)'),
         ('k', '1.0', 'Odometry noise scale (alpha = 0.05 k)'),
         ('sigma_r', '0.03', 'Lidar range noise std, m'),
         ('seed', '0', 'Trial seed'),

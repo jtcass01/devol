@@ -35,6 +35,7 @@ setup(
             'localization_viz = devol_localization.localization_viz:main',
             'posterior_snapshot = devol_localization.posterior_snapshot:main',
             'localization_study = devol_localization.localization_study:main',
+            'hybrid_supervisor = devol_localization.hybrid_supervisor:main',
         ],
     },
 )
