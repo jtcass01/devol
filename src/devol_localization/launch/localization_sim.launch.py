@@ -112,6 +112,9 @@ def launch_setup(context):
 
     if arg('scenario') == 'kidnap':
         target = [float(v) for v in arg('kidnap_target').split(',')]
+        world_pcd = os.path.join(
+            get_package_share_directory('devol_gazebo'), 'worlds', arg('maze'), 'static_world.pcd'
+        )
         actions.append(
             Node(
                 package='devol_localization',
@@ -124,6 +127,9 @@ def launch_setup(context):
                         'kidnap_time': float(arg('kidnap_time')),
                         'target': target,
                         'trigger': arg('kidnap_trigger'),
+                        'target_mode': arg('kidnap_target_mode'),
+                        'seed': int(arg('seed')),
+                        'world_pcd': world_pcd,
                     }
                 ],
             )
@@ -183,6 +189,12 @@ def generate_launch_description():
             'kidnap_target',
             '5.45,2.03,0.0',
             'scenario:=kidnap: x,y,yaw to teleport to (default Goal 2)',
+        ),
+        (
+            'kidnap_target_mode',
+            'fixed',
+            'scenario:=kidnap: fixed (kidnap_target) or random (a seeded, '
+            'collision-free pose >= 3 m away that can reach Goal 2)',
         ),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
         ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf,hybrid (hybrid needs pf)'),

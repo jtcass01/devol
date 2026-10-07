@@ -34,6 +34,8 @@ def generate_launch_description():
                 'use_gazebo:=true ',
                 'use_cameras:=',
                 LaunchConfiguration('use_cameras'),
+                ' wheel_slip_compliance:=',
+                LaunchConfiguration('wheel_slip_compliance'),
             ]
         ),
         value_type=str,
@@ -65,6 +67,12 @@ def generate_launch_description():
         default_value='static',
         choices=['static', 'none'],
         description='static: publish map -> odom at the spawn pose; none: leave it to another node',
+    )
+    declare_wheel_slip_compliance = DeclareLaunchArgument(
+        'wheel_slip_compliance',
+        default_value='0.5',
+        description='Unitless WheelSlip compliance for all four wheels (lateral and '
+        'longitudinal); 0 = no slip',
     )
     declare_namespace = DeclareLaunchArgument(
         'namespace', default_value='/devol_drive', description='Namespace for topics'
@@ -243,6 +251,7 @@ def generate_launch_description():
             declare_use_sim_time_cmd,
             declare_use_cameras_cmd,
             declare_map_odom_tf,
+            declare_wheel_slip_compliance,
             declare_namespace,
             maze_arg,
             OpaqueFunction(function=launch_setup),
