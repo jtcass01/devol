@@ -25,16 +25,6 @@
     <xacro:arg name="script_filename" default="None" />
     <xacro:arg name="input_recipe_filename" default="None" />
     <xacro:arg name="output_recipe_filename" default="None" />
-    <xacro:arg name="body_length" default="0.4"/>
-    <xacro:arg name="body_width" default="0.25"/>
-    <xacro:arg name="body_height" default="0.1"/>
-    <xacro:arg name="body_density" default="7850.0"/>
-    <xacro:arg name="wheel_radius" default="0.1"/>
-    <xacro:arg name="wheel_width" default="0.05"/>
-    <xacro:arg name="wheel_density" default="900"/>
-    <xacro:arg name="caster_radius" default="0.05"/>
-    <xacro:arg name="caster_density" default="0.1"/>
-    <xacro:arg name="max_linear_acceleration" default="10"/>
     <xacro:arg name="use_gazebo" default="true"/>
     <xacro:arg name="force_abs_paths" default="true"/>
     <xacro:arg name="namespace" default="/devol_drive"/>
@@ -45,10 +35,6 @@
 
     <!-- convert to property to use substitution in function -->
     <xacro:property name="initial_positions_file" default="$(arg initial_positions_file)"/>
-
-    <xacro:property name="body_width" value="$(arg body_width)"/>
-    <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
-    <xacro:property name="wheel_separation" value="${(body_width) + (wheel_width)}"/>
     <xacro:property name="name" value="$(arg name)"/>
     <xacro:property name="namespace" value="$(arg namespace)"/>
 
@@ -73,16 +59,6 @@
         initial_positions="${xacro.load_yaml((initial_positions_file))}"
         use_gazebo="$(arg use_gazebo)"
         force_abs_paths="$(arg use_gazebo)"
-        body_length="$(arg body_length)"
-        body_width="$(arg body_width)"
-        body_height="$(arg body_height)"
-        body_density="$(arg body_density)"
-        wheel_radius="$(arg wheel_radius)"
-        wheel_width="$(arg wheel_width)"
-        wheel_density="$(arg wheel_density)"
-        caster_radius="$(arg caster_radius)"
-        caster_density="$(arg caster_density)"
-        max_linear_acceleration="$(arg max_linear_acceleration)"
         namespace="$(arg namespace)"
         use_cameras="$(arg use_cameras)">
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -93,9 +69,6 @@
     <xacro:if value="$(arg use_gazebo)">
         <xacro:include filename="$(find devol_drive_description)/urdf/devol_drive.gazebo.xacro"/>
         <xacro:devol_drive_gazebo 
-            wheel_separation="${(wheel_separation)}"
-            wheel_radius="$(arg wheel_radius)"
-            max_linear_acceleration="$(arg max_linear_acceleration)"
             tf_prefix="$(arg tf_prefix)" 
             namespace="$(arg namespace)"
             use_cameras="$(arg use_cameras)"

@@ -10,7 +10,7 @@ scoring, kidnapping, live views and the replay runner).
 |---|---|
 | `ekf_localization` | EKF: odometry prediction, scan-matched pose correction. `init_mode` tf / pose / global. Publishes `ekf_pose`, `ekf_compute_time_ms`. |
 | `pf_localization` | SIR Monte Carlo localization with augmented-MCL injection. Publishes `pf_pose`, `pf_particles`, `pf_compute_time_ms`. |
-| `hybrid_supervisor` | Hybrid EKF+PF: after each PF update, compares a second EKF instance (`hybrid_ekf`, publishing `hybrid_pose`) with `pf_pose` and the scan, and re-seeds that EKF's prior from the PF on `hybrid_initialpose` when it judges the EKF lost (see `hybrid.py`). Started by the stack when `estimators` includes `hybrid`, or by `hybrid_localization.launch.py`. |
+| `hybrid_supervisor` | Hybrid EKF+PF: after each PF update, compares a second EKF instance (`hybrid_ekf`, publishing `hybrid_pose`) with `pf_pose` and the scan, and re-seeds that EKF's prior from the PF on `hybrid_initialpose` when it judges the EKF lost (see `hybrid.py`). Started by the stack when `estimators` includes `hybrid`. |
 | `noise_injector` | Seeded study noise: odometry increments perturbed with alpha1..4 = 0.05 k (per 0.1 m / 0.1 rad segment, so independent of the odometry rate; a segment under 1 cm gets pure-rotation noise, as in AMCL), lidar ranges + N(0, sigma_r^2). Publishes `/devol_drive/noisy/{odom,scan}`. |
 | `localization_evaluator` | Scores a trial against ground truth: position / heading RMSE, waypoint error, compute time, recovery time to < 0.25 m (global and kidnap). Dead reckoning from the noisy odometry is scored as a third estimator. Writes `trajectory.csv`, `compute.csv`, `summary.json`; for a test case also judges PASS/FAIL (`verdict.txt`) and can end the run at the last goal. |
 | `localization_viz` | Live Matplotlib view (no RViz): map, Gazebo pose vs estimate, lidar projected from the estimate, 2-sigma ellipse, every particle (`mode:=pf`), and error vs time against the filter's own 2-sigma bound. Optional MP4. |
@@ -22,10 +22,6 @@ Ground truth comes from a Gazebo `OdometryPublisher` added to the A200 (`a200.ga
 as `/devol_drive/ground_truth/odom` (world frame, which equals `map`).
 
 ## Running the tests in Gazebo
-
-Prerequisite: the sim fixes from the WSL machine (odom -> `a200_base_link` on `/tf` via the bridged
-`/model/devol_drive/tf`, the `a200_base_link` alias, the wheel-slip calibration). `ground_truth_tf`
-only replaces `map -> odom`; the planner still needs `odom -> base` on `/tf`.
 
 Verification test cases, preconfigured, with the EKF, PF and hybrid views updating live. Each run stops by
 itself a few seconds after the robot reaches Goal 3 (or FAILs after 400 s of sim time without

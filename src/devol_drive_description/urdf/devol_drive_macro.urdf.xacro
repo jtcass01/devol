@@ -28,21 +28,9 @@
         *origin
         use_gazebo
         force_abs_paths
-        body_length:=0.5
-        body_width:=0.3
-        body_height:=0.1
-        body_density:=7850.0
-        wheel_radius:=0.1
-        wheel_width:=0.05
-        wheel_density:=900
-        caster_radius:=0.1
-        caster_density:=0.1
-        max_linear_acceleration:=10
         namespace:=/devol_drive
         use_cameras:=true
     ">
-        <xacro:property name="caster_offset" value="${body_length/2 - caster_radius}"/>
-
         <xacro:a200 namespace="${namespace}" use_cameras="${use_cameras}" />
 
         <xacro:devol 
@@ -67,7 +55,7 @@
             initial_positions="${xacro.load_yaml((initial_positions_file))}"
             use_gazebo="${use_gazebo}"
             force_abs_paths="${force_abs_paths}" >
-            <origin xyz="0 0 ${caster_offset}" rpy="0 0 0"/>
+            <origin xyz="0 0 0.15" rpy="0 0 0"/>
         </xacro:devol>
     </xacro:macro>
 

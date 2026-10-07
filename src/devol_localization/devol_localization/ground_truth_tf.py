@@ -5,7 +5,7 @@ The study requires the waypoint controller to drive on simulator ground truth, s
 never changes the trajectory being scored. The controller looks up map -> base through
 odom -> base (wheel odometry); this node supplies map -> odom = truth (+) odom^-1 on every odometry
 message, which makes that lookup return the true pose. It replaces the static map -> odom of
-spawn_entities.launch.py (start the sim with map_odom_tf:=none so the two do not fight).
+devol_sim motion_planner_sim.launch.py (start the sim with map_odom_tf:=none so the two do not fight).
 
 Inputs
   ground_truth_topic (nav_msgs/Odometry) Gazebo OdometryPublisher, world (= map) frame

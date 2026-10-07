@@ -1,0 +1,73 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Cell Size: 1
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Enabled: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Source: Topic
+      Description Topic:
+        Value: /@NS@/robot_description
+        Durability Policy: Transient Local
+      Visual Enabled: true
+      Collision Enabled: false
+      Enabled: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Show Names: false
+      Show Axes: true
+      Show Arrows: false
+      Marker Scale: 0.3
+      Enabled: false
+    - Class: rviz_default_plugins/LaserScan
+      Name: 2D lidar
+      Topic:
+        Value: /@NS@/sensors/lidar2d_0/scan
+        Reliability Policy: Best Effort
+      Size (m): 0.03
+      Style: Points
+      Color Transformer: FlatColor
+      Color: 255; 0; 0
+      Enabled: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: 3D lidar
+      Topic:
+        Value: /@NS@/sensors/lidar3d_0/scan/points
+        Reliability Policy: Best Effort
+      Size (m): 0.02
+      Style: Points
+      Enabled: false
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: a200_base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Measure
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 4
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.5
+      Pitch: 0.5
+      Yaw: 0.8
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+Window Geometry:
+  Height: 900
+  Width: 1400

@@ -12,7 +12,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
              compliance * (wheel_radius * |spin rate|) / wheel_normal_force, so the slip velocity grows
              with wheel speed and with the friction force (0 = no slip). Lateral and longitudinal use the
              same value because the wheel collisions set no fdir1, so the engine's friction directions are
-             not tied to the wheel axes. Set with the xacro arg wheel_slip_compliance (spawn_entities.launch.py
+             not tied to the wheel axes. Set with the xacro arg wheel_slip_compliance (devol_sim motion_planner_sim.launch.py
              forwards the launch argument of the same name). -->
         <xacro:property name="wheel_slip_compliance" value="$(arg wheel_slip_compliance)"/>
         <gazebo>

@@ -14,10 +14,6 @@ What it adds to devol_sim's motion_planner_sim.launch.py:
   Goal 1 (kidnap_trigger:=time counts from the start instead; that can fire before Goal 1);
 - ros2 bag record of the raw streams (record_bag), for replaying every study configuration offline;
 - localization_stack.launch.py (filters, noise, scorer, views) unless filters:=false.
-
-Depends on the sim fixes still being finished on the WSL machine: odom -> a200_base_link on /tf
-(bridged /model/devol_drive/tf plus the a200_base_link alias), so the planner's map -> base lookup
-resolves through ground_truth_tf.
 """
 
 import os
@@ -83,7 +79,6 @@ def launch_setup(context):
                 'maze': arg('maze'),
                 'planner': arg('planner'),
                 'map_odom_tf': 'none',
-                # Honored by sim launch files that declare them; ignored otherwise.
                 'gz_gui': arg('gz_gui'),
                 'rviz': 'false',
             }.items(),
@@ -175,7 +170,7 @@ def generate_launch_description():
     args = [
         ('maze', 'factory', 'World to load'),
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
-        ('gz_gui', 'false', 'Show the Gazebo GUI (if the sim launch supports it)'),
+        ('gz_gui', 'false', 'Show the Gazebo GUI'),
         ('filters', 'true', 'Run the estimators, scorer and views live'),
         ('record_bag', '', 'Record the raw streams to this bag directory for offline replay'),
         (

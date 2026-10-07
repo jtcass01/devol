@@ -8,7 +8,7 @@ ekf_localization:
     initial_pose_topic: initialpose
     map_frame: map
     odom_frame: odom
-    # Off while spawn_entities.launch.py publishes a static map -> odom; turn on once that is removed.
+    # Off while devol_sim publishes a static map -> odom placeholder (map_odom_tf:=static).
     publish_tf: false
     map_transient_local: true
     initial_pose_from_tf: true
