@@ -112,6 +112,8 @@ class EKFLocalization(Node):
         self.declare_parameter('match_min_std', [0.05, 0.02])
         self.declare_parameter('max_ambiguity', 0.95)
         self.declare_parameter('gate_chi2', CHI2_3DOF_99)
+        # Fuse each scan at its own stamp, rewinding past newer odometry (see EKFPipeline).
+        self.declare_parameter('align_scan_to_odom', True)
         # Search window half-widths [min, max], sized from 3 sigma of the covariance.
         self.declare_parameter('search_window_xy', [0.15, 1.5])
         self.declare_parameter('search_window_yaw', [0.05, 0.8])
@@ -137,6 +139,7 @@ class EKFLocalization(Node):
             self.get_parameter('laser_pose').value
         )
         self._beam_step: int = int(self.get_parameter('beam_step').value)
+        self._align: bool = bool(self.get_parameter('align_scan_to_odom').value)
 
         self._ekf: PoseEKF = PoseEKF(alphas=self.get_parameter('odom_alphas').value)
         self._pipeline: EKFPipeline = EKFPipeline(
@@ -197,6 +200,10 @@ class EKFLocalization(Node):
             f'EKF localization started; publishing {ns}/{self._str("pose_topic")}, '
             f'publish_tf={self._publish_tf}'
         )
+
+    @staticmethod
+    def _stamp(msg) -> float:
+        return Time.from_msg(msg.header.stamp).nanoseconds * 1e-9
 
     def _str(self, name: str) -> str:
         return str(self.get_parameter(name).value)
@@ -260,9 +267,21 @@ class EKFLocalization(Node):
         with self._lock:
             if not self._ekf.initialized and not self._initialize(odom_pose, msg):
                 return
-            self._pipeline.on_odom(odom_pose)
+            lost_before: bool = self._pipeline.stats.failed_in_row >= self._pipeline.lost_after
+            calls: int = self._pipeline.stats.match_calls
+            t0: float = perf_counter()
+            # A scan stamped after the previous odometry is matched here, once this message arrives.
+            result = self._pipeline.on_odom(odom_pose, self._stamp(msg) if self._align else None)
+            if self._pipeline.stats.match_calls > calls:
+                self._record_match_time((perf_counter() - t0) * 1e3)
+            if result is not None and lost_before:
+                self.get_logger().info('Scan match re-acquired')
             self._last_odom_msg = msg
             self._publish(msg.header.stamp)
+
+    def _record_match_time(self, dt_ms: float) -> None:
+        self._match_ms += dt_ms
+        self._compute_pub.publish(Float64(data=dt_ms))
 
     def scan_received(self, msg: LaserScan) -> None:
         with self._lock:
@@ -277,12 +296,12 @@ class EKFLocalization(Node):
                 self._beam_step,
                 self._laser_pose,
             )
+            calls: int = self._pipeline.stats.match_calls
             t0: float = perf_counter()
             lost_before: bool = self._pipeline.stats.failed_in_row >= self._pipeline.lost_after
-            result = self._pipeline.on_scan(points)
-            dt_ms: float = (perf_counter() - t0) * 1e3
-            self._match_ms += dt_ms
-            self._compute_pub.publish(Float64(data=dt_ms))
+            result = self._pipeline.on_scan(points, self._stamp(msg) if self._align else None)
+            if self._pipeline.stats.match_calls > calls:
+                self._record_match_time((perf_counter() - t0) * 1e3)
             if result is not None and lost_before:
                 self.get_logger().info('Scan match re-acquired')
             if self._last_odom_msg is not None:
@@ -301,6 +320,7 @@ class EKFLocalization(Node):
             cov = diag(self._initial_std**2)
         with self._lock:
             self._ekf.reset(pose, cov)
+            self._pipeline.clear_history()
         self.get_logger().info(
             f'Filter reset to x={pose[0]:.2f} y={pose[1]:.2f} yaw={pose[2]:.2f}'
         )
@@ -379,11 +399,12 @@ class EKFLocalization(Node):
             x = self._ekf.x.copy()
             std = self._ekf.P.diagonal() ** 0.5
             ready = self._ekf.initialized
-            avg_ms = self._match_ms / s.scans if s.scans else 0.0
+            avg_ms = self._match_ms / s.match_calls if s.match_calls else 0.0
             line = (
                 f'pose=({x[0]:.2f}, {x[1]:.2f}, {x[2]:.2f}) std=({std[0]:.2f}, {std[1]:.2f}, {std[2]:.3f}) '
                 f'scans={s.scans} matched={s.matched} fused={s.fused} gated={s.gated} '
-                f'failed_in_row={s.failed_in_row} reacquired={s.reacquired} match={avg_ms:.1f} ms'
+                f'failed_in_row={s.failed_in_row} reacquired={s.reacquired} rewound={s.rewound} stale={s.stale} '
+                f'match={avg_ms:.1f} ms'
             )
             lost = s.failed_in_row >= self._pipeline.lost_after
         if not ready:
