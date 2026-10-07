@@ -14,6 +14,7 @@ from devol_sim.rrt_planner import (
     StartInCollision,
     body_checker_from_voxels,
     densify,
+    distance_to_segment,
     layer_grids_from_voxels,
     path_length,
 )
@@ -391,3 +392,10 @@ def test_path_ends_with_straight_run_along_goal_heading():
     (x0, y0, _), (x1, y1, _) = result.path[-2:]
     assert np.arctan2(y1 - y0, x1 - x0) == pytest.approx(goal[2], abs=1e-9)
     assert not checker.poses_in_collision(dense_path_poses(checker, result.path))
+
+
+def test_distance_to_segment():
+    assert distance_to_segment(0.5, 1.0, 0.0, 0.0, 1.0, 0.0) == pytest.approx(1.0)
+    assert distance_to_segment(-3.0, 4.0, 0.0, 0.0, 1.0, 0.0) == pytest.approx(5.0)
+    assert distance_to_segment(4.0, 4.0, 0.0, 0.0, 1.0, 0.0) == pytest.approx(5.0)
+    assert distance_to_segment(2.0, 0.0, 1.0, 1.0, 1.0, 1.0) == pytest.approx(hypot(1.0, 1.0))
