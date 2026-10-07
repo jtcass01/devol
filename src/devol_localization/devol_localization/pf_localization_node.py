@@ -38,8 +38,14 @@ from std_msgs.msg import Float64
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener, TransformException
 
+from devol_localization.graceful import init_with_stop_flag
 from devol_localization.particle_filter import (
-    LikelihoodField, ParticleFilter, PFParams, odometry_delta, wrap_angle)
+    LikelihoodField,
+    ParticleFilter,
+    PFParams,
+    odometry_delta,
+    wrap_angle,
+)
 
 
 def yaw_from_quaternion(q) -> float:
@@ -56,8 +62,9 @@ def set_yaw(q, yaw: float) -> None:
 def compose(a, b) -> np.ndarray:
     """a ⊕ b for 2D poses (x, y, yaw)."""
     c, s = math.cos(a[2]), math.sin(a[2])
-    return np.array([a[0] + c * b[0] - s * b[1], a[1] + s * b[0] + c * b[1],
-                     float(wrap_angle(a[2] + b[2]))])
+    return np.array(
+        [a[0] + c * b[0] - s * b[1], a[1] + s * b[0] + c * b[1], float(wrap_angle(a[2] + b[2]))]
+    )
 
 
 def inverse(a) -> np.ndarray:
@@ -133,22 +140,28 @@ class PFLocalizationNode(Node):
 
         params = PFParams(
             num_particles=int(gp('num_particles').value),
-            alpha1=float(gp('alpha1').value), alpha2=float(gp('alpha2').value),
-            alpha3=float(gp('alpha3').value), alpha4=float(gp('alpha4').value),
+            alpha1=float(gp('alpha1').value),
+            alpha2=float(gp('alpha2').value),
+            alpha3=float(gp('alpha3').value),
+            alpha4=float(gp('alpha4').value),
             min_translation=float(gp('min_translation').value),
-            sigma_hit=float(gp('sigma_hit').value), z_hit=float(gp('z_hit').value),
-            z_rand=float(gp('z_rand').value), max_beams=int(gp('max_beams').value),
+            sigma_hit=float(gp('sigma_hit').value),
+            z_hit=float(gp('z_hit').value),
+            z_rand=float(gp('z_rand').value),
+            max_beams=int(gp('max_beams').value),
             resample_threshold=float(gp('resample_threshold').value),
-            alpha_slow=float(gp('alpha_slow').value), alpha_fast=float(gp('alpha_fast').value))
+            alpha_slow=float(gp('alpha_slow').value),
+            alpha_fast=float(gp('alpha_fast').value),
+        )
         self._pf = ParticleFilter(params, seed=None if seed < 0 else seed)
 
         # State
         self._map_crc: Optional[int] = None
-        self._odom_pose: Optional[np.ndarray] = None      # latest odom -> base
+        self._odom_pose: Optional[np.ndarray] = None  # latest odom -> base
         self._odom_stamp = None
         self._last_update_odom: Optional[np.ndarray] = None  # odom pose at last filter update
-        self._map_to_odom = np.zeros(3)                    # correction published as map -> odom
-        self._cov = np.zeros((3, 3))                       # particle covariance at last update
+        self._map_to_odom = np.zeros(3)  # correction published as map -> odom
+        self._cov = np.zeros((3, 3))  # particle covariance at last update
         self._laser_pose: Optional[np.ndarray] = None
         self._laser_frame: Optional[str] = None
         self._pending_global = self._init_mode == 'global'
@@ -159,23 +172,30 @@ class PFLocalizationNode(Node):
         self._tf_broadcaster = TransformBroadcaster(self) if self._publish_tf else None
 
         # I/O
-        self._pose_pub = self.create_publisher(PoseWithCovarianceStamped, gp('pose_topic').value, 10)
+        self._pose_pub = self.create_publisher(
+            PoseWithCovarianceStamped, gp('pose_topic').value, 10
+        )
         self._particles_pub = self.create_publisher(PoseArray, gp('particles_topic').value, 1)
         self._compute_pub = self.create_publisher(Float64, gp('compute_time_topic').value, 10)
         # Latched map: transient_local gets the last map even if it was published once
         # before this node started (octomap_server latches its projected map).
-        map_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        map_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
         self.create_subscription(OccupancyGrid, gp('map_topic').value, self._map_cb, map_qos)
         self.create_subscription(Odometry, gp('odom_topic').value, self._odom_cb, 50)
         self.create_subscription(LaserScan, gp('scan_topic').value, self._scan_cb, 5)
-        self.create_subscription(PoseWithCovarianceStamped, gp('initialpose_topic').value,
-                                 self._initialpose_cb, 1)
+        self.create_subscription(
+            PoseWithCovarianceStamped, gp('initialpose_topic').value, self._initialpose_cb, 1
+        )
         self.create_service(Empty, '~/global_localization', self._global_srv)
 
         self.get_logger().info(
             f'PF localization: {params.num_particles} particles, init_mode={self._init_mode}, '
-            f'publish_tf={self._publish_tf}')
+            f'publish_tf={self._publish_tf}'
+        )
 
     # ------------------------------------------------------------- callbacks
     def _map_cb(self, msg: OccupancyGrid) -> None:
@@ -188,11 +208,16 @@ class PFLocalizationNode(Node):
             self.get_logger().warning('Map origin is rotated; rotation is ignored.')
         grid = data.reshape((msg.info.height, msg.info.width))
         self._pf.field = LikelihoodField(
-            grid, msg.info.resolution, msg.info.origin.position.x, msg.info.origin.position.y,
-            max_dist=self._lik_max_dist)
+            grid,
+            msg.info.resolution,
+            msg.info.origin.position.x,
+            msg.info.origin.position.y,
+            max_dist=self._lik_max_dist,
+        )
         self._map_crc = crc
         self.get_logger().info(
-            f'Map received: {msg.info.width}x{msg.info.height} @ {msg.info.resolution:.3f} m')
+            f'Map received: {msg.info.width}x{msg.info.height} @ {msg.info.resolution:.3f} m'
+        )
         if self._pending_global:
             self._pf.init_uniform()
             self._pending_global = False
@@ -201,7 +226,9 @@ class PFLocalizationNode(Node):
 
     def _odom_cb(self, msg: Odometry) -> None:
         p = msg.pose.pose
-        self._odom_pose = np.array([p.position.x, p.position.y, yaw_from_quaternion(p.orientation)])
+        self._odom_pose = np.array(
+            [p.position.x, p.position.y, yaw_from_quaternion(p.orientation)]
+        )
         self._odom_stamp = msg.header.stamp
 
         if not self._pf.initialized:
@@ -264,25 +291,36 @@ class PFLocalizationNode(Node):
     def _try_initialize(self) -> None:
         if self._init_mode == 'pose':
             gp = self.get_parameter
-            pose = (float(gp('initial_x').value), float(gp('initial_y').value),
-                    float(gp('initial_yaw').value))
+            pose = (
+                float(gp('initial_x').value),
+                float(gp('initial_y').value),
+                float(gp('initial_yaw').value),
+            )
         elif self._init_mode == 'tf':
             try:
                 tf = self._tf_buffer.lookup_transform(self._map_frame, self._odom_frame, Time())
             except TransformException as e:
-                self.get_logger().info(f'Waiting for {self._map_frame} -> {self._odom_frame}: {e}',
-                                       throttle_duration_sec=5.0)
+                self.get_logger().info(
+                    f'Waiting for {self._map_frame} -> {self._odom_frame}: {e}',
+                    throttle_duration_sec=5.0,
+                )
                 return
             t = tf.transform
-            map_odom = np.array([t.translation.x, t.translation.y, yaw_from_quaternion(t.rotation)])
+            map_odom = np.array(
+                [t.translation.x, t.translation.y, yaw_from_quaternion(t.rotation)]
+            )
             pose = compose(map_odom, self._odom_pose)
         else:
             return  # 'global' initializes when the map arrives
-        self._pf.init_gaussian(pose, float(self.get_parameter('initial_std_xy').value),
-                               float(self.get_parameter('initial_std_yaw').value))
+        self._pf.init_gaussian(
+            pose,
+            float(self.get_parameter('initial_std_xy').value),
+            float(self.get_parameter('initial_std_yaw').value),
+        )
         self._start_tracking()
         self.get_logger().info(
-            f'Initialized ({self._init_mode}) at ({pose[0]:.2f}, {pose[1]:.2f}, {pose[2]:.2f})')
+            f'Initialized ({self._init_mode}) at ({pose[0]:.2f}, {pose[1]:.2f}, {pose[2]:.2f})'
+        )
 
     def _start_tracking(self) -> None:
         """Anchor odometry deltas and the map -> odom correction at the current odom pose."""
@@ -294,17 +332,26 @@ class PFLocalizationNode(Node):
 
     def _lookup_laser_pose(self, laser_frame: str) -> np.ndarray:
         try:
-            tf = self._tf_buffer.lookup_transform(self._base_frame, laser_frame, Time(),
-                                                  timeout=Duration(seconds=0.5))
+            tf = self._tf_buffer.lookup_transform(
+                self._base_frame, laser_frame, Time(), timeout=Duration(seconds=0.5)
+            )
             t = tf.transform
             pose = np.array([t.translation.x, t.translation.y, yaw_from_quaternion(t.rotation)])
-            self.get_logger().info(f'Laser pose from TF {self._base_frame} -> {laser_frame}: {pose}')
+            self.get_logger().info(
+                f'Laser pose from TF {self._base_frame} -> {laser_frame}: {pose}'
+            )
         except TransformException:
             gp = self.get_parameter
-            pose = np.array([float(gp('laser_x').value), float(gp('laser_y').value),
-                             float(gp('laser_yaw').value)])
+            pose = np.array(
+                [
+                    float(gp('laser_x').value),
+                    float(gp('laser_y').value),
+                    float(gp('laser_yaw').value),
+                ]
+            )
             self.get_logger().warning(
-                f'No TF {self._base_frame} -> {laser_frame}; using laser_x/y/yaw params {pose}')
+                f'No TF {self._base_frame} -> {laser_frame}; using laser_x/y/yaw params {pose}'
+            )
         return pose
 
     def _publish_pose(self, stamp) -> None:
@@ -329,7 +376,9 @@ class PFLocalizationNode(Node):
         if self._tf_broadcaster is not None:
             tf = TransformStamped()
             # Future-date like AMCL so consumers can interpolate up to the next update.
-            tf.header.stamp = (Time.from_msg(stamp) + Duration(seconds=self._tf_tolerance)).to_msg()
+            tf.header.stamp = (
+                Time.from_msg(stamp) + Duration(seconds=self._tf_tolerance)
+            ).to_msg()
             tf.header.frame_id = self._map_frame
             tf.child_frame_id = self._odom_frame
             tf.transform.translation.x = float(self._map_to_odom[0])
@@ -342,7 +391,9 @@ class PFLocalizationNode(Node):
             return
         parts = self._pf.particles
         if parts.shape[0] > self._particles_publish_count > 0:
-            parts = parts[np.linspace(0, parts.shape[0] - 1, self._particles_publish_count).astype(int)]
+            parts = parts[
+                np.linspace(0, parts.shape[0] - 1, self._particles_publish_count).astype(int)
+            ]
         msg = PoseArray()
         msg.header.stamp = stamp
         msg.header.frame_id = self._map_frame
@@ -356,10 +407,11 @@ class PFLocalizationNode(Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    stop = init_with_stop_flag(args)
     node = PFLocalizationNode()
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not stop:
+            rclpy.spin_once(node, timeout_sec=0.1)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:

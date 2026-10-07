@@ -9,7 +9,12 @@ import numpy as np
 import pytest
 
 from devol_localization.particle_filter import (
-    LikelihoodField, ParticleFilter, PFParams, odometry_delta, wrap_angle)
+    LikelihoodField,
+    ParticleFilter,
+    PFParams,
+    odometry_delta,
+    wrap_angle,
+)
 
 RES = 0.05
 BEAMS = 540
@@ -20,10 +25,10 @@ RANGE_MAX = 12.0
 def make_map():
     """20 m x 12 m room with asymmetric obstacles, ROS OccupancyGrid layout (row = y)."""
     h, w = int(12 / RES), int(20 / RES)
-    g = np.full((h, w), -1, dtype=np.int8)   # unknown, like an octomap projection
+    g = np.full((h, w), -1, dtype=np.int8)  # unknown, like an octomap projection
 
     def box(x0, y0, x1, y1):
-        g[int(y0 / RES):int(y1 / RES), int(x0 / RES):int(x1 / RES)] = 100
+        g[int(y0 / RES) : int(y1 / RES), int(x0 / RES) : int(x1 / RES)] = 100
 
     box(0, 0, 20, 0.2)
     box(0, 11.8, 20, 12)
@@ -57,8 +62,15 @@ def raycast(grid, pose, laser=(0.32825, 0.0, 0.0), step=RES / 2):
 def trajectory():
     """Ground-truth loop through the free space: drive, turn, drive (10 cm steps)."""
     poses = [np.array([2.0, 2.0, 0.0])]
-    legs = [(4.0, 0.0), (0.0, np.pi / 2), (5.0, 0.0), (0.0, -np.pi / 2), (6.0, 0.0),
-            (0.0, -np.pi / 2), (4.0, 0.0)]
+    legs = [
+        (4.0, 0.0),
+        (0.0, np.pi / 2),
+        (5.0, 0.0),
+        (0.0, -np.pi / 2),
+        (6.0, 0.0),
+        (0.0, -np.pi / 2),
+        (4.0, 0.0),
+    ]
     for dist, turn in legs:
         steps = max(1, int(round(abs(dist) / 0.1))) if dist else 10
         for _ in range(steps):
@@ -179,13 +191,15 @@ def test_tracking_beats_dead_reckoning(world):
     errs, yaw_errs = run(pf, grid, truth, odom, rng=rng)
 
     dr_err = np.array([np.hypot(*(o[:2] - t[:2])) for o, t in zip(odom[1:], truth[1:])])
-    pf_rmse = np.sqrt(np.mean(errs ** 2))
-    dr_rmse = np.sqrt(np.mean(dr_err ** 2))
-    print(f'PF RMSE {pf_rmse:.3f} m, yaw {np.degrees(np.sqrt(np.mean(yaw_errs**2))):.2f} deg; '
-          f'dead reckoning RMSE {dr_rmse:.3f} m (final {dr_err[-1]:.3f} m)')
+    pf_rmse = np.sqrt(np.mean(errs**2))
+    dr_rmse = np.sqrt(np.mean(dr_err**2))
+    print(
+        f'PF RMSE {pf_rmse:.3f} m, yaw {np.degrees(np.sqrt(np.mean(yaw_errs**2))):.2f} deg; '
+        f'dead reckoning RMSE {dr_rmse:.3f} m (final {dr_err[-1]:.3f} m)'
+    )
     assert pf_rmse < 0.10
     assert errs[-1] < 0.10
-    assert np.sqrt(np.mean(yaw_errs ** 2)) < np.radians(3)
+    assert np.sqrt(np.mean(yaw_errs**2)) < np.radians(3)
     assert pf_rmse < dr_rmse
 
 
@@ -202,8 +216,10 @@ def test_tracks_through_skid_steer_odometry_error(world, yaw_scale):
     pf.init_gaussian(truth[0], 0.25, 0.2)
     errs, yaw_errs = run(pf, grid, truth, odom, rng=rng)
     dr_final = np.hypot(*(odom[-1][:2] - truth[-1][:2]))
-    print(f'yaw_scale {yaw_scale:+.1f}: PF mean {errs.mean():.3f} m, final {errs[-1]:.3f} m, '
-          f'max yaw {np.degrees(yaw_errs.max()):.1f} deg; odometry final {dr_final:.2f} m')
+    print(
+        f'yaw_scale {yaw_scale:+.1f}: PF mean {errs.mean():.3f} m, final {errs[-1]:.3f} m, '
+        f'max yaw {np.degrees(yaw_errs.max()):.1f} deg; odometry final {dr_final:.2f} m'
+    )
     assert errs.mean() < 0.15
     assert errs[-1] < 0.15
 
@@ -218,13 +234,16 @@ def test_global_localization_converges(world):
     for seed in range(3):
         rng = np.random.default_rng(seed)
         odom = noisy_odometry(truth, rng, frac=0.05)
-        pf = ParticleFilter(PFParams(num_particles=20000, alpha_slow=0.0, alpha_fast=0.0),
-                            field, seed=seed)
+        pf = ParticleFilter(
+            PFParams(num_particles=20000, alpha_slow=0.0, alpha_fast=0.0), field, seed=seed
+        )
         pf.init_uniform()
         errs, _ = run(pf, grid, truth, odom, rng=rng)
         converged = np.flatnonzero(errs < 0.25)
-        print(f'global localization seed {seed}: first < 0.25 m at step '
-              f'{converged[0] if converged.size else None}')
+        print(
+            f'global localization seed {seed}: first < 0.25 m at step '
+            f'{converged[0] if converged.size else None}'
+        )
         successes += bool(np.all(errs[-20:] < 0.25))
     assert successes >= 2
 
@@ -235,16 +254,16 @@ def test_kidnapping_recovery_with_injection(world):
     truth = trajectory()
     odom = noisy_odometry(truth, rng, frac=0.05)
     kidnap_step = 30
-    jump = np.array([3.0, 3.0, 0.0])   # filter confidently ~4 m off after the kidnap
+    jump = np.array([3.0, 3.0, 0.0])  # filter confidently ~4 m off after the kidnap
 
-    params = PFParams(num_particles=2000)   # injection is on by default
+    params = PFParams(num_particles=2000)  # injection is on by default
     pf = ParticleFilter(params, field, seed=7)
     pf.init_gaussian(truth[0], 0.2, 0.1)
     errs, _ = run(pf, grid, truth, odom, rng=rng, kidnap_at=(kidnap_step, jump))
-    after = errs[kidnap_step - 1:]
+    after = errs[kidnap_step - 1 :]
     recovered = np.flatnonzero(after < 0.25)
     print(f'kidnap: recovered after {recovered[0] if recovered.size else None} steps')
-    assert after[0] > 1.0          # the jump really did break the estimate
+    assert after[0] > 1.0  # the jump really did break the estimate
     assert np.all(after[-20:] < 0.25)
 
 
@@ -255,7 +274,9 @@ def test_plain_sir_does_not_recover_from_kidnapping(world):
     rng = np.random.default_rng(7)
     truth = trajectory()
     odom = noisy_odometry(truth, rng, frac=0.05)
-    pf = ParticleFilter(PFParams(num_particles=2000, alpha_slow=0.0, alpha_fast=0.0), field, seed=7)
+    pf = ParticleFilter(
+        PFParams(num_particles=2000, alpha_slow=0.0, alpha_fast=0.0), field, seed=7
+    )
     pf.init_gaussian(truth[0], 0.2, 0.1)
     errs, _ = run(pf, grid, truth, odom, rng=rng, kidnap_at=(30, np.array([3.0, 3.0, 0.0])))
     assert np.all(errs[-20:] > 0.25)
@@ -266,7 +287,7 @@ def test_creeping_in_place_turn_spreads_noise_as_rotation():
     read the creep direction as a 90 deg rot1: that put ~0.16 m of translation
     and ~26 deg of rot1 noise on every particle while the robot stood still."""
     rot1, trans, rot2 = odometry_delta((0.0, 0.0, 0.0), (0.0, 2e-4, 0.1))
-    assert abs(rot1) > 1.0          # the decomposition really is degenerate
+    assert abs(rot1) > 1.0  # the decomposition really is degenerate
     pf = ParticleFilter(PFParams(num_particles=5000), seed=0)
     pf.init_gaussian((0.0, 0.0, 0.0), 0.0, 0.0)
     pf.predict(rot1, trans, rot2)

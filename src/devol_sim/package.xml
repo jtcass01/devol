@@ -3,16 +3,13 @@
 <package format="3">
   <name>devol_sim</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>devol Gazebo simulation: worlds, spawning, bridges, octomap map pipeline and goal markers</description>
   <maintainer email="jacobtaylorcassady@outlook.com">jakeadelic</maintainer>
   <license>TODO: License declaration</license>
 
-  <exec_depend>python3-numpy</exec_depend>
-  <exec_depend>python3-scipy</exec_depend>
+  <exec_depend>devol_local_planner</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
 
   <export>

@@ -3,7 +3,7 @@
 <package format="3">
   <name>devol_description</name>
   <version>0.0.0</version>
-  <description>SDFormat description files for the devol project</description>
+  <description>UR5e arm, Robotiq gripper and wrist camera URDF for the devol mobile manipulator</description>
   <maintainer email="jcassad1@jh.edu">Jacob Cassady</maintainer>
   <license>Apache 2.0</license>
   <author>Jacob Cassady</author>
@@ -11,11 +11,9 @@
   <depend>ur_description</depend>
   <depend>robotiq_description</depend>
   <depend>realsense2_description</depend>
-  <depend>gz-sensors8</depend>
+  <depend>gz_sensors_vendor</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-
-  <test_depend>ament_lint_auto</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

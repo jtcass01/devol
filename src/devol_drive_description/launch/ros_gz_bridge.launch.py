@@ -1,45 +1,53 @@
-from os.path import join
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+"""ROS <-> Gazebo bridge for the robot's drive, joint states and sensors under <namespace>.
 
-from ament_index_python.packages import get_package_share_directory
+Topic names follow the plugins and sensors in the a200 and devol URDFs (a200.gazebo.xacro,
+devol.gazebo.xacro). Topics whose sensor is not in the model (for example the cameras with
+use_cameras:=false) are bridged but stay silent.
+"""
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+
+def launch_setup(context):
+    ns = LaunchConfiguration('namespace').perform(context)
+    topics = [
+        'cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+        'dynamic_joint_states@sensor_msgs/msg/JointState@gz.msgs.Model',
+        'odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
+        'sensors/lidar2d_0/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
+        'sensors/lidar3d_0/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
+        'sensors/lidar3d_0/scan/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
+    ]
+    # camera_0: the base's rear RealSense D435; camera_1: the wrist D405.
+    for cam in ('camera_0', 'camera_1'):
+        topics += [
+            f'sensors/{cam}/image@sensor_msgs/msg/Image[gz.msgs.Image',
+            f'sensors/{cam}/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            f'sensors/{cam}/depth_image@sensor_msgs/msg/Image[gz.msgs.Image',
+            f'sensors/{cam}/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
+        ]
+    return [
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='ros_gz_bridge',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+            arguments=[f'{ns}/{t}' for t in topics],
+            remappings=[(f'{ns}/dynamic_joint_states', f'{ns}/joint_states')],
+        )
+    ]
+
 
 def generate_launch_description():
-    a200_urdf_package = "a200_description"
-    a200_urdf_pkg_share = get_package_share_directory(a200_urdf_package)
-
-    devol_urdf_package = "devol_description"
-    devol_urdf_pkg_share = get_package_share_directory(devol_urdf_package)
-
-    declare_namespace = DeclareLaunchArgument(
-        'namespace',
-        default_value='/devol_drive',
-        description='Namespace for topics'
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                'namespace', default_value='/devol_drive', description='Namespace for topics'
+            ),
+            OpaqueFunction(function=launch_setup),
+        ]
     )
-
-    def launch_setup(context):
-        namespace = context.perform_substitution(LaunchConfiguration('namespace'))
-
-        a200_bridge = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                join(a200_urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-            ),
-            launch_arguments={
-                'namespace': namespace
-            }.items()
-        )
-
-        devol_bridge = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                join(devol_urdf_pkg_share, 'launch', 'ros_gz_bridge.launch.py')
-            ),
-            launch_arguments={
-                'namespace': namespace
-            }.items()
-        )
-
-        return [a200_bridge, devol_bridge]
-
-    return LaunchDescription([declare_namespace, OpaqueFunction(function=launch_setup)])

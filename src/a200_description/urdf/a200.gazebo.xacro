@@ -5,48 +5,42 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 -->
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="a200_gazebo" params="namespace:=/a200_0000" >
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="front_left_wheel_link">
-                <slip_compliance_lateral>0.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
+    <xacro:arg name="wheel_slip_compliance" default="0.0"/>
 
+    <xacro:macro name="a200_gazebo" params="namespace:=/a200_0000 use_cameras:=true" >
+        <!-- Wheel slip. Compliance is unitless: the plugin sets each wheel's contact slip to
+             compliance * (wheel_radius * |spin rate|) / wheel_normal_force, so the slip velocity grows
+             with wheel speed and with the friction force (0 = no slip). Lateral and longitudinal use the
+             same value because the wheel collisions set no fdir1, so the engine's friction directions are
+             not tied to the wheel axes. Set with the xacro arg wheel_slip_compliance (devol_sim motion_planner_sim.launch.py
+             forwards the launch argument of the same name). -->
+        <xacro:property name="wheel_slip_compliance" value="$(arg wheel_slip_compliance)"/>
         <gazebo>
             <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="front_right_wheel_link">
-                <slip_compliance_lateral>0.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
-
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="rear_left_wheel_link">
-                <slip_compliance_lateral>0.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
-            </plugin>
-        </gazebo>
-
-        <gazebo>
-            <plugin filename="libgz-sim-wheel-slip-system.so" name="gz::sim::systems::WheelSlip">
-            <wheel link_name="rear_right_wheel_link">
-                <slip_compliance_lateral>0.0</slip_compliance_lateral>
-                <slip_compliance_longitudinal>0.0</slip_compliance_longitudinal>
-                <wheel_normal_force>113</wheel_normal_force>
-                <wheel_radius>0.1651</wheel_radius>
-            </wheel>
+                <wheel link_name="front_left_wheel_link">
+                    <slip_compliance_lateral>${wheel_slip_compliance}</slip_compliance_lateral>
+                    <slip_compliance_longitudinal>${wheel_slip_compliance}</slip_compliance_longitudinal>
+                    <wheel_normal_force>113</wheel_normal_force>
+                    <wheel_radius>0.1651</wheel_radius>
+                </wheel>
+                <wheel link_name="front_right_wheel_link">
+                    <slip_compliance_lateral>${wheel_slip_compliance}</slip_compliance_lateral>
+                    <slip_compliance_longitudinal>${wheel_slip_compliance}</slip_compliance_longitudinal>
+                    <wheel_normal_force>113</wheel_normal_force>
+                    <wheel_radius>0.1651</wheel_radius>
+                </wheel>
+                <wheel link_name="rear_left_wheel_link">
+                    <slip_compliance_lateral>${wheel_slip_compliance}</slip_compliance_lateral>
+                    <slip_compliance_longitudinal>${wheel_slip_compliance}</slip_compliance_longitudinal>
+                    <wheel_normal_force>113</wheel_normal_force>
+                    <wheel_radius>0.1651</wheel_radius>
+                </wheel>
+                <wheel link_name="rear_right_wheel_link">
+                    <slip_compliance_lateral>${wheel_slip_compliance}</slip_compliance_lateral>
+                    <slip_compliance_longitudinal>${wheel_slip_compliance}</slip_compliance_longitudinal>
+                    <wheel_normal_force>113</wheel_normal_force>
+                    <wheel_radius>0.1651</wheel_radius>
+                </wheel>
             </plugin>
         </gazebo>
 
@@ -59,9 +53,23 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
             </plugin>
         </gazebo>
 
+        <!-- Ground truth for the localization study: the model's world pose (world = map frame),
+             bridged by devol_localization's localization_sim.launch.py. tf_topic is set so it does not
+             publish on /model/<name>/pose, which the sim bridges onto /tf. -->
+        <gazebo>
+            <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+                <odom_frame>map</odom_frame>
+                <robot_base_frame>a200_base_link</robot_base_frame>
+                <odom_topic>${namespace}/ground_truth/odom</odom_topic>
+                <tf_topic>${namespace}/ground_truth/tf</tf_topic>
+                <odom_publish_frequency>50</odom_publish_frequency>
+                <dimensions>3</dimensions>
+            </plugin>
+        </gazebo>
+
         <gazebo reference="lidar2d_0_laser">
             <sensor name="lidar2d_0" type="gpu_lidar">
-            <update_rate>40</update_rate>
+            <update_rate>20</update_rate>
             <visualize>true</visualize>
             <always_on>true</always_on>
             <gz_frame_id>lidar2d_0_laser</gz_frame_id>
@@ -92,7 +100,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
 
         <gazebo reference="lidar3d_0_laser">
             <sensor name="lidar3d_0" type="gpu_lidar">
-            <update_rate>20</update_rate>
+            <update_rate>10</update_rate>
             <visualize>true</visualize>
             <always_on>true</always_on>
             <gz_frame_id>lidar3d_0_laser</gz_frame_id>
@@ -121,6 +129,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
             </sensor>
         </gazebo>
 
+        <xacro:if value="${use_cameras}">
         <gazebo reference="rear_camera_color_frame">
             <sensor name="realsense_d435_camera" type="rgbd_camera">
                 <camera>
@@ -143,6 +152,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
                 <topic>${namespace}/sensors/camera_0</topic>
             </sensor>
         </gazebo>
+        </xacro:if>
     </xacro:macro>
 
 </robot>
