@@ -9,7 +9,7 @@ pf_localization:
     map_frame: map
     odom_frame: odom
     base_frame: a200_base_link
-    # Off while spawn_entities.launch.py publishes a static map -> odom placeholder.
+    # Off while devol_sim publishes a static map -> odom placeholder (map_odom_tf:=static).
     publish_tf: false
 
     num_particles: 500          # study grid: 100, 500, 2000, 5000

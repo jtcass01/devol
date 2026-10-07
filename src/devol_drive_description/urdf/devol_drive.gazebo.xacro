@@ -2,9 +2,6 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
   <xacro:macro name="devol_drive_gazebo" params="
-    wheel_separation
-    wheel_radius
-    max_linear_acceleration
     tf_prefix
     namespace:=/devol_drive
     use_cameras:=true">

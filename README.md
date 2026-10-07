@@ -13,9 +13,9 @@ world's point cloud, and are scored against Gazebo's ground-truth pose.
 |---|---|
 | `a200_description` | Clearpath A200 base, lidars and vendored meshes |
 | `devol_description` | UR arm, gripper and cameras mounted on the base |
-| `devol_drive_description` | The full robot (base + arm), its Gazebo plugins and the ROS–Gazebo bridge |
+| `devol_drive_description` | The full robot (base + arm), its Gazebo plugins, the ROS–Gazebo bridge, and `view.launch.py` for checking any of the three robot descriptions in RViz or Gazebo |
 | `devol_gazebo` | Worlds (`factory`, `empty`, `moon_terrain`), their waypoints (`poses.csv`) and static point clouds |
-| `devol_sim` | Sim launch files, octomap map pipeline (point cloud publisher), goal markers, RViz config |
+| `devol_sim` | The simulation launch file (`motion_planner_sim.launch.py`: world, robot, bridges, octomap map pipeline, goal markers, planner) |
 | `devol_local_planner` | Local motion planning: RRT\* / A\* planners, the A\* map padder and the PID path follower (`local_planner.launch.py`) |
 | `devol_localization` | EKF and PF nodes, plus the study tooling: noise injection, ground truth, scoring, kidnapping, live views and the replay runner (see [its README](src/devol_localization/README.md)) |
 
@@ -101,7 +101,7 @@ This starts Gazebo on the factory world, spawns the robot, builds the map (stati
 | Argument | Default | Meaning |
 |---|---|---|
 | `maze` | `factory` | World: `factory`, `empty` or `moon_terrain` |
-| `planner` | `rrt_star` | `rrt_star`, `rrt`, or `a_star` (the older planner on the inflated 2D map) |
+| `planner` | `rrt_star` | `rrt_star`, `rrt`, `a_star` (the older planner on the inflated 2D map), or `none` (the robot stays put) |
 | `gz_gui` | `true` | Show the Gazebo window. `false` roughly doubles the simulation speed. |
 | `rviz` | `true` | Show RViz. The study uses its own Matplotlib views instead, so `false` is recommended. |
 
@@ -114,13 +114,29 @@ docker exec -it devol bash
 ```
 
 ```bash
-ros2 launch devol_localization ekf_localization.launch.py    # publishes /devol_drive/ekf_pose
-ros2 launch devol_localization pf_localization.launch.py     # publishes /devol_drive/pf_pose and /devol_drive/pf_particles
+# EKF and PF on the raw sensors (k:=0 sigma_r:=0 turns the study's noise off), one live view each;
+# add hybrid to estimators for the PF-re-seeded EKF
+ros2 launch devol_localization localization_stack.launch.py estimators:=ekf,pf k:=0 sigma_r:=0
 ```
 
 The container uses `ROS_DOMAIN_ID=42` and `GZ_PARTITION=devol_docker`, so it does not talk to a
 simulation running natively in WSL at the same time. Set `ROS_DOMAIN_ID` in the environment before
 `docker compose` to change it.
+
+### Checking the robot models
+
+`devol_drive_description`'s `view.launch.py` shows any of the three robot descriptions, built exactly as
+the simulation builds them, in RViz with joint sliders or spawned in Gazebo:
+
+```bash
+docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_drive_description view.launch.py                 # full robot in RViz
+docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_drive_description view.launch.py model:=a200     # base only
+docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_drive_description view.launch.py model:=devol    # arm only
+docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_drive_description view.launch.py gz:=true        # spawned in Gazebo, RViz shows its joint states and lidar
+```
+
+Other arguments: `world` (Gazebo world, default `empty`), `gz_gui`, `rviz`, `jsp_gui:=false` (no
+slider window) and `use_cameras:=true` (simulate the RGB-D cameras).
 
 ## 6. Test cases
 
@@ -228,6 +244,7 @@ The same stack can be installed directly on **Ubuntu 26.04**, native or as a WSL
    sudo apt install -y \
      ros-lyrical-desktop \
      ros-lyrical-ros-gz ros-lyrical-gz-ros2-control ros-lyrical-ros2-controllers ros-lyrical-xacro \
+     ros-lyrical-joint-state-publisher-gui \
      ros-lyrical-ur ros-lyrical-robotiq-description ros-lyrical-realsense2-description \
      ros-lyrical-octomap-server \
      python3-colcon-common-extensions python3-pytest \

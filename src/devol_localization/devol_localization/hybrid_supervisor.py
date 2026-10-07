@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hybrid EKF + PF supervisor node: re-seeds an EKF from the particle filter after a kidnap.
 
-Runs next to an EKF instance of its own (hybrid_localization.launch.py starts one, publishing
+Runs next to an EKF instance of its own (localization_stack.launch.py with estimators:=...,hybrid starts one, publishing
 hybrid_pose) and the regular particle filter node. After every particle filter update it runs
 devol_localization.hybrid.KidnapMonitor on the two estimates and the latest scan; when the
 monitor calls for it, it publishes the particle filter's mean and floored covariance on the

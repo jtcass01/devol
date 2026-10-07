@@ -27,8 +27,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import Header
 
-import struct
 from pathlib import Path
+
+import numpy as np
 
 
 # ==============================================================================
@@ -56,33 +57,23 @@ class PointCloudPublisher(Node):
             raise FileNotFoundError(f'PointCloud file not found: {pointcloud_path}')
 
         self._points = self.load_ascii_pointcloud(pointcloud_path)
+        # Packed once: the cloud is static, so every publish sends the same bytes.
+        self._data = self._points.astype('<f4').tobytes()
         self._publisher = self.create_publisher(PointCloud2, topic, 10)
         self._timer = self.create_timer(1.0 / rate, self.publish_pointcloud)
 
         self.get_logger().info(f'Loaded {len(self._points)} points from {pointcloud_path}')
 
     # ==========================================================================
-    def load_ascii_pointcloud(self, path: Path):
-        """Load XYZ points from an ASCII PointCloud file."""
-        points = []
-        data_section = False
-
-        with open(path, 'r') as f:
-            for line in f:
-                line = line.strip()
-
+    def load_ascii_pointcloud(self, path: Path) -> np.ndarray:
+        """Load XYZ points from an ASCII PointCloud file as an (N, 3) float32 array."""
+        with open(path) as f:
+            for header_lines, line in enumerate(f, start=1):
                 if line.startswith('DATA ascii'):
-                    data_section = True
-                    continue
-
-                if not data_section or line.startswith('#') or not line:
-                    continue
-
-                values = line.split()
-                x, y, z = map(float, values[:3])
-                points.append((x, y, z))
-
-        return points
+                    break
+        return np.loadtxt(
+            path, skiprows=header_lines, usecols=(0, 1, 2), dtype=np.float32, ndmin=2
+        )
 
     # ==========================================================================
     def publish_pointcloud(self):
@@ -104,12 +95,7 @@ class PointCloudPublisher(Node):
         msg.point_step = 12  # 3 * float32
         msg.row_step = msg.point_step * msg.width
         msg.is_dense = True
-
-        buffer = []
-        for x, y, z in self._points:
-            buffer.append(struct.pack('fff', x, y, z))
-
-        msg.data = b''.join(buffer)
+        msg.data = self._data
 
         self._publisher.publish(msg)
 
