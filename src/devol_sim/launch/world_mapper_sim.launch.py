@@ -114,7 +114,7 @@ def generate_launch_description():
         )
 
         pid_controller = Node(
-            package='devol_sim',
+            package='devol_local_planner',
             executable='diffdrive_pid',
             name='diffdrive_pid',
             output='screen',

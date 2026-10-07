@@ -12,7 +12,7 @@ from typing import Optional, Sequence, Tuple
 
 import numpy as np
 
-from devol_sim.rrt_planner import (
+from devol_local_planner.rrt_planner import (
     GoalInCollision,
     PlannerConfig,
     RRTPlanner,

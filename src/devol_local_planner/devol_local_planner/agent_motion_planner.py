@@ -16,9 +16,9 @@ from visualization_msgs.msg import MarkerArray, Marker
 import tf2_ros
 from matplotlib.pyplot import ion, subplots, pause, close as plt_close
 
-from devol_sim.a_star_planner import a_star_grid
-from devol_sim.utils import quaternion_to_euler, euler_to_quaternion
-from devol_sim.mobile_robot_goal import MobileRobotGoal
+from devol_local_planner.a_star_planner import a_star_grid
+from devol_local_planner.utils import quaternion_to_euler, euler_to_quaternion
+from devol_local_planner.mobile_robot_goal import MobileRobotGoal
 
 
 def euclidean_distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:

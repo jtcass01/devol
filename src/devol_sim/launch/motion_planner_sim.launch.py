@@ -1,6 +1,5 @@
 import os
 import csv
-from math import pi
 
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, OpaqueFunction
@@ -15,6 +14,7 @@ def generate_launch_description():
     devol_drive_pkg_share = get_package_share_directory('devol_drive_description')
     sim_pkg_share = get_package_share_directory('devol_sim')
     gz_pkg_share = get_package_share_directory('devol_gazebo')
+    planner_pkg_share = get_package_share_directory('devol_local_planner')
 
     # Declare maze selection argument
     maze_arg = DeclareLaunchArgument(
@@ -139,26 +139,18 @@ def generate_launch_description():
             ],
         )
 
-        pid_controller = Node(
-            package='devol_sim',
-            executable='diffdrive_pid',
-            name='diffdrive_pid',
-            output='screen',
-            parameters=[
-                {
-                    'kp': 2.3,
-                    'ki': 0.01,
-                    'kd': 0.5,
-                    'lookahead': 0.25,
-                    'publish_rate': 30.0,
-                    'max_linear_vel': 1.0,
-                    'max_angular_vel': pi,
-                    'x': float(robot_pose['x']),
-                    'y': float(robot_pose['y']),
-                    'yaw': float(robot_pose['yaw']),
-                    'namespace': namespace,
-                }
-            ],
+        # Local planning stack (PID path follower + selected planner)
+        local_planner = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(planner_pkg_share, 'launch', 'local_planner.launch.py')
+            ),
+            launch_arguments={
+                'namespace': namespace,
+                'planner': planner,
+                'x': robot_pose['x'],
+                'y': robot_pose['y'],
+                'yaw': robot_pose['yaw'],
+            }.items(),
         )
 
         octomap_server = Node(
@@ -177,60 +169,6 @@ def generate_launch_description():
             ],
             remappings=[('cloud_in', 'static_map_pointcloud')],
         )
-
-        map_padder = Node(
-            package='devol_sim',
-            executable='map_padder',
-            name='map_padder',
-            output='screen',
-            namespace=namespace,
-            parameters=[
-                {
-                    'namespace': namespace,
-                    'robot_width': 1.0,  # In m
-                }
-            ],
-        )
-
-        agent_motion_planner: Node = Node(
-            package='devol_sim',
-            executable='agent_motion_planner',
-            name='agent_motion_planner',
-            output='screen',
-            parameters=[
-                {
-                    'publish_rate': 10.0,
-                    'namespace': namespace,
-                    'lookahead': 0.25,
-                    'goal_tolerance': 0.1,
-                    'intermediate_goal_tolerance': 0.4,
-                }
-            ],
-            arguments=['--ros-args', '--log-level', 'agent_motion_planner:=info'],
-        )
-
-        rrt_motion_planner: Node = Node(
-            package='devol_sim',
-            executable='rrt_motion_planner',
-            name='rrt_motion_planner',
-            output='screen',
-            parameters=[
-                {
-                    'publish_rate': 10.0,
-                    'namespace': namespace,
-                    'lookahead': 0.25,
-                    'goal_tolerance': 0.1,
-                    'intermediate_goal_tolerance': 0.4,
-                    'map_source': 'octomap_3d',
-                    'algorithm': planner if planner != 'a_star' else 'rrt_star',
-                }
-            ],
-        )
-
-        if planner == 'a_star':
-            planner_nodes = [map_padder, agent_motion_planner]
-        else:
-            planner_nodes = [rrt_motion_planner]
 
         # Map publisher
         pointcloud_publisher = Node(
@@ -271,9 +209,8 @@ def generate_launch_description():
             spawn_entities,
             bridge,
             system_bridge_cmd,
-            pid_controller,
+            local_planner,
             octomap_server,
-            *planner_nodes,
             pointcloud_publisher,
             goal_points_publisher,
         ] + ([rviz] if use_rviz else [])

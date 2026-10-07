@@ -15,7 +15,8 @@ world's point cloud, and are scored against Gazebo's ground-truth pose.
 | `devol_description` | UR arm, gripper and cameras mounted on the base |
 | `devol_drive_description` | The full robot (base + arm), its Gazebo plugins and the ROS–Gazebo bridge |
 | `devol_gazebo` | Worlds (`factory`, `empty`, `moon_terrain`), their waypoints (`poses.csv`) and static point clouds |
-| `devol_sim` | Sim launch files, octomap map pipeline, RRT\* / A\* planners, PID path follower |
+| `devol_sim` | Sim launch files, octomap map pipeline (point cloud publisher), goal markers, RViz config |
+| `devol_local_planner` | Local motion planning: RRT\* / A\* planners, the A\* map padder and the PID path follower (`local_planner.launch.py`) |
 | `devol_localization` | EKF and PF nodes, plus the study tooling: noise injection, ground truth, scoring, kidnapping, live views and the replay runner (see [its README](src/devol_localization/README.md)) |
 
 The recommended way to run everything is the Docker image in [`docker/`](docker/), which bundles
@@ -80,7 +81,7 @@ Then run the offline tests, which exercise the filter, planner and scoring math 
 Gazebo (about four minutes):
 
 ```bash
-docker compose -f docker/compose.yaml run --rm sim bash -c "cd src/devol_localization && python3 -m pytest -q test && cd ../devol_sim && python3 -m pytest -q test/test_rrt_planner.py"
+docker compose -f docker/compose.yaml run --rm sim bash -c "cd src/devol_localization && python3 -m pytest -q test && cd ../devol_local_planner && python3 -m pytest -q test/test_rrt_planner.py"
 ```
 
 Expected: `38 passed` and `18 passed`.

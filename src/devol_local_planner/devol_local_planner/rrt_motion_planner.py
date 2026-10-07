@@ -29,8 +29,8 @@ from rclpy.node import Node as RCLPY_Node
 from rclpy.qos import QoSProfile
 from visualization_msgs.msg import Marker, MarkerArray
 
-from devol_sim.mobile_robot_goal import MobileRobotGoal
-from devol_sim.rrt_planner import (
+from devol_local_planner.mobile_robot_goal import MobileRobotGoal
+from devol_local_planner.rrt_planner import (
     DEFAULT_BODY,
     FootprintCollisionChecker,
     GoalInCollision,
@@ -45,7 +45,7 @@ from devol_sim.rrt_planner import (
     distance_to_segment,
     wrap_to_pi,
 )
-from devol_sim.utils import euler_to_quaternion, quaternion_to_euler
+from devol_local_planner.utils import euler_to_quaternion, quaternion_to_euler
 
 __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'
