@@ -133,11 +133,7 @@ def launch_setup(context):
     actions.append(static_tf('a200_base_link', f'{ns.lstrip("/")}/a200_base_link'))
     if a['map_odom_tf'] == 'static':
         actions.append(static_tf('map', 'odom', robot['x'], robot['y'], robot['z'], robot['yaw']))
-    actions += [
-        static_tf('map', 'maze_world'),
-        static_tf('lidar2d_0_link', f'{ns}/robot/base_link/lidar2d_0'),
-        static_tf('lidar3d_0_link', f'{ns}/robot/base_link/lidar3d_0'),
-    ]
+    actions.append(static_tf('map', 'maze_world'))
 
     actions += [
         IncludeLaunchDescription(

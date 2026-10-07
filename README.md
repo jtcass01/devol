@@ -244,6 +244,7 @@ The same stack can be installed directly on **Ubuntu 26.04**, native or as a WSL
    sudo apt install -y \
      ros-lyrical-desktop \
      ros-lyrical-ros-gz ros-lyrical-gz-ros2-control ros-lyrical-ros2-controllers ros-lyrical-xacro \
+     ros-lyrical-joint-state-publisher-gui \
      ros-lyrical-ur ros-lyrical-robotiq-description ros-lyrical-realsense2-description \
      ros-lyrical-octomap-server \
      python3-colcon-common-extensions python3-pytest \
