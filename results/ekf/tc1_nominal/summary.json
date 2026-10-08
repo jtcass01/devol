@@ -1,0 +1,117 @@
+{
+  "config": {
+    "k": 1.0,
+    "sigma_r": 0.03,
+    "seed": 0,
+    "num_particles": 2000,
+    "estimators": [
+      "ekf",
+      "pf",
+      "hybrid"
+    ],
+    "maze": "factory",
+    "waypoint_names": [
+      "Goal 1: Pick Up",
+      "Goal 2: Place",
+      "Goal 3: Drive"
+    ],
+    "scenario": "nominal",
+    "start_pose": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "waypoints": [
+      [
+        -4.7,
+        9.2
+      ],
+      [
+        5.45,
+        2.03
+      ],
+      [
+        1.87,
+        -8.06
+      ]
+    ]
+  },
+  "estimators": {
+    "dead_reckoning": {
+      "samples": 2258,
+      "pos_rmse": 7.632480560450157,
+      "yaw_rmse": 0.9276027066223412,
+      "pos_mean": 5.357957241323642,
+      "pos_max": 17.849353323082894,
+      "final_pos_err": 17.849353323082894,
+      "waypoint_errors": [
+        2.24233409860856,
+        11.396121322722763,
+        17.846483486340876
+      ],
+      "compute_ms_mean": null,
+      "compute_ms_median": null,
+      "compute_ms_p95": null,
+      "event_time": null,
+      "recovered": null,
+      "recovery_time": null
+    },
+    "ekf": {
+      "samples": 3552,
+      "pos_rmse": 0.05857078316118025,
+      "yaw_rmse": 0.01990091290176536,
+      "pos_mean": 0.045204537439164055,
+      "pos_max": 0.21969076533721224,
+      "final_pos_err": 0.04236845456811195,
+      "waypoint_errors": [
+        0.02632914179054486,
+        0.12474680615600671,
+        0.04595318408163149
+      ],
+      "compute_ms_mean": 14.67805822565551,
+      "compute_ms_median": 13.424223000015445,
+      "compute_ms_p95": 29.1197348499935,
+      "event_time": null,
+      "recovered": null,
+      "recovery_time": null
+    },
+    "pf": {
+      "samples": 2951,
+      "pos_rmse": 0.0782843038308586,
+      "yaw_rmse": 0.025000444514756255,
+      "pos_mean": 0.06497950246704225,
+      "pos_max": 0.22978307100900697,
+      "final_pos_err": 0.06350051505231034,
+      "waypoint_errors": [
+        0.05192469744199454,
+        0.10409580275939272,
+        0.06350126748017088
+      ],
+      "compute_ms_mean": 10.14004768875771,
+      "compute_ms_median": 9.40377850000118,
+      "compute_ms_p95": 19.104559300004098,
+      "event_time": null,
+      "recovered": null,
+      "recovery_time": null
+    },
+    "hybrid": {
+      "samples": 3552,
+      "pos_rmse": 0.05860754251250393,
+      "yaw_rmse": 0.019901872865327706,
+      "pos_mean": 0.04521961554131603,
+      "pos_max": 0.21969076533721224,
+      "final_pos_err": 0.04236845456811195,
+      "waypoint_errors": [
+        0.02632914179054486,
+        0.12474680615600671,
+        0.04595318408163149
+      ],
+      "compute_ms_mean": 14.599304169242199,
+      "compute_ms_median": 12.67673149999382,
+      "compute_ms_p95": 30.52172634998555,
+      "event_time": null,
+      "recovered": null,
+      "recovery_time": null
+    }
+  }
+}

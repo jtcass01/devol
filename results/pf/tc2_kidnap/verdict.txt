@@ -1,0 +1,6 @@
+===== Test case 2: kidnapping: PASS =====
+kidnap seen at t = 38.66 s
+PASS pf: back within 0.25 m 7.2 s after the kidnap
+INFO ekf: did not recover (final error 20.51 m)
+PASS hybrid: back within 0.25 m 7.4 s after the kidnap
+(results in /out/tc2; reached the last waypoint)

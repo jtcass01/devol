@@ -17,5 +17,8 @@ log
 __pycache__/
 *.pyc
 
-# Docker test-case output (docker/compose.yaml)
+# Docker test-case output (docker/compose.yaml) goes to results/docker/; the rest of the top-level results/ is
+# the curated localization results (results/README.md)
 results/
+!/results/
+/results/docker/
