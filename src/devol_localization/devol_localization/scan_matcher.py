@@ -6,6 +6,27 @@ search over a pose window around the filter's prior (sized from its covariance),
 then Levenberg-Marquardt on the squared distances of the endpoints to the nearest
 obstacle. The result and an approximate covariance feed the EKF correction step.
 
+This is the EKF's measurement model: it turns a raw scan into the pose observation z and
+covariance R that ekf_core.PoseEKF.correct fuses. References are listed in THEORY.md at the
+package root.
+
+- The distance field is the same structure as the likelihood field of Probabilistic Robotics
+  Section 6.4 [thrun2005probabilistic] (and the particle filter's LikelihoodField): scan
+  endpoints are scored by their distance to the nearest obstacle, so no explicit point
+  correspondences are needed (unlike ICP, Besl and McKay 1992 [besl1992method]).
+- The coarse search is correlative scan matching (Olson 2009 [olson2009correlative]): every
+  pose on a grid around the prior is scored, so the match does not depend on the prior lying in
+  the refinement's basin of attraction. Its score is the mean of exp(-d^2 / 2 sigma^2) over
+  endpoints, a likelihood field score without the random-measurement term.
+- The refinement minimizes sum_k d(T(pose) p_k)^2, the squared distance-field value at each
+  transformed endpoint, by Levenberg-Marquardt (Nocedal and Wright 2006 [nocedal2006numerical],
+  Section 10.3), with bilinear interpolation of the field and its gradient as in Hector
+  mapping's scan matcher (Kohlbrecher et al. 2011 [kohlbrecher2011flexible]).
+- The covariance is the Gauss-Newton approximation sigma^2 (J^T J)^-1 at the optimum, the
+  inverse of the Fisher information of a least-squares fit with residual variance sigma^2.
+  That estimate is known to be overconfident for scan matching (Censi 2007
+  [censi2007accurate]), which is why it is inflated by covariance_scale and floored.
+
 Pure numpy/scipy, no ROS.
 """
 
@@ -289,7 +310,12 @@ class ScanMatcher:
     def _refine(
         self, points: ndarray, pose: ndarray, inlier_distance: float
     ) -> Optional[Tuple[ndarray, ndarray, ndarray, ndarray, int]]:
-        """Levenberg-Marquardt on squared endpoint distances over the inlier set."""
+        """Levenberg-Marquardt on squared endpoint distances over the inlier set.
+
+        Each step solves (J^T J + lambda diag(J^T J)) step = -J^T d (Marquardt's scaling of the
+        damping term); lambda shrinks after a step that lowers the cost (towards Gauss-Newton)
+        and grows after one that does not (towards scaled gradient descent).
+        """
         lam: float = 1e-3
         d, J, inl = self._residuals(pose, points, inlier_distance)
         cost: float = float((d[inl] ** 2).sum())
@@ -352,6 +378,7 @@ class ScanMatcher:
         if n_in < self.min_points or frac < self.min_inlier_fraction:
             return None
         Ji, di = J[inl], d[inl]
+        # Residual variance with n - 3 degrees of freedom (3 pose parameters fitted).
         sigma2: float = float((di**2).sum() / max(n_in - 3, 1))
         sigma2 = max(sigma2, (0.25 * self.field.resolution) ** 2)
         # A direction the scan cannot observe (along a featureless corridor) has a singular

@@ -245,12 +245,17 @@ class PFLocalizationNode(Node):
             self._laser_pose = self._lookup_laser_pose(msg.header.frame_id)
             self._laser_frame = msg.header.frame_id
 
+        # One MCL iteration (Probabilistic Robotics Table 8.2; see particle_filter.py) per scan,
+        # with the odometry accumulated since the last one as its control u_t. Like AMCL, the
+        # filter only updates after the robot has moved, so a parked robot does not keep
+        # re-weighting and resampling on the same evidence.
         rot1, trans, rot2 = odometry_delta(self._last_update_odom, self._odom_pose)
         moved_a = abs(wrap_angle(self._odom_pose[2] - self._last_update_odom[2]))
         if abs(trans) < self._update_min_d and moved_a < self._update_min_a:
             return
 
         t0 = time.perf_counter()
+        # Prediction (motion model), correction (measurement model), resampling.
         self._pf.predict(rot1, trans, rot2)
         ranges = np.asarray(msg.ranges, dtype=float)
         angles = msg.angle_min + np.arange(ranges.size) * msg.angle_increment
