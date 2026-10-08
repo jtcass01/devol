@@ -1,0 +1,6 @@
+===== Test case 1: nominal three-waypoint route: PASS =====
+PASS ekf: every waypoint within 0.25 m (Goal 1: Pick Up: 0.026 m, Goal 2: Place: 0.125 m, Goal 3: Drive: 0.046 m); position RMSE 0.059 m
+PASS pf: every waypoint within 0.25 m (Goal 1: Pick Up: 0.052 m, Goal 2: Place: 0.104 m, Goal 3: Drive: 0.064 m); position RMSE 0.078 m
+PASS hybrid: every waypoint within 0.25 m (Goal 1: Pick Up: 0.026 m, Goal 2: Place: 0.125 m, Goal 3: Drive: 0.046 m); position RMSE 0.059 m
+PASS dead reckoning worse than both filters: mean waypoint error 10.495 m vs worst filter 0.125 m
+(results in /out/tc1; reached the last waypoint)

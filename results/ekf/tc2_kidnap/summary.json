@@ -1,0 +1,118 @@
+{
+  "config": {
+    "k": 1.0,
+    "sigma_r": 0.03,
+    "seed": 0,
+    "num_particles": 2000,
+    "estimators": [
+      "ekf",
+      "pf",
+      "hybrid"
+    ],
+    "maze": "factory",
+    "waypoint_names": [
+      "Goal 1: Pick Up",
+      "Goal 2: Place",
+      "Goal 3: Drive"
+    ],
+    "scenario": "kidnap",
+    "start_pose": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "waypoints": [
+      [
+        -4.7,
+        9.2
+      ],
+      [
+        5.45,
+        2.03
+      ],
+      [
+        1.87,
+        -8.06
+      ]
+    ],
+    "kidnap_time": 38.660000000000004
+  },
+  "estimators": {
+    "dead_reckoning": {
+      "samples": 1734,
+      "pos_rmse": 4.920004103173619,
+      "yaw_rmse": 0.3242066729421225,
+      "pos_mean": 3.476138385493126,
+      "pos_max": 8.696067660999066,
+      "final_pos_err": 7.835804185151466,
+      "waypoint_errors": [
+        2.2564651512644627,
+        6.301461311384151,
+        7.835742144327872
+      ],
+      "compute_ms_mean": null,
+      "compute_ms_median": null,
+      "compute_ms_p95": null,
+      "event_time": null,
+      "recovered": null,
+      "recovery_time": null
+    },
+    "ekf": {
+      "samples": 2730,
+      "pos_rmse": 8.24291174220466,
+      "yaw_rmse": 0.9405455670772924,
+      "pos_mean": 4.704941455005885,
+      "pos_max": 20.50867285603163,
+      "final_pos_err": 20.50867285603163,
+      "waypoint_errors": [
+        0.015327756640690656,
+        8.069703040445793,
+        20.504027430427804
+      ],
+      "compute_ms_mean": 48.307397894630604,
+      "compute_ms_median": 19.98686500007807,
+      "compute_ms_p95": 165.47441480006452,
+      "event_time": 38.660000000000004,
+      "recovered": false,
+      "recovery_time": null
+    },
+    "pf": {
+      "samples": 2258,
+      "pos_rmse": 1.3532717044310587,
+      "yaw_rmse": 0.09749897914915763,
+      "pos_mean": 0.4075693741404767,
+      "pos_max": 9.069053825249993,
+      "final_pos_err": 0.083917776263345,
+      "waypoint_errors": [
+        0.014610074734963523,
+        8.053626083545899,
+        0.08392126592839344
+      ],
+      "compute_ms_mean": 10.291965316189687,
+      "compute_ms_median": 9.446383999943464,
+      "compute_ms_p95": 19.9223842000265,
+      "event_time": 38.660000000000004,
+      "recovered": true,
+      "recovery_time": 7.240000000000002
+    },
+    "hybrid": {
+      "samples": 2732,
+      "pos_rmse": 3.000138170220321,
+      "yaw_rmse": 0.6103658057880386,
+      "pos_mean": 1.134293886554177,
+      "pos_max": 9.732202552968252,
+      "final_pos_err": 0.0400947131054381,
+      "waypoint_errors": [
+        0.015327756640690656,
+        8.069703040445793,
+        0.0440348578241368
+      ],
+      "compute_ms_mean": 18.065874936809593,
+      "compute_ms_median": 14.363168000045334,
+      "compute_ms_p95": 41.50654200000183,
+      "event_time": 38.660000000000004,
+      "recovered": true,
+      "recovery_time": 7.409999999999997
+    }
+  }
+}
