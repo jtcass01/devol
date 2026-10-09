@@ -1,0 +1,16 @@
+preset highlands, seed 7, 100 m x 100 m, 0.5 m grid, 425 craters >= 1.5 m
+LOLA target (Rosenburg et al. 2011): median 7.5 deg at 17 m, H 0.95
+  median slope over    1 m baseline: 11.30 deg
+  median slope over    2 m baseline: 10.48 deg
+  median slope over    5 m baseline:  9.29 deg
+  median slope over   10 m baseline:  8.27 deg
+  median slope over   17 m baseline:  7.50 deg
+  median slope over   25 m baseline:  6.85 deg
+  local slope (one-cell gradient) percentiles 50/75/90/95/99/max: 11.3 / 15.7 / 20.0 / 22.8 / 28.8 / 43.8 deg
+  area steeper than 10 deg:  58.6 %
+  area steeper than 15 deg:  28.4 %
+  area steeper than 20 deg:  10.0 %
+  area steeper than 25 deg:   2.8 %
+  area steeper than 30 deg:   0.7 %
+134 boulders 0.2-2 m; spawn and goals (x, y): (0.00, 0.00), (-10.16, 9.10), (3.23, 10.77), (11.05, 1.98)
+static_world.pcd: 265746 points, terrain every 0.2 m, boulders every 0.05 m; z -11.46 to 6.90 m
