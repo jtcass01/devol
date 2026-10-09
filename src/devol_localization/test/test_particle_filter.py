@@ -181,6 +181,7 @@ def test_low_variance_resampling_keeps_heavy_particle():
     assert np.allclose(pf.weights, 0.01)
 
 
+@pytest.mark.slow
 def test_tracking_beats_dead_reckoning(world):
     grid, field = world
     rng = np.random.default_rng(3)
@@ -203,6 +204,7 @@ def test_tracking_beats_dead_reckoning(world):
     assert pf_rmse < dr_rmse
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('yaw_scale', [-0.3, 0.3])
 def test_tracks_through_skid_steer_odometry_error(world, yaw_scale):
     """Regression for the Gazebo divergence: odometry rotation off by 30%.
@@ -224,6 +226,7 @@ def test_tracks_through_skid_steer_odometry_error(world, yaw_scale):
     assert errs[-1] < 0.15
 
 
+@pytest.mark.slow
 def test_global_localization_converges(world):
     """Uniform prior, plain SIR. Success depends on a particle landing near the
     true pose, so it is a rate, not a guarantee: on this map 20000 particles
@@ -248,6 +251,7 @@ def test_global_localization_converges(world):
     assert successes >= 2
 
 
+@pytest.mark.slow
 def test_kidnapping_recovery_with_injection(world):
     grid, field = world
     rng = np.random.default_rng(7)
@@ -267,6 +271,7 @@ def test_kidnapping_recovery_with_injection(world):
     assert np.all(after[-20:] < 0.25)
 
 
+@pytest.mark.slow
 def test_plain_sir_does_not_recover_from_kidnapping(world):
     """Documents why alpha_slow/alpha_fast exist: without injection the
     particle set has nothing near the new pose and stays lost."""

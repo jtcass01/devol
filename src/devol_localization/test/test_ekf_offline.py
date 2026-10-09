@@ -17,6 +17,7 @@ from numpy import (
 )
 from numpy.linalg import inv
 from numpy.random import default_rng
+import pytest
 
 from devol_localization.ekf_core import PoseEKF, odometry_delta, wrap_angle
 from devol_localization.ekf_pipeline import EKFPipeline
@@ -300,6 +301,7 @@ def run_trial(
     }
 
 
+@pytest.mark.slow
 def test_ekf_beats_dead_reckoning():
     for seed in range(2):
         r = run_trial(seed)
@@ -308,6 +310,7 @@ def test_ekf_beats_dead_reckoning():
         assert r['rmse'] < r['dr_rmse']
 
 
+@pytest.mark.slow
 def test_ekf_holds_lock_with_slip_and_large_heading_error():
     # Gazebo run: ~5% distance and ~8% yaw odometry error, and the filter started 20 deg off
     # while believing its heading std was 3 deg. The old matcher never matched again.
@@ -317,6 +320,7 @@ def test_ekf_holds_lock_with_slip_and_large_heading_error():
     assert r['rmse'] < r['dr_rmse'] / 3, r
 
 
+@pytest.mark.slow
 def test_ekf_reacquires_after_scan_blackout():
     # 15 s without scans through two turns lets slip build up a large heading error.
     r = run_trial(1, slip=(1.05, 1.08), blackout=(250, 550))
@@ -324,6 +328,7 @@ def test_ekf_reacquires_after_scan_blackout():
     assert r['stats'].fused > 0.9 * (r['stats'].scans - 150), r
 
 
+@pytest.mark.slow
 def test_ekf_covariance_is_consistent():
     # Mean NEES of a consistent 3-state filter is 3; allow a factor of 2 either way. The Gazebo
     # run reported 0.1 m std while the true error was metres.
@@ -381,6 +386,7 @@ def spin_with_late_scans(stamped: bool, lag: float = 0.3, seed: int = 0):
     return abs(wrap_angle(pipeline.ekf.x[2] - truth_at(events[-1][0])[2])), pipeline.stats
 
 
+@pytest.mark.slow
 def test_late_scans_are_fused_at_their_stamps():
     # The Gazebo study diverged in a fast turn at Goal 2: odometry over-counted the turn and
     # scans fused late against newer odometry pulled the heading the wrong way.
