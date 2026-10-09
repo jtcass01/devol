@@ -11,6 +11,19 @@ transport delay) rewinds the filter to the scan time, is fused there, and the od
 then is re-applied. A scan stamped after the newest odometry waits for the next odometry
 message. Without this, a scan taken during a fast turn is fused as if taken later, which pulls
 the heading back by the rotation in between (0.15 s at 3 rad/s is 26 degrees).
+
+Theory (references in THEORY.md at the package root):
+- Search window: the EKF's predicted covariance bounds where the true pose can be, so the
+  matcher searches +/- 3 sigma around the predicted mean, the same idea as a validation region
+  in target tracking (Bar-Shalom et al. 2001 [barshalom2001estimation]).
+- Inflation while lost: adding process noise while the observations keep failing is a
+  heuristic (not from the references) that widens the belief, and with it the search window,
+  until a match lands inside the gate again. It is the EKF's counterpart of augmented MCL's
+  random particles; a single Gaussian cannot do more, which is why the kidnapped-robot case
+  needs the particle filter (Probabilistic Robotics Section 7.1 [thrun2005probabilistic]).
+- Late scans: re-running the filter from the stored state at the scan's time over the
+  odometry since then is the exact (reprocessing) way to fuse an out-of-sequence measurement;
+  Bar-Shalom (2002) [barshalom2002oosm] derives cheaper retrodiction-based alternatives.
 """
 
 from bisect import bisect_right
@@ -126,6 +139,7 @@ class EKFPipeline:
         return None
 
     def search_window(self) -> Tuple[float, float]:
+        """3-sigma half-widths (position, yaw) from the predicted covariance, clamped."""
         P: ndarray = self.ekf.P
         half_xy: float = float(clip(3.0 * sqrt(max(P[0, 0], P[1, 1])), *self.window_xy))
         half_yaw: float = float(clip(3.0 * sqrt(P[2, 2]), *self.window_yaw))
@@ -152,7 +166,11 @@ class EKFPipeline:
         return self._fuse_at(points, stamp)
 
     def _fuse_at(self, points: ndarray, stamp: float) -> Optional[MatchResult]:
-        """Rewinds to stamp, fuses the scan there and re-applies the later odometry."""
+        """Rewinds to stamp, fuses the scan there and re-applies the later odometry.
+
+        The odometry pose at the scan time is interpolated linearly between the two stored
+        odometry messages around it, and the stored state there is predicted forward to it.
+        """
         hist: List[_HistoryEntry] = list(self._history)
         if stamp < hist[0].stamp:
             self.stats.stale += 1
@@ -182,6 +200,8 @@ class EKFPipeline:
         return result
 
     def _match_and_fuse(self, points: ndarray) -> Optional[MatchResult]:
+        """Measurement update: scan-match around the predicted pose (the measurement model),
+        then fuse the match with the gated EKF correction."""
         self.stats.match_calls += 1
         half_xy, half_yaw = self.search_window()
         result: Optional[MatchResult] = self.matcher.match(points, self.ekf.x, half_xy, half_yaw)

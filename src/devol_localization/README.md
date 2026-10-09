@@ -4,6 +4,9 @@ EKF and particle-filter localization for the devol mobile manipulator, plus the 
 PF-vs-EKF trade study in `docs/Reasoning Under Uncertainty/` (noise injection, ground truth,
 scoring, kidnapping, live views and the replay runner).
 
+The theory behind each filter step, with the textbook tables and papers it implements and where the
+code departs from them, is in [THEORY.md](THEORY.md).
+
 ## Nodes
 
 | Executable | What it does |

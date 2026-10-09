@@ -26,6 +26,28 @@ consecutive particle filter updates:
 The particle filter's covariance is floored before it is used in test 1 and as the new EKF
 prior, because the particle cloud is overconfident (its spread is much smaller than its error),
 and an EKF re-seeded with a few-centimetre covariance would gate out its next scan matches.
+
+Theory (references in THEORY.md at the package root). The two filters are left as they are
+(ekf_core.py and particle_filter.py document them); this module only adds the switching logic.
+- The design pairs the strengths that Gutmann and Fox (2002) [gutmann2002experimental] measured:
+  Kalman filter localization is the most accurate and efficient while it tracks, Monte Carlo
+  localization is the one that recovers after the robot is displaced. Probabilistic Robotics
+  Section 7.1 [thrun2005probabilistic] explains why: a single Gaussian cannot represent the
+  multimodal belief of the global-localization and kidnapped-robot problems, while particles
+  can, with augmented MCL (Table 8.3) supplying the recovery.
+- Test 1 is a chi-square test on the difference of two Gaussian estimates, with the sum of
+  their covariances as its covariance (treating the two estimates as independent, which is
+  conservative because they share odometry and scans): the same normalized innovation
+  squared test the EKF uses to gate observations (Bar-Shalom et al. 2001
+  [barshalom2001estimation], Section 5.4).
+- Tests 3 and 4 score both candidate poses with the particle filter's own measurement model
+  (the likelihood field of Probabilistic Robotics Section 6.4, Table 6.3), so the choice
+  between the filters is made by the same p(z | x) the particle filter weights particles with.
+- Re-seeding the EKF prior from the particle set is moment matching: the particle set is
+  summarized by its weighted mean and covariance, as a Gaussian filter would represent it.
+  Resetting a filter's belief from the current measurement is also the idea of sensor
+  resetting localization (Lenser and Veloso 2000 [lenser2000sensor]), here driven by the
+  particle filter's posterior rather than by one measurement.
 """
 
 from dataclasses import dataclass
@@ -72,7 +94,7 @@ class HybridStats:
 
 
 def floor_covariance(cov: np.ndarray, floor_xy: float, floor_yaw: float) -> np.ndarray:
-    """Returns cov with its x, y and yaw variances raised to at least the floors."""
+    """Returns cov (symmetrized) with its x, y and yaw variances raised to at least the floors."""
     out = np.asarray(cov, dtype=float).reshape(3, 3).copy()
     out = 0.5 * (out + out.T)
     floors = (floor_xy**2, floor_xy**2, floor_yaw**2)
@@ -132,6 +154,7 @@ class KidnapMonitor:
     def mahalanobis2(
         self, ekf_x: np.ndarray, ekf_P: np.ndarray, pf_x: np.ndarray, pf_P: np.ndarray
     ) -> float:
+        """Squared Mahalanobis distance d^T (P_ekf + P_pf)^-1 d between the two means (test 1)."""
         p = self.params
         y = np.asarray(pf_x, dtype=float) - np.asarray(ekf_x, dtype=float)
         y[2] = wrap_angle(y[2])
@@ -141,6 +164,7 @@ class KidnapMonitor:
         return float(y @ np.linalg.solve(S, y))
 
     def pf_confident(self, pf_P: np.ndarray) -> bool:
+        """Test 2: the particle set has converged (its std is below the limits)."""
         p = self.params
         std_xy = float(np.sqrt(max(pf_P[0, 0], pf_P[1, 1])))
         return std_xy <= p.pf_max_std_xy and float(np.sqrt(pf_P[2, 2])) <= p.pf_max_std_yaw
