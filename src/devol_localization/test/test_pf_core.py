@@ -32,7 +32,7 @@ def wall_field():
 
 
 def beam_likelihood(d, p: PFParams):
-    """One beam of the likelihood field model (PR Table 6.3): z_hit N(d; 0, sigma) + z_rand/z_max."""
+    """One beam of the likelihood field model (PR Table 6.3): z_hit N(d; 0, s) + z_rand / z_max."""
     gauss = np.exp(-0.5 * (d / p.sigma_hit) ** 2) / (np.sqrt(2.0 * np.pi) * p.sigma_hit)
     return p.z_hit * gauss + p.z_rand / RANGE_MAX
 
