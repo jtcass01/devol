@@ -109,12 +109,14 @@ def run(kidnap_step=None, jump=np.zeros(3), hybrid=True, seed=3):
     return np.array(errs), hyb.stats
 
 
+@pytest.mark.slow
 def test_hybrid_does_not_reseed_while_tracking():
     errs, stats = run()
     assert stats.reseeds == 0
     assert np.max(errs) < 0.25
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('jump', [np.array([3.0, 3.0, 0.0]), np.array([-2.5, 2.0, 0.8])])
 def test_hybrid_reseeds_ekf_after_kidnap(jump):
     alone, _ = run(kidnap_step=30, jump=jump, hybrid=False)
