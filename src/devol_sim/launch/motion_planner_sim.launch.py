@@ -36,6 +36,10 @@ ARGS = {
         'static: publish a placeholder map -> odom at the spawn pose; none: another node publishes it '
         '(devol_localization ground_truth_tf or a filter)',
     ),
+    'max_linear_velocity': (
+        '1.5',
+        'Path follower top speed in m/s (a real Husky A200 tops out at 1.0)',
+    ),
     'octomap_resolution': ('0.05', 'Octomap voxel size in m'),
     'gz_gui': ('true', 'Open the Gazebo GUI (false runs the server headless)'),
     'rviz': ('true', 'Open RViz'),
@@ -227,6 +231,7 @@ def launch_setup(context):
                 launch_arguments={
                     'namespace': ns,
                     'planner': a['planner'],
+                    'max_linear_velocity': a['max_linear_velocity'],
                     'x': robot['x'],
                     'y': robot['y'],
                     'yaw': robot['yaw'],

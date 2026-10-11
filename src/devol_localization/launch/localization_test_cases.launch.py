@@ -96,6 +96,7 @@ def launch_setup(context):
         'kidnap_target': '5.45,2.03,0.0',
         'kidnap_target_mode': arg('kidnap_target_mode'),
         'estimators': arg('estimators'),
+        'max_linear_velocity': arg('max_linear_velocity'),
         'k': '1.0',
         'sigma_r': '0.03',
         'num_particles': arg('num_particles'),
@@ -147,6 +148,11 @@ def generate_launch_description():
             'Estimators to run and judge (subset of ekf,pf,hybrid; hybrid needs pf)',
         ),
         ('num_particles', '2000', 'PF particle count'),
+        (
+            'max_linear_velocity',
+            '1.5',
+            'Path follower top speed in m/s (a real Husky A200 tops out at 1.0)',
+        ),
         ('seed', '0', 'Noise, PF and random kidnap target seed'),
         (
             'kidnap_delay',
