@@ -33,7 +33,7 @@ getting there), prints PASS/FAIL, and leaves `verdict.txt`,
 
 ```bash
 ros2 launch devol_localization localization_test_cases.launch.py test_case:=1   # nominal route: EKF, PF and hybrid within 0.25 m at every goal, dead reckoning worse
-ros2 launch devol_localization localization_test_cases.launch.py test_case:=2   # kidnap onto Goal 2 after Goal 1: PF and hybrid back within 0.25 m before 60 s
+ros2 launch devol_localization localization_test_cases.launch.py test_case:=2   # kidnap to a seeded random valid pose after Goal 1 (kidnap_target_mode:=fixed: onto Goal 2): PF and hybrid back within 0.25 m before 60 s
 ```
 
 Start each test case only after the previous Gazebo has fully exited: a sim or bridge still shutting
