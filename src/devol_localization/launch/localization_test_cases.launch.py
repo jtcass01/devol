@@ -14,9 +14,13 @@ Test case 1, nominal three-waypoint route: expected output is the Goal 1-3 poses
 devol_gazebo/worlds/factory/poses.csv. PASS when every filter (EKF, PF and hybrid) is within 0.25 m of
 ground truth at every waypoint and dead reckoning is worse than all of them.
 
-Test case 2, kidnapping: kidnap_delay s after the robot reaches Goal 1, it is teleported onto Goal 2
-(5.45, 2.03, 0) without the estimators being told; the planner then drives on to Goal 3. Expected
-output is that pose. PASS when the PF, and the hybrid when it runs, return within 0.25 m and stay there
+Test case 2, kidnapping: kidnap_delay s after the robot reaches Goal 1, it is teleported, without the
+estimators being told, to a random valid pose drawn from the run's seed (kidnap_target_mode:=random):
+collision-free under the planner's 3D body check with 0.15 m clearance, any heading, at least 3 m from
+the robot and from Goal 2, and one from which the planner can reach Goal 2. The planner re-plans from
+there to Goal 2 and drives on to Goal 3. kidnap_target_mode:=fixed teleports onto Goal 2
+(5.45, 2.03, 0) as earlier runs did. Expected output is the teleport pose (logged by the kidnapper and
+published on /devol_drive/kidnap_event). PASS when the PF, and the hybrid when it runs, return within 0.25 m and stay there
 for 3 s before the 60 s recovery timeout; the EKF's outcome is reported either way.
 """
 
@@ -90,6 +94,7 @@ def launch_setup(context):
         'kidnap_trigger': 'after_waypoint',
         'kidnap_time': arg('kidnap_delay'),
         'kidnap_target': '5.45,2.03,0.0',
+        'kidnap_target_mode': arg('kidnap_target_mode'),
         'estimators': arg('estimators'),
         'k': '1.0',
         'sigma_r': '0.03',
@@ -142,11 +147,16 @@ def generate_launch_description():
             'Estimators to run and judge (subset of ekf,pf,hybrid; hybrid needs pf)',
         ),
         ('num_particles', '2000', 'PF particle count'),
-        ('seed', '0', 'Noise and PF seed'),
+        ('seed', '0', 'Noise, PF and random kidnap target seed'),
         (
             'kidnap_delay',
             '10.0',
             'Test case 2: sim seconds after reaching Goal 1 before the teleport',
+        ),
+        (
+            'kidnap_target_mode',
+            'random',
+            'Test case 2: random (a seeded valid pose, see above) or fixed (onto Goal 2)',
         ),
         (
             'posterior_times',

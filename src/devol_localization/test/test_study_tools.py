@@ -461,6 +461,32 @@ def test_test_cases_detect_a_still_running_sim(monkeypatch, tmp_path):
     ]
 
 
+def test_test_case_2_kidnaps_to_a_seeded_random_pose(monkeypatch, tmp_path):
+    tc = _load_launch(monkeypatch, 'localization_test_cases.launch.py')
+    defaults = {
+        d.a[0]: d.k['default_value']
+        for d in tc.generate_launch_description().a[0]
+        if type(d).__name__ == 'DeclareLaunchArgument'
+    }
+    assert defaults['kidnap_target_mode'] == 'random'
+
+    def sim_args(**overrides):
+        values = dict(defaults, test_case='2', seed='5', output_dir=str(tmp_path))
+        values.update(overrides)
+
+        class Context:
+            def perform_substitution(self, lc):
+                return values[lc.a[0]]
+
+        (include,) = tc.launch_setup(Context())
+        return dict(include.k['launch_arguments'])
+
+    args = sim_args()
+    assert args['scenario'] == 'kidnap'
+    assert (args['kidnap_target_mode'], args['seed']) == ('random', '5')
+    assert sim_args(kidnap_target_mode='fixed')['kidnap_target_mode'] == 'fixed'
+
+
 def test_spin_segment_gets_rotation_noise_not_translation():
     """Regression: the study_nominal bag at t = 56.405 s, mid-spin before Goal 2.
 
