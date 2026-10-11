@@ -79,6 +79,7 @@ def launch_setup(context):
             launch_arguments={
                 'maze': arg('maze'),
                 'planner': arg('planner'),
+                'max_linear_velocity': arg('max_linear_velocity'),
                 'map_odom_tf': 'none',
                 'gz_gui': arg('gz_gui'),
                 'rviz': 'false',
@@ -171,6 +172,11 @@ def generate_launch_description():
     args = [
         ('maze', 'factory', 'World to load'),
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
+        (
+            'max_linear_velocity',
+            '1.5',
+            'Path follower top speed in m/s (a real Husky A200 tops out at 1.0)',
+        ),
         ('gz_gui', 'false', 'Show the Gazebo GUI'),
         ('filters', 'true', 'Run the estimators, scorer and views live'),
         ('record_bag', '', 'Record the raw streams to this bag directory for offline replay'),
