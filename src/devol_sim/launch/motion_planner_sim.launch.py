@@ -63,17 +63,22 @@ def launch_setup(context):
         poses = {row['name']: row for row in csv.DictReader(f)}
     robot = poses.pop('robot')
 
-    gz_args = ('-r ' if a['gz_gui'] == 'true' else '-r -s ') + os.path.join(
-        world_dir, 'maze_world.sdf'
+    # Server and GUI run as separate processes so the server loads the world on its
+    # own; the combined `gz sim` waits for the GUI to hand it the world, and a GUI
+    # that stalls (e.g. WSLg in copy mode) leaves no world and spawners looping.
+    gz_launch = os.path.join(
+        get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
     )
+    gz_runs = ['-r -s ' + os.path.join(world_dir, 'maze_world.sdf')]
+    if a['gz_gui'] == 'true':
+        gz_runs.append('-g')
     actions = [
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(
-                    get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py'
-                )
-            ),
-            launch_arguments={'gz_args': gz_args}.items(),
+        *(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(gz_launch),
+                launch_arguments={'gz_args': gz_args}.items(),
+            )
+            for gz_args in gz_runs
         ),
         Node(
             package='robot_state_publisher',
