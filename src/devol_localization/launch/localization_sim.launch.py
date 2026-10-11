@@ -1,6 +1,7 @@
 """Live Gazebo run of the localization study: sim + ground truth + filters + live views (+ bag, kidnap).
 
-  ros2 launch devol_localization localization_sim.launch.py                       # nominal, EKF + PF windows
+  ros2 launch devol_localization localization_sim.launch.py                       # nominal, EKF + PF + hybrid windows
+  ros2 launch devol_localization localization_sim.launch.py estimators:=ekf,pf    # without the hybrid
   ros2 launch devol_localization localization_sim.launch.py scenario:=kidnap      # teleport 10 s after Goal 1
   ros2 launch devol_localization localization_sim.launch.py scenario:=global
   ros2 launch devol_localization localization_sim.launch.py record_bag:=~/loc_bags/nominal filters:=false
@@ -13,7 +14,7 @@ What it adds to devol_sim's motion_planner_sim.launch.py:
 - kidnapper when scenario:=kidnap: teleports the robot to kidnap_target kidnap_time s after it reaches
   Goal 1 (kidnap_trigger:=time counts from the start instead; that can fire before Goal 1);
 - ros2 bag record of the raw streams (record_bag), for replaying every study configuration offline;
-- localization_stack.launch.py (filters, noise, scorer, views) unless filters:=false.
+- localization_stack.launch.py (filters incl. the hybrid EKF+PF, noise, scorer, views) unless filters:=false.
 """
 
 import os
@@ -192,7 +193,11 @@ def generate_launch_description():
             'collision-free pose >= 3 m away that can reach Goal 2)',
         ),
         ('scenario', 'nominal', 'nominal | global | kidnap'),
-        ('estimators', 'ekf,pf', 'Comma-separated subset of ekf,pf,hybrid (hybrid needs pf)'),
+        (
+            'estimators',
+            'ekf,pf,hybrid',
+            'Comma-separated subset of ekf,pf,hybrid (hybrid = EKF re-seeded from the PF; needs pf)',
+        ),
         ('k', '1.0', 'Odometry noise scale (alpha = 0.05 k)'),
         ('sigma_r', '0.03', 'Lidar range noise std, m'),
         ('seed', '0', 'Trial seed'),
