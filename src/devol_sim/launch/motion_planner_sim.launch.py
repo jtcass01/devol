@@ -21,7 +21,10 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 ARGS = {
-    'maze': ('factory', 'World folder in devol_gazebo/worlds: empty, factory or moon_terrain'),
+    'maze': (
+        'factory',
+        'World folder in devol_gazebo/worlds: factory, lunar, empty or moon_terrain',
+    ),
     'namespace': ('/devol_drive', 'Namespace for the robot topics'),
     'planner': (
         'rrt_star',

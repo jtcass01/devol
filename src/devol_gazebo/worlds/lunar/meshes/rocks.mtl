@@ -1,0 +1,7 @@
+newmtl rock
+Ka 0 0 0
+Kd 0.6 0.6 0.6
+Ks 0.02 0.02 0.02
+Ns 4
+illum 2
+map_Kd regolith.jpg

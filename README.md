@@ -14,7 +14,7 @@ world's point cloud, and are scored against Gazebo's ground-truth pose.
 | `a200_description` | Clearpath A200 base, lidars and vendored meshes |
 | `devol_description` | UR arm, gripper and cameras mounted on the base |
 | `devol_drive_description` | The full robot (base + arm), its Gazebo plugins, the ROS–Gazebo bridge, and `view.launch.py` for checking any of the three robot descriptions in RViz or Gazebo |
-| `devol_gazebo` | Worlds (`factory`, `empty`, `moon_terrain`), their waypoints (`poses.csv`) and static point clouds |
+| `devol_gazebo` | Worlds (`factory`, `lunar`, `empty`, `moon_terrain`), their waypoints (`poses.csv`) and static point clouds, and the procedural lunar world generator ([`worlds/lunar`](src/devol_gazebo/worlds/lunar/README.md)) |
 | `devol_sim` | The simulation launch file (`motion_planner_sim.launch.py`: world, robot, bridges, octomap map pipeline, goal markers, planner) |
 | `devol_local_planner` | Local motion planning: RRT\* / A\* planners, the A\* map padder and the PID path follower (`local_planner.launch.py`) |
 | `devol_localization` | EKF and PF nodes, plus the study tooling: noise injection, ground truth, scoring, kidnapping, live views and the replay runner (see [its README](src/devol_localization/README.md)) |
@@ -100,7 +100,7 @@ This starts Gazebo on the factory world, spawns the robot, builds the map (stati
 
 | Argument | Default | Meaning |
 |---|---|---|
-| `maze` | `factory` | World: `factory`, `empty` or `moon_terrain` |
+| `maze` | `factory` | World: `factory`, `lunar` (procedural lunar highlands, see [its README](src/devol_gazebo/worlds/lunar/README.md)), `empty` or `moon_terrain` |
 | `planner` | `rrt_star` | `rrt_star`, `rrt`, `a_star` (the older planner on the inflated 2D map), or `none` (the robot stays put) |
 | `gz_gui` | `true` | Show the Gazebo window. `false` roughly doubles the simulation speed. |
 | `rviz` | `true` | Show RViz. The study uses its own Matplotlib views instead, so `false` is recommended. |
