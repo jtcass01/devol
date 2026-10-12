@@ -37,13 +37,14 @@ class LocalizationVisNode(Node):
         self.create_subscription(Odometry, '/devol_drive/odom', self.gt_callback, 10)
         self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self.ekf_callback, 10)
         self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/pf_pose', self.pf_callback, 10)
+        self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/dr_pose', self.dr_callback, 10) # Added DR sub
         self.create_subscription(PoseArray, '/devol_drive/pf_pose_cloud', self.cloud_callback, 10)
 
         # Plotting objects (assigned in main)
         self.fig = None
         self.ax = None
 
-        self.get_logger().info(f"Unified Visualization Node Started at {self.rate_hz} Hz")
+        self.get_logger().info(f"Visualization Node Started at {self.rate_hz} Hz")
 
     def map_callback(self, msg: OccupancyGrid):
         # Convert to visual grayscale
@@ -69,8 +70,10 @@ class LocalizationVisNode(Node):
     def pf_callback(self, msg: PoseWithCovarianceStamped):
         self.pf_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
 
+    def dr_callback(self, msg: PoseWithCovarianceStamped):
+        self.dr_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+
     def cloud_callback(self, msg: PoseArray):
-        # Extract to an Nx2 numpy array for fast plotting
         self.pf_particles = np.array([[p.position.x, p.position.y] for p in msg.poses])
 
     def render(self):
@@ -99,7 +102,11 @@ class LocalizationVisNode(Node):
         if self.pf_pose is not None:
             self.ax.plot(self.pf_pose[0], self.pf_pose[1], 's', color='orange', markersize=6, label='PF')
 
-        self.ax.set_title('Live Localization: EKF vs PF')
+        # Draw Dead Reckoning Estimate
+        if self.pf_pose is not None:
+            self.ax.plot(self.dr_pose[0], self.dr_pose[1], 'r^', markersize=6, label='Dead Reckoning')
+
+        self.ax.set_title('Live Localization: EKF vs PF vs DR')
         self.ax.set_xlabel('Meters (X)')
         self.ax.set_ylabel('Meters (Y)')
         self.ax.legend(loc='upper right', bbox_to_anchor=(1.25, 1))

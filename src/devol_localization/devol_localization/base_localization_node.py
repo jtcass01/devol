@@ -11,14 +11,14 @@ from devol_localization.differential_drive import DifferentialDrive
 from devol_localization.utils import euler_to_quaternion, yaw_from_quaternion, compose, inverse
 
 class BaseLocalizationNode(Node):
-    def __init__(self, node_name):
+    def __init__(self, node_name, pose_topic: str = '/devol_drive/pose'):
         super().__init__(node_name)
         
         # Declare Parameters
         self.declare_parameter('odom_topic', '/devol_drive/odom')
         self.declare_parameter('map_topic', '/devol_drive/projected_map')
         self.declare_parameter('scan_topic', '/devol_drive/sensors/lidar2d_0/scan')
-        self.declare_parameter('pose_topic', '/devol_drive/pose') # Generic name
+        self.declare_parameter('pose_topic', '/devol_drive/pose')
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'a200_base_link')

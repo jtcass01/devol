@@ -17,8 +17,8 @@ from devol_localization.utils import euler_to_quaternion
 
 class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('particle_filter_node')
-        
+        super().__init__('particle_filter_node', '/devol_drive/pf_pose')
+
         self.map_dict = None
         self.num_particles = 100
 

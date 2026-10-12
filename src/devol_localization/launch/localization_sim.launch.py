@@ -26,14 +26,14 @@ def launch_setup(context):
                 'maze': arg('maze'),
                 'planner': arg('planner'),
                 'max_linear_velocity': arg('max_linear_velocity'),
-                'map_odom_tf': 'none', # We let our filters handle the map->odom TF!
+                'map_odom_tf': 'none',
                 'gz_gui': arg('gz_gui'),
-                'rviz': 'false', # Disable RViz so we can use our custom Matplotlib viz
+                'rviz': 'false',
             }.items(),
         )
     )
 
-    # Bridge Ground Truth from Gazebo (For the Visualizer!)
+    # Bridge Ground Truth from Gazebo
     actions.append(
         Node(
             package='ros_gz_bridge',
@@ -42,7 +42,6 @@ def launch_setup(context):
             output='screen',
             parameters=[{'use_sim_time': True}],
             arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry'],
-            # Remap the topic name so our visualizer can find it at /devol_drive/odom (or a custom GT topic)
             remappings=[
                 (f'{namespace}/ground_truth/odom', f'{namespace}/ground_truth/odom')
             ]
@@ -53,7 +52,7 @@ def launch_setup(context):
     actions.append(
         Node(
             package=loc_share,
-            executable='ekf_node', # Make sure this matches your setup.py entry_points
+            executable='ekf_node',
             name='ekf_localization_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
@@ -64,8 +63,19 @@ def launch_setup(context):
     actions.append(
         Node(
             package=loc_share,
-            executable='pf_node', # Make sure this matches your setup.py entry_points
+            executable='pf_node',
             name='particle_filter_node',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+        )
+    )
+
+    # Start Dead Reckoning
+    actions.append(
+        Node(
+            package=loc_share,
+            executable='dr_node',
+            name='dead_reckoning_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
         )

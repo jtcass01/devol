@@ -1,6 +1,4 @@
-"""
-This DifferentialDrive model comes from Introduction of Robotics course notes.
-"""
+"""This DifferentialDrive model comes from Introduction of Robotics course notes."""
 
 # Import Libraries
 from numpy import array, cos, sin, pi, ndarray, eye
@@ -13,34 +11,30 @@ class DifferentialDrive(object):
   and accepts the following control inputs
   input = [left_wheel_rotation_rate,right_wheel_rotation_rate]
   """
-  def __init__(self,L=1,R=1):
-    """
-    Initializes the class
+  def __init__(self,L: float = 1,R: float = 1):
+    """Initializes the class
     Input
       :param L: The distance between the wheels
-      :param R: The radius of the wheels
-    """
-    self.L = L
-    self.R = R
-    self.u_limit = 1 / R
-    self.V = None
-    self.k_p = 1
+      :param R: The radius of the wheels"""
+    self.L: float = L
+    self.R: float = R
+    self.u_limit: float = 1. / R
+    self.V: ndarray = None
+    self.k_p: float = 1.
 
-  def get_state_size(self):
+  def get_state_size(self) -> int:
     return 3
 
-  def get_input_size(self):
+  def get_input_size(self) -> int:
     return 2
 
-  def get_V(self):
-    '''
-    This function provides the covariance matrix V which describes the noise that can be applied to the forward kinematics.
+  def get_V(self) -> ndarray:
+    '''This function provides the covariance matrix V which describes the noise that can be applied to the forward kinematics.
     
     Feel free to experiment with different levels of noise.
 
       Output
-        :return: V: input cost matrix
-    '''
+        :return: V: input cost matrix'''
     if self.V is None:
         self.V = eye(3)
         self.V[0,0] = 0.01
@@ -49,8 +43,7 @@ class DifferentialDrive(object):
     return 1e-5*self.V
 
   def forward(self, x, u, v, dt):
-    """
-    Computes the forward kinematics for the system.
+    """Computes the forward kinematics for the system.
 
     Input
       :param x0: The starting state (position) of the system (units:[m,m,rad])
@@ -58,8 +51,7 @@ class DifferentialDrive(object):
       :param v: The noise applied to the system (units:[m/s, m/s])
 
     Output
-      :return: x1: The new state of the system
-    """
+      :return: x1: The new state of the system"""
     x_t, y_t, theta_t = x
     wL, wR = u
     R: float = self.R
@@ -76,8 +68,7 @@ class DifferentialDrive(object):
     return array([x_next, y_next, theta_next]) + v
 
   def linearize(self,x,u,dt):
-    """
-    Computes the first order jacobian for A and B around the state x and input u
+    """Computes the first order jacobian for A and B around the state x and input u
 
     Input
       :param x: The state of the system 
@@ -85,9 +76,7 @@ class DifferentialDrive(object):
 
     Output
       :return: A: The Jacobian of the kinematics with respect to x
-      :return: B: The Jacobian of the kinematics with respect to u
-
-    """
+      :return: B: The Jacobian of the kinematics with respect to u"""
     x_t, y_t, theta_t = x
     wL, wR = u
     R: float = self.R
@@ -108,8 +97,7 @@ class DifferentialDrive(object):
     return A, B
 
   def PID(self,x, x_goal, dt):
-    """
-    Computes the Proportional control for the diff drive system given
+    """Computes the Proportional control for the diff drive system given
     the current state and velocity and the desired state. Do not worry about the derivative
     or integral term for this controller. 
 
@@ -120,8 +108,7 @@ class DifferentialDrive(object):
       :param dt: The timestep of the simulation
       
     Output
-      :return u: The control input to the system (e.g. wheel rotation rates)
-    """
+      :return u: The control input to the system (e.g. wheel rotation rates)"""
     x_r = x[0]
     y_r = x[1]
     th_r = x[2]
@@ -148,8 +135,7 @@ class DifferentialDrive(object):
     return self.inverse(x, v_new)
   
   def inverse(self, x, v):
-    """
-    Computes the inverse kinematics for the DiffDrive system (vehicle motion --> wheel motion).
+    """Computes the inverse kinematics for the DiffDrive system (vehicle motion --> wheel motion).
 
     Input
       :param x: The starting state (position) of the system. This is [x,y,theta].
@@ -157,9 +143,7 @@ class DifferentialDrive(object):
                 This is [speed, turn_rate] where Vtheta is the yaw rate (rotation rate around the z-axis)
 
     Output
-      :return: u: The necessary control inputs to achieve the desired velocity vector. This is the rotation rates for each wheel [psi_dot_left,psi_dot_right] (e.g. radians per second)
-
-    """
+      :return: u: The necessary control inputs to achieve the desired velocity vector. This is the rotation rates for each wheel [psi_dot_left,psi_dot_right] (e.g. radians per second)"""
     psi_left  = 1 / self.R * (v[0] - self.L/2 * v[1])
     psi_right =  1 / self.R * (v[0] + self.L/2 * v[1])
 

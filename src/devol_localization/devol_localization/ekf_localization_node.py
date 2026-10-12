@@ -14,7 +14,7 @@ from devol_localization.ekf import EKF
 
 class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('ekf_localization_node')
+        super().__init__('ekf_localization_node', '/devol_drive/ekf_pose')
 
         # EKF Covariances        
         self.covariance = np.diag([0.1**2, 0.1**2, np.deg2rad(5.0)**2])
