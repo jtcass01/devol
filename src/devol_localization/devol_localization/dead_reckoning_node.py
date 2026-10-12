@@ -3,13 +3,14 @@ import numpy as np
 
 from devol_localization.base_localization_node import BaseLocalizationNode
 
+
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose')
 
         # EKF-style Covariances (Covariance will grow unboundedly over time!)
-        self.covariance = np.diag([0.1**2, 0.1**2, np.deg2rad(5.0)**2])
-        self.V = np.diag([0.05**2, 0.05**2, np.deg2rad(2.0)**2]) # Process noise
+        self.covariance = np.diag([0.1**2, 0.1**2, np.deg2rad(5.0) ** 2])
+        self.V = np.diag([0.05**2, 0.05**2, np.deg2rad(2.0) ** 2])  # Process noise
 
         self.last_time = None
 
@@ -23,14 +24,14 @@ class DeadReckoningNode(BaseLocalizationNode):
         if self.last_time is None:
             self.last_time = current_time
             return
-        
+
         dt = current_time - self.last_time
         self.last_time = current_time
 
         # Predict
         # Apply forward kinematics
         self.x_est = self.diff_drive.forward(self.x_est, self.u, np.zeros(3), dt)
-        
+
         # update the covariance matrix
         A, _ = self.diff_drive.linearize(self.x_est, self.u, dt)
         self.covariance = A @ self.covariance @ A.T + self.V
@@ -46,6 +47,7 @@ def main(args=None):
     rclpy.init(args=args)
     rclpy.spin(DeadReckoningNode())
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

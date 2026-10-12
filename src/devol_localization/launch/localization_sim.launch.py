@@ -7,12 +7,13 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
 def launch_setup(context):
     def arg(name):
         return context.perform_substitution(LaunchConfiguration(name))
 
     sim_share = get_package_share_directory('devol_sim')
-    loc_share = 'devol_localization' 
+    loc_share = 'devol_localization'
     namespace = '/devol_drive'
     actions = []
 
@@ -42,9 +43,7 @@ def launch_setup(context):
             output='screen',
             parameters=[{'use_sim_time': True}],
             arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry'],
-            remappings=[
-                (f'{namespace}/ground_truth/odom', f'{namespace}/ground_truth/odom')
-            ]
+            remappings=[(f'{namespace}/ground_truth/odom', f'{namespace}/ground_truth/odom')],
         )
     )
 
@@ -89,13 +88,12 @@ def launch_setup(context):
             name='localization_vis_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            remappings=[
-                ('/devol_drive/odom', '/devol_drive/ground_truth/odom')
-            ]
+            remappings=[('/devol_drive/odom', '/devol_drive/ground_truth/odom')],
         )
     )
 
     return actions
+
 
 def generate_launch_description():
     args = [
@@ -104,7 +102,7 @@ def generate_launch_description():
         ('max_linear_velocity', '1.5', 'Path follower top speed in m/s'),
         ('gz_gui', 'false', 'Show the Gazebo GUI'),
     ]
-    
+
     return LaunchDescription(
         [DeclareLaunchArgument(n, default_value=d, description=desc) for n, d, desc in args]
         + [OpaqueFunction(function=launch_setup)]

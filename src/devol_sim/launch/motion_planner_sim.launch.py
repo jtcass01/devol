@@ -7,6 +7,7 @@ Starts Gazebo on devol_gazebo/worlds/<maze>/maze_world.sdf, spawns the robot at 
 world's poses.csv and a goal sphere at every other row, bridges the robot's topics, builds the map
 (static_world.pcd -> octomap_server -> <namespace>/projected_map) and drives the robot through the goals
 with devol_local_planner."""
+
 import csv
 import os
 

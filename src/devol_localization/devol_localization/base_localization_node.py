@@ -10,10 +10,11 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
 from devol_localization.differential_drive import DifferentialDrive
 from devol_localization.utils import euler_to_quaternion, yaw_from_quaternion, compose, inverse
 
+
 class BaseLocalizationNode(Node):
     def __init__(self, node_name, pose_topic: str = '/devol_drive/pose'):
         super().__init__(node_name)
-        
+
         # Declare Parameters
         self.declare_parameter('odom_topic', '/devol_drive/odom')
         self.declare_parameter('map_topic', '/devol_drive/projected_map')
@@ -57,9 +58,9 @@ class BaseLocalizationNode(Node):
         self.u = self.diff_drive.inverse(self.x_est, np.array([v_x, omega]))
 
         p = msg.pose.pose
-        self.latest_odom_pose = np.array([
-            p.position.x, p.position.y, yaw_from_quaternion(p.orientation)
-        ])
+        self.latest_odom_pose = np.array(
+            [p.position.x, p.position.y, yaw_from_quaternion(p.orientation)]
+        )
 
     def get_laser_offset(self, laser_frame):
         """Looks up the physical LiDAR mount offset."""
@@ -78,11 +79,11 @@ class BaseLocalizationNode(Node):
         pose_msg = PoseWithCovarianceStamped()
         pose_msg.header.stamp = stamp
         pose_msg.header.frame_id = self.map_frame
-        
+
         pose_msg.pose.pose.position.x = self.x_est[0]
         pose_msg.pose.pose.position.y = self.x_est[1]
         pose_msg.pose.pose.orientation = euler_to_quaternion(self.x_est[2])
-        
+
         # Pack 3x3 covariance into ROS 6x6 format
         cov_6x6 = np.zeros((6, 6))
         cov_6x6[0, 0], cov_6x6[0, 1] = cov_3x3[0, 0], cov_3x3[0, 1]
@@ -90,7 +91,7 @@ class BaseLocalizationNode(Node):
         cov_6x6[0, 5], cov_6x6[5, 0] = cov_3x3[0, 2], cov_3x3[2, 0]
         cov_6x6[1, 5], cov_6x6[5, 1] = cov_3x3[1, 2], cov_3x3[2, 1]
         cov_6x6[5, 5] = cov_3x3[2, 2]
-        
+
         pose_msg.pose.covariance = tuple(cov_6x6.flatten())
         self.pub_pose.publish(pose_msg)
 
@@ -101,10 +102,10 @@ class BaseLocalizationNode(Node):
         tf.header.stamp = stamp
         tf.header.frame_id = self.map_frame
         tf.child_frame_id = self.odom_frame
-        
+
         tf.transform.translation.x = map_to_odom[0]
         tf.transform.translation.y = map_to_odom[1]
         tf.transform.translation.z = 0.0
         tf.transform.rotation = euler_to_quaternion(map_to_odom[2])
-        
+
         self.tf_broadcaster.sendTransform(tf)
