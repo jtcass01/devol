@@ -20,8 +20,10 @@ class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('particle_filter_node', '/devol_drive/pf_pose')
 
+        self.declare_parameter('num_particles', 500)
+
         self.map_dict = None
-        self.num_particles = 100
+        self.num_particles = self.get_parameter('num_particles').value
 
         # Initialize particles clustered around starting origin
         self.particles = np.random.multivariate_normal(

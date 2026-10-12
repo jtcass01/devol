@@ -94,7 +94,7 @@ def launch_setup(context):
             name='ground_truth_bridge',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry'],
+            arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry']
         )
     )
     actions.append(

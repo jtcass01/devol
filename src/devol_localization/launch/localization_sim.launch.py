@@ -27,23 +27,10 @@ def launch_setup(context):
                 'maze': arg('maze'),
                 'planner': arg('planner'),
                 'max_linear_velocity': arg('max_linear_velocity'),
-                'map_odom_tf': 'none',
                 'gz_gui': arg('gz_gui'),
                 'rviz': 'false',
+                'map_odom_tf': 'none'
             }.items(),
-        )
-    )
-
-    # Bridge Ground Truth from Gazebo
-    actions.append(
-        Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge',
-            name='ground_truth_bridge',
-            output='screen',
-            parameters=[{'use_sim_time': True}],
-            arguments=[f'{namespace}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry'],
-            remappings=[(f'{namespace}/ground_truth/odom', f'{namespace}/ground_truth/odom')],
         )
     )
 
@@ -100,7 +87,8 @@ def generate_launch_description():
         ('maze', 'factory', 'World to load'),
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
         ('max_linear_velocity', '1.5', 'Path follower top speed in m/s'),
-        ('gz_gui', 'false', 'Show the Gazebo GUI'),
+        ('gz_gui', 'true', 'Show the Gazebo GUI'),
+        ('k', '1.0', 'Odometry noise scale (alpha = 0.05 k)'),
     ]
 
     return LaunchDescription(

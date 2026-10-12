@@ -17,6 +17,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('ekf_localization_node', '/devol_drive/ekf_pose')
 
+        self.map_data = None
+
         # EKF Covariances
         self.covariance = np.diag([0.1**2, 0.1**2, np.deg2rad(5.0) ** 2])
         self.V = np.diag([0.05**2, 0.05**2, np.deg2rad(2.0) ** 2])

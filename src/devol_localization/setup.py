@@ -29,7 +29,8 @@ setup(
             'pf_node = devol_localization.pf_localization_node:main',
             'ekf_node = devol_localization.ekf_localization_node:main',
             'dr_node = devol_localization.dead_reckoning_node:main',
-            'localization_vis_node = devol_localization.localization_vis_node:main',
+            'ground_truth_node = devol_localization.ground_truth_node:main',
+            'viz_node = devol_localization.localization_vis_node:main'
         ],
     },
 )

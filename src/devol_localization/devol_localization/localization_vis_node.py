@@ -26,6 +26,7 @@ class LocalizationVisNode(Node):
         self.gt_pose = None
         self.ekf_pose = None
         self.pf_pose = None
+        self.dr_pose = None
         self.pf_particles = None
 
         # Subscribers
@@ -123,7 +124,7 @@ class LocalizationVisNode(Node):
             )
 
         # Draw Dead Reckoning Estimate
-        if self.pf_pose is not None:
+        if self.dr_pose is not None:
             self.ax.plot(
                 self.dr_pose[0], self.dr_pose[1], 'r^', markersize=6, label='Dead Reckoning'
             )

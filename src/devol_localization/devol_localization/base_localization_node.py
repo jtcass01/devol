@@ -19,7 +19,7 @@ class BaseLocalizationNode(Node):
         self.declare_parameter('odom_topic', '/devol_drive/odom')
         self.declare_parameter('map_topic', '/devol_drive/projected_map')
         self.declare_parameter('scan_topic', '/devol_drive/sensors/lidar2d_0/scan')
-        self.declare_parameter('pose_topic', '/devol_drive/pose')
+        self.declare_parameter('pose_topic', pose_topic)
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'a200_base_link')
@@ -64,14 +64,7 @@ class BaseLocalizationNode(Node):
 
     def get_laser_offset(self, laser_frame):
         """Looks up the physical LiDAR mount offset."""
-        try:
-            tf = self.tf_buffer.lookup_transform(self.base_frame, laser_frame, Time())
-            x = tf.transform.translation.x
-            y = tf.transform.translation.y
-            yaw = yaw_from_quaternion(tf.transform.rotation)
-            return np.array([x, y, yaw])
-        except TransformException:
-            return np.array([0.32825, 0.0, 0.0])
+        return np.array([0.32825, 0.0, 0.0])
 
     def publish_pose_and_tf(self, stamp, cov_3x3):
         """Standardized publishing of Pose + Covariance and REP-105 TF."""
@@ -95,17 +88,17 @@ class BaseLocalizationNode(Node):
         pose_msg.pose.covariance = tuple(cov_6x6.flatten())
         self.pub_pose.publish(pose_msg)
 
-        # Broadcast map -> odom TF
-        map_to_odom = compose(self.x_est, inverse(self.latest_odom_pose))
+        # # Broadcast map -> odom TF
+        # map_to_odom = compose(self.x_est, inverse(self.latest_odom_pose))
 
-        tf = TransformStamped()
-        tf.header.stamp = stamp
-        tf.header.frame_id = self.map_frame
-        tf.child_frame_id = self.odom_frame
+        # tf = TransformStamped()
+        # tf.header.stamp = stamp
+        # tf.header.frame_id = self.map_frame
+        # tf.child_frame_id = self.odom_frame
 
-        tf.transform.translation.x = map_to_odom[0]
-        tf.transform.translation.y = map_to_odom[1]
-        tf.transform.translation.z = 0.0
-        tf.transform.rotation = euler_to_quaternion(map_to_odom[2])
+        # tf.transform.translation.x = map_to_odom[0]
+        # tf.transform.translation.y = map_to_odom[1]
+        # tf.transform.translation.z = 0.0
+        # tf.transform.rotation = euler_to_quaternion(map_to_odom[2])
 
-        self.tf_broadcaster.sendTransform(tf)
+        # self.tf_broadcaster.sendTransform(tf)

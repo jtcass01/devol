@@ -146,6 +146,27 @@ def launch_setup(context):
         actions.append(static_tf('map', 'odom', robot['x'], robot['y'], robot['z'], robot['yaw']))
     actions.append(static_tf('map', 'maze_world'))
 
+    # Bridge Ground Truth from Gazebo
+    actions.append(
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='ground_truth_bridge',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+            arguments=[f'{ns}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry']
+        )
+    )
+    actions.append(
+        Node(
+            package='devol_sim',
+            executable='ground_truth_node',
+            name='ground_truth_tf',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+        )
+    )
+
     actions += [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
