@@ -9,10 +9,17 @@ from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from tf2_ros import TransformBroadcaster
 
-from devol_localization.utils import euler_to_quaternion, yaw_from_quaternion, compose, inverse, odom_to_planar
+from devol_localization.utils import (
+    euler_to_quaternion,
+    yaw_from_quaternion,
+    compose,
+    inverse,
+    odom_to_planar,
+)
 
 __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'
+
 
 class GroundTruthNode(Node):
     def __init__(self) -> None:
@@ -27,8 +34,12 @@ class GroundTruthNode(Node):
 
         self.gt: Optional[np.ndarray] = None
         self.broadcaster = TransformBroadcaster(self)
-        self.create_subscription(Odometry, self.get_parameter('ground_truth_topic').value, self.gt_callback, 50)
-        self.create_subscription(Odometry, self.get_parameter('odom_topic').value, self.odom_callback, 50)
+        self.create_subscription(
+            Odometry, self.get_parameter('ground_truth_topic').value, self.gt_callback, 50
+        )
+        self.create_subscription(
+            Odometry, self.get_parameter('odom_topic').value, self.odom_callback, 50
+        )
         self.get_logger().info(
             f'Publishing {self.map_frame} -> {self.odom_frame} from ground truth'
         )

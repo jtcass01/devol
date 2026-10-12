@@ -29,7 +29,7 @@ def launch_setup(context):
                 'max_linear_velocity': arg('max_linear_velocity'),
                 'gz_gui': arg('gz_gui'),
                 'rviz': 'false',
-                'map_odom_tf': 'none'
+                'map_odom_tf': 'none',
             }.items(),
         )
     )
