@@ -12,7 +12,7 @@ import matplotlib
 
 matplotlib.use('Agg')
 from matplotlib.animation import FFMpegWriter
-from devol_localization.viz_core import LocalizationFigure, VizState
+from devol_localization_claude.viz_core import LocalizationFigure, VizState
 
 run, out = sys.argv[1], sys.argv[2]
 step = float(sys.argv[3]) if len(sys.argv) > 3 else 0.5

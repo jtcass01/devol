@@ -6,7 +6,7 @@
 Starts Gazebo on devol_gazebo/worlds/<maze>/maze_world.sdf, spawns the robot at the 'robot' row of that
 world's poses.csv and a goal sphere at every other row, bridges the robot's topics, builds the map
 (static_world.pcd -> octomap_server -> <namespace>/projected_map) and drives the robot through the goals
-with devol_local_planner. devol_localization's localization_sim.launch.py includes this file.
+with devol_local_planner. devol_localization_claude's localization_sim.launch.py includes this file.
 """
 
 import csv
@@ -34,7 +34,7 @@ ARGS = {
     'map_odom_tf': (
         'static',
         'static: publish a placeholder map -> odom at the spawn pose; none: another node publishes it '
-        '(devol_localization ground_truth_tf or a filter)',
+        '(devol_localization_claude ground_truth_tf or a filter)',
     ),
     'max_linear_velocity': (
         '1.5',
