@@ -1,18 +1,9 @@
-"""
-This LaserModel comes from Introduction of Robotics course notes.
-"""
+"""This LaserModel comes from Introduction of Robotics course notes."""
 
 from numpy import (array, cos, sin, linspace, arange, 
-                   pi, ndarray, exp, sqrt, eye, inf, 
-                   ones, searchsorted, cumsum, zeros, 
-                   argmax, diag, deg2rad, average)
-from numpy.random import uniform, multivariate_normal
-from typing import List, Tuple
-from math import ceil
-from typing import Iterable
-from ipywidgets import interact, IntSlider
-
-import matplotlib.pyplot as plt
+                   pi, ndarray, exp, sqrt)
+from typing import Tuple
+from math import pi
 
 class LaserModel:
   @staticmethod
@@ -74,3 +65,53 @@ class LaserModel:
       point = x[:2] + z * ray
       q *= LaserModel.ray_prob(point, map, std=std)
     return q
+
+"""
+The updated ROSLaserModel was developed by the author.
+"""
+
+import numpy as np
+  
+class ROSLaserModel(LaserModel):
+    @staticmethod
+    def ray_prob(point: np.ndarray, map_dict: dict, std=0.5):
+        map_data = map_dict['grid']
+        info = map_dict['info']
+        
+        # Convert metric point (meters) to map indices (cells)
+        col = int(round((point[0] - info.origin.position.x) / info.resolution))
+        row = int(round((point[1] - info.origin.position.y) / info.resolution))
+        
+        n, m = map_data.shape # n=rows (Y), m=cols (X)
+        
+        # Handle rays that go out of bounds (add distance to the map edge)
+        out_of_bounds_dist = 0.0
+        if row < 0:
+            out_of_bounds_dist += abs(row) * info.resolution
+            row = 0
+        elif row >= n:
+            out_of_bounds_dist += (row - n + 1) * info.resolution
+            row = n - 1
+            
+        if col < 0:
+            out_of_bounds_dist += abs(col) * info.resolution
+            col = 0
+        elif col >= m:
+            out_of_bounds_dist += (col - m + 1) * info.resolution
+            col = m - 1
+            
+        dist = map_data[row, col] + out_of_bounds_dist
+        return np.exp(-dist**2/(2*std**2)) / np.sqrt(2*pi*std**2)
+
+    @staticmethod
+    def likelihood_field_range_finder(z_dists, z_thetas, x, map_dict, z_max=4.0, std=0.5):
+        q = 1.0
+        eps = 0.02
+        for z, theta in zip(z_dists, z_thetas):
+            if z > z_max - eps:
+                continue
+            ray_theta = x[2] + theta
+            ray = np.array([cos(ray_theta), sin(ray_theta)])
+            point = x[:2] + z * ray
+            q *= ROSLaserModel.ray_prob(point, map_dict, std=std)
+        return q

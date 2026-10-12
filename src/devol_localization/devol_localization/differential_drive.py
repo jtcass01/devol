@@ -3,17 +3,7 @@ This DifferentialDrive model comes from Introduction of Robotics course notes.
 """
 
 # Import Libraries
-from numpy import (array, cos, sin, linspace, arange, 
-                   pi, ndarray, exp, sqrt, eye, inf, 
-                   ones, searchsorted, cumsum, zeros, 
-                   argmax, diag, deg2rad, average)
-from numpy.random import uniform, multivariate_normal
-from typing import List, Tuple
-from math import ceil
-from typing import Iterable
-from ipywidgets import interact, IntSlider
-
-import matplotlib.pyplot as plt
+from numpy import array, cos, sin, pi, ndarray, eye
 
 class DifferentialDrive(object):
   """

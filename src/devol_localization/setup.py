@@ -26,8 +26,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pf_localization = devol_localization.pf_localization_node:main',
-            'ekf_localization = devol_localization.ekf_localization_node:main'
+            'pf_node = devol_localization.pf_localization_node:main',
+            'ekf_node = devol_localization.ekf_localization_node:main',
+            'localization_vis_node = devol_localization.localization_vis_node:main'
         ],
     },
 )
