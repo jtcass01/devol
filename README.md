@@ -17,7 +17,7 @@ world's point cloud, and are scored against Gazebo's ground-truth pose.
 | `devol_gazebo` | Worlds (`factory`, `lunar`, `empty`, `moon_terrain`), their waypoints (`poses.csv`) and static point clouds, and the procedural lunar world generator ([`worlds/lunar`](src/devol_gazebo/worlds/lunar/README.md)) |
 | `devol_sim` | The simulation launch file (`motion_planner_sim.launch.py`: world, robot, bridges, octomap map pipeline, goal markers, planner) |
 | `devol_local_planner` | Local motion planning: RRT\* / A\* planners, the A\* map padder and the PID path follower (`local_planner.launch.py`) |
-| `devol_localization` | EKF and PF nodes, plus the study tooling: noise injection, ground truth, scoring, kidnapping, live views and the replay runner (see [its README](src/devol_localization/README.md)) |
+| `devol_localization_claude` | EKF and PF nodes, plus the study tooling: noise injection, ground truth, scoring, kidnapping, live views and the replay runner (see [its README](src/devol_localization_claude/README.md)) |
 
 The recommended way to run everything is the Docker image in [`docker/`](docker/), which bundles
 Ubuntu 26.04, ROS 2 Lyrical, Gazebo Jetty and the built workspace. A native install is described in
@@ -81,7 +81,7 @@ Then run the offline tests, which exercise the filter, planner and scoring math 
 Gazebo (about four minutes):
 
 ```bash
-docker compose -f docker/compose.yaml run --rm sim bash -c "cd src/devol_localization && python3 -m pytest -q test && cd ../devol_local_planner && python3 -m pytest -q test/test_rrt_planner.py"
+docker compose -f docker/compose.yaml run --rm sim bash -c "cd src/devol_localization_claude && python3 -m pytest -q test && cd ../devol_local_planner && python3 -m pytest -q test/test_rrt_planner.py"
 ```
 
 Expected: `38 passed` and `18 passed`.
@@ -116,7 +116,7 @@ docker exec -it devol bash
 ```bash
 # EKF and PF on the raw sensors (k:=0 sigma_r:=0 turns the study's noise off), one live view each;
 # add hybrid to estimators for the PF-re-seeded EKF
-ros2 launch devol_localization localization_stack.launch.py estimators:=ekf,pf k:=0 sigma_r:=0
+ros2 launch devol_localization_claude localization_stack.launch.py estimators:=ekf,pf k:=0 sigma_r:=0
 ```
 
 The container uses `ROS_DOMAIN_ID=42` and `GZ_PARTITION=devol_docker`, so it does not talk to a
@@ -149,8 +149,8 @@ ellipse (EKF and hybrid) or the particle cloud (PF), and position error over tim
 bound.
 
 ```bash
-docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization localization_test_cases.launch.py test_case:=1
-docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization localization_test_cases.launch.py test_case:=2
+docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization_claude localization_test_cases.launch.py test_case:=1
+docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization_claude localization_test_cases.launch.py test_case:=2
 ```
 
 Test case 1 is the nominal route and test case 2 the kidnapped robot. Each `run --rm` starts a fresh
@@ -202,19 +202,19 @@ is not expected to recover, and that contrast is part of the study.
 
 The study records each route once in Gazebo, then replays the recording through every noise level,
 particle count and random seed. See
-[`src/devol_localization/README.md`](src/devol_localization/README.md) for the details. Run these in a
+[`src/devol_localization_claude/README.md`](src/devol_localization_claude/README.md) for the details. Run these in a
 container shell (`docker compose -f docker/compose.yaml run --rm sim`) and keep bags and results under
 `~/loc_results`, the folder that is saved to `results/docker/` on the host:
 
 ```bash
 # Record the two routes (filters off). Stop each with Ctrl-C once Goal 3 is reached.
-ros2 launch devol_localization localization_sim.launch.py filters:=false record_bag:=~/loc_results/bags/nominal
-ros2 launch devol_localization localization_sim.launch.py filters:=false scenario:=kidnap record_bag:=~/loc_results/bags/kidnap
+ros2 launch devol_localization_claude localization_sim.launch.py filters:=false record_bag:=~/loc_results/bags/nominal
+ros2 launch devol_localization_claude localization_sim.launch.py filters:=false scenario:=kidnap record_bag:=~/loc_results/bags/kidnap
 
 # Replay every configuration with 20 seeds each, then build the tables (mean ± 95% CI)
-ros2 run devol_localization localization_study run --bag ~/loc_results/bags/nominal \
+ros2 run devol_localization_claude localization_study run --bag ~/loc_results/bags/nominal \
   --kidnap-bag ~/loc_results/bags/kidnap --out ~/loc_results/study
-ros2 run devol_localization localization_study analyze --out ~/loc_results/study
+ros2 run devol_localization_claude localization_study analyze --out ~/loc_results/study
 ```
 
 ## 8. Changing the code

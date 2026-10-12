@@ -4,5 +4,5 @@ export GZ_SIM_RESOURCE_PATH=/gzmodels:/deps/install/share:$GZ_SIM_RESOURCE_PATH;
 n=$1; o=/out/tc$n; mkdir -p $o
 python3 /tools/cpusample.py $o/cpu.json & CS=$!
 python3 /tools/particle_logger.py $o/particles.npz & PL=$!
-timeout 2400 ros2 launch devol_localization localization_test_cases.launch.py test_case:=$n seed:=0 viz:=false record_video:=false check_running_sim:=false output_dir:=$o > $o/launch.log 2>&1; echo "exit $?" >> $o/launch.log
+timeout 2400 ros2 launch devol_localization_claude localization_test_cases.launch.py test_case:=$n seed:=0 viz:=false record_video:=false check_running_sim:=false output_dir:=$o > $o/launch.log 2>&1; echo "exit $?" >> $o/launch.log
 kill -INT $PL; touch $o/cpu.json.stop; wait $PL $CS

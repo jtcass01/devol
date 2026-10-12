@@ -54,7 +54,7 @@ https://github.com/ros-simulation/gazebo_ros_demos/blob/kinetic-devel/rrbot_desc
         </gazebo>
 
         <!-- Ground truth for the localization study: the model's world pose (world = map frame),
-             bridged by devol_localization's localization_sim.launch.py. tf_topic is set so it does not
+             bridged by devol_localization_claude's localization_sim.launch.py. tf_topic is set so it does not
              publish on /model/<name>/pose, which the sim bridges onto /tf. -->
         <gazebo>
             <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">

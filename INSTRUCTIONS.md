@@ -72,7 +72,7 @@ The offline unit tests check the filter, planner and scoring math on synthetic d
 (about four minutes):
 
 ```bash
-cd ~/devol/src/devol_localization && python3 -m pytest -q test
+cd ~/devol/src/devol_localization_claude && python3 -m pytest -q test
 cd ~/devol/src/devol_local_planner && python3 -m pytest -q test/test_rrt_planner.py
 ```
 
@@ -97,7 +97,7 @@ If the second command still prints a process, wait a few seconds and repeat.
 ### Test case 2: kidnapped robot (headline run)
 
 ```bash
-ros2 launch devol_localization localization_sim.launch.py gz_gui:=true scenario:=kidnap kidnap_target_mode:=random
+ros2 launch devol_localization_claude localization_sim.launch.py gz_gui:=true scenario:=kidnap kidnap_target_mode:=random
 ```
 
 **What you should see:**
@@ -122,7 +122,7 @@ saves no files (see section 4 for scored runs).
 Drop the kidnap arguments:
 
 ```bash
-ros2 launch devol_localization localization_sim.launch.py gz_gui:=true
+ros2 launch devol_localization_claude localization_sim.launch.py gz_gui:=true
 ```
 
 You see the same four windows. The robot drives the three goals without being moved, and all three
@@ -135,7 +135,7 @@ odometry and lidar, the PF's random sampling and, in test case 2, where the robo
 example:
 
 ```bash
-ros2 launch devol_localization localization_sim.launch.py gz_gui:=true scenario:=kidnap kidnap_target_mode:=random seed:=3
+ros2 launch devol_localization_claude localization_sim.launch.py gz_gui:=true scenario:=kidnap kidnap_target_mode:=random seed:=3
 ```
 
 Other arguments that are useful here:
@@ -161,8 +161,8 @@ not reached Goal 3 after 400 s of simulated time stops and FAILs.
 One run of each test case:
 
 ```bash
-ros2 launch devol_localization localization_test_cases.launch.py test_case:=1 gz_gui:=true seed:=0 output_dir:=~/loc_results/tc1_seed0
-ros2 launch devol_localization localization_test_cases.launch.py test_case:=2 gz_gui:=true seed:=0 output_dir:=~/loc_results/tc2_seed0
+ros2 launch devol_localization_claude localization_test_cases.launch.py test_case:=1 gz_gui:=true seed:=0 output_dir:=~/loc_results/tc1_seed0
+ros2 launch devol_localization_claude localization_test_cases.launch.py test_case:=2 gz_gui:=true seed:=0 output_dir:=~/loc_results/tc2_seed0
 ```
 
 Both test cases for seeds 0, 1 and 2 in one go (leave out `gz_gui:=true` for faster runs):
@@ -171,7 +171,7 @@ Both test cases for seeds 0, 1 and 2 in one go (leave out `gz_gui:=true` for fas
 for seed in 0 1 2; do
   for tc in 1 2; do
     pkill -f gz-sim; pkill -f "gz sim"; pkill -f parameter_bridge; sleep 5
-    ros2 launch devol_localization localization_test_cases.launch.py \
+    ros2 launch devol_localization_claude localization_test_cases.launch.py \
       test_case:=$tc seed:=$seed gz_gui:=true output_dir:=~/loc_results/tc${tc}_seed${seed}
   done
 done

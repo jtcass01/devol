@@ -1,6 +1,6 @@
 # Run from the repository root, in PowerShell or a WSL shell (Docker Desktop, WSL 2 backend):
 #   docker compose -f docker/compose.yaml build
-#   docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization localization_test_cases.launch.py test_case:=1
+#   docker compose -f docker/compose.yaml run --rm sim ros2 launch devol_localization_claude localization_test_cases.launch.py test_case:=1
 #   docker compose -f docker/compose.yaml run --rm sim            # interactive shell
 #   docker compose -f docker/compose.yaml run --rm dev            # shell with ../src mounted for edit + colcon build
 # Full instructions are in the repository README.
