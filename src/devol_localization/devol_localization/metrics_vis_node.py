@@ -146,7 +146,8 @@ class LocalizationMetricsNode(Node):
 
         # Subscribers
         self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        self.ekf_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
+        self.ekf_sub: Subscriber = Subscriber(
+            self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
         )
         self.pf_sub: Subscriber = Subscriber(
             self, PoseWithCovarianceStamped, '/devol_drive/pf_pose'
