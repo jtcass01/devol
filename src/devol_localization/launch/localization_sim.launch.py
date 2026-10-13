@@ -51,7 +51,8 @@ def launch_setup(context):
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
-            parameters=[{'use_sim_time': True}],
+            parameters=[{'use_sim_time': True,
+                         'gz_gui': arg('gz_gui')}],
         )
     )
 
@@ -96,6 +97,7 @@ def generate_launch_description():
         ('maze', 'factory', 'World to load'),
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
         ('max_linear_velocity', '1.5', 'Path follower top speed in m/s'),
+        ('pf_num_particles', '400', 'Number of Particles for Particle Filter'),
         ('gz_gui', 'true', 'Show the Gazebo GUI'),
     ]
 

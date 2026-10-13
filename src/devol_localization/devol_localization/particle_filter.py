@@ -77,7 +77,7 @@ def particle_filter_2d(
                 x=particle,
                 map_dict=map_dict,
                 z_max=20.0,
-                std=2.0,
+                std=0.1,
             )
             for particle in laser_poses
         ],

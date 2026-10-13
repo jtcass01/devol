@@ -29,6 +29,11 @@ class ErrorTracker:
         self.sum_sq_yaw = 0.0
         self.count = 0
 
+        # Cumulative stats for Integral of Absolute Error
+        self.integral_pos = 0.0
+        self.integral_yaw = 0.0
+        self.last_time = None
+
         # History arrays for plotting
         self.times = []
         self.err_pos = []
@@ -54,6 +59,14 @@ class ErrorTracker:
         # Calculate Heading Error (Shortest angular distance wrapped to [-pi, pi])
         dyaw = math.atan2(math.sin(est_pose[2] - gt_pose[2]), math.cos(est_pose[2] - gt_pose[2]))
         e_yaw = abs(dyaw)
+
+        # Acculate Integral Error with Trapezoidal Rule
+        if self.last_time is not None:
+            dt = t - self.last_time
+            if dt > 0:
+                self.integral_pos += ((self.curr_err_pos + e_pos) / 2.0) * dt
+                self.integral_yaw += ((self.curr_err_yaw + e_yaw) / 2.0) * dt
+        self.last_time = t
 
         # Accumulate for RMSE
         self.sum_sq_pos += e_pos**2
@@ -82,12 +95,16 @@ class LocalizationMetricsNode(Node):
         self.rate_hz = self.get_parameter('rate_hz').value
 
         # State Variables
+        self.recording_started = False
         self.t0 = None  # Start time for x-axis zeroing
         self.latest_gt = None
 
         # Initialize Trackers
+        self.ekf_pose = None
         self.ekf = ErrorTracker('EKF', 'blue')
+        self.pf_pose = None
         self.pf = ErrorTracker('PF', 'orange')
+        self.dr_pose = None
         self.dr = ErrorTracker('DR', 'red')
         self.trackers = [self.ekf, self.pf, self.dr]
 
@@ -151,20 +168,56 @@ class LocalizationMetricsNode(Node):
             self.t0 = t
         return t - self.t0
 
+    @property
+    def all_algorithms_ready(self):
+        return (
+            self.ekf_pose is not None
+            and self.pf_pose is not None
+            and self.dr_pose is not None
+        )
+
+    def start_recording_if_ready(self):
+        if (
+            not self.recording_started
+            and self.all_algorithms_ready
+            and self.latest_gt is not None
+        ):
+            # Start a common time baseline for all algorithms.
+            self.t0 = self.get_clock().now().nanoseconds / 1e9
+            self.recording_started = True
+            self.get_logger().info(
+                'All localization algorithms ready. Starting metrics collection.'
+            )
+
     def gt_callback(self, msg: Odometry):
         self.latest_gt = odom_to_planar(msg)
 
     def ekf_callback(self, msg: PoseWithCovarianceStamped):
-        pose = pose_to_planar(msg.pose.pose)
-        self.ekf.update(self.get_sim_time(), pose, self.latest_gt)
+        self.ekf_pose = pose_to_planar(msg.pose.pose)
+        self.start_recording_if_ready()
+
+        if self.recording_started:
+            self.ekf.update(
+                self.get_sim_time(), self.ekf_pose, self.latest_gt
+            )
 
     def pf_callback(self, msg: PoseWithCovarianceStamped):
-        pose = pose_to_planar(msg.pose.pose)
-        self.pf.update(self.get_sim_time(), pose, self.latest_gt)
+        self.pf_pose = pose_to_planar(msg.pose.pose)
+        self.start_recording_if_ready()
 
+        if self.recording_started:
+            self.pf.update(
+                self.get_sim_time(), self.pf_pose, self.latest_gt
+            )
+    
     def dr_callback(self, msg: PoseWithCovarianceStamped):
-        pose = pose_to_planar(msg.pose.pose)
-        self.dr.update(self.get_sim_time(), pose, self.latest_gt)
+        self.dr_pose = pose_to_planar(msg.pose.pose)
+        self.start_recording_if_ready()
+
+        if self.recording_started:
+            self.dr.update(
+                self.get_sim_time(), self.dr_pose, self.latest_gt
+            )
 
     def log_to_csv(self, t):
         if self.latest_gt is None:
@@ -198,7 +251,7 @@ class LocalizationMetricsNode(Node):
         self.csv_file.flush()  # Ensure data is saved immediately in case of crash
 
     def render(self):
-        if self.fig is None:
+        if self.fig is None or not self.recording_started:
             return
 
         t = self.get_sim_time()
@@ -283,17 +336,26 @@ def main(args=None):
 
     # Standard execution/render loop
     period = 1.0 / max(node.rate_hz, 0.1)
-    next_draw = time.monotonic()
+    next_draw = None
 
     try:
         while rclpy.ok() and plt.fignum_exists(fig.number):
-            timeout = max(0.0, min(0.05, next_draw - time.monotonic()))
+            timeout = 0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
             executor.spin_once(timeout_sec=timeout)
 
             now = time.monotonic()
+
+            if not node.all_algorithms_ready:
+                next_draw = None
+                continue
+
+            if next_draw is None:
+                next_draw = now
+
             if now >= next_draw:
                 node.render()
                 next_draw += period
+
                 if next_draw < now:
                     next_draw = now + period
 

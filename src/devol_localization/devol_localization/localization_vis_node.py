@@ -80,6 +80,15 @@ class LocalizationVisNode(Node):
 
         self.get_logger().info(f'Visualization Node Started at {self.rate_hz} Hz')
 
+    @property
+    def all_algorithms_ready(self):
+        return (
+            self.gt_pose is not None
+            and self.ekf_pose is not None
+            and self.pf_pose is not None
+            and self.dr_pose is not None
+        )
+
     def map_callback(self, msg: OccupancyGrid):
         # Convert to visual grayscale
         grid = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
@@ -153,9 +162,12 @@ class LocalizationVisNode(Node):
         self.ax.plot([x, front_x], [y, front_y], color='black', linewidth=1.5, zorder=6)
 
     def render(self):
-        if self.map_grid is None or self.ax is None:
+        if (
+            self.map_grid is None
+            or self.ax is None
+            or not self.all_algorithms_ready
+        ):
             return
-
         self.ax.clear()
 
         # Draw Map directly in physical meters!
@@ -220,23 +232,31 @@ def main(args=None):
 
     # Precise timing loop adopted from reference
     period = 1.0 / max(node.rate_hz, 0.1)
-    next_draw = time.monotonic()
-
+    next_draw = None
+    
     try:
         # plt.fignum_exists checks if the user closed the window manually!
         while rclpy.ok() and plt.fignum_exists(fig.number):
             # Calculate exactly how much time we have left until we need to draw again
-            timeout = max(0.0, min(0.05, next_draw - time.monotonic()))
+            timeout = 0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
 
             # Let ROS process messages in the background
             executor.spin_once(timeout_sec=timeout)
 
             # Check if it's time to render the next frame
             now = time.monotonic()
+
+            if not node.all_algorithms_ready or node.map_grid is None:
+                next_draw = None
+                continue
+
+            if next_draw is None:
+                next_draw = now
+
             if now >= next_draw:
                 node.render()
-
                 next_draw += period
+
                 if next_draw < now:  # Prevent getting stuck behind
                     next_draw = now + period
 
