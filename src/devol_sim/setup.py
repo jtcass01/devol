@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'goal_points_publisher = devol_sim.goal_points_publisher:main',
+            'ground_truth_node = devol_sim.ground_truth_node:main',
             'pointcloud_publisher = devol_sim.pointcloud_publisher:main',
         ],
     },

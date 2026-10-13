@@ -6,8 +6,7 @@
 Starts Gazebo on devol_gazebo/worlds/<maze>/maze_world.sdf, spawns the robot at the 'robot' row of that
 world's poses.csv and a goal sphere at every other row, bridges the robot's topics, builds the map
 (static_world.pcd -> octomap_server -> <namespace>/projected_map) and drives the robot through the goals
-with devol_local_planner. devol_localization_claude's localization_sim.launch.py includes this file.
-"""
+with devol_local_planner."""
 
 import csv
 import os
@@ -40,7 +39,7 @@ ARGS = {
         '1.5',
         'Path follower top speed in m/s (a real Husky A200 tops out at 1.0)',
     ),
-    'octomap_resolution': ('0.05', 'Octomap voxel size in m'),
+    'octomap_resolution': ('0.2', 'Octomap voxel size in m'),
     'gz_gui': ('true', 'Open the Gazebo GUI (false runs the server headless)'),
     'rviz': ('true', 'Open RViz'),
     'use_cameras': ('false', 'Simulate the RGB-D cameras (costly; not needed for localization)'),
@@ -147,6 +146,27 @@ def launch_setup(context):
         actions.append(static_tf('map', 'odom', robot['x'], robot['y'], robot['z'], robot['yaw']))
     actions.append(static_tf('map', 'maze_world'))
 
+    # Bridge Ground Truth from Gazebo
+    actions.append(
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='ground_truth_bridge',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+            arguments=[f'{ns}/ground_truth/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry'],
+        )
+    )
+    actions.append(
+        Node(
+            package='devol_sim',
+            executable='ground_truth_node',
+            name='ground_truth_tf',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+        )
+    )
+
     actions += [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -203,7 +223,7 @@ def launch_setup(context):
                 {
                     'pointcloud_file': os.path.join(world_dir, 'static_world.pcd'),
                     'frame_id': 'map',
-                    'publish_rate': 1.0,  # octomap only needs the static cloud once
+                    'publish_rate': 1.0,
                     'topic_name': 'static_map_pointcloud',
                     'namespace': ns,
                 }
