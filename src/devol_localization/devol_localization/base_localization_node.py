@@ -1,11 +1,11 @@
 import numpy as np
+import zlib
 
 from rclpy.node import Node
-from rclpy.time import Time
-from tf2_ros import Buffer, TransformBroadcaster, TransformListener, TransformException
+from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
+from nav_msgs.msg import Odometry, OccupancyGrid
+from geometry_msgs.msg import PoseWithCovarianceStamped
 
 from devol_localization.differential_drive import DifferentialDrive
 from devol_localization.utils import euler_to_quaternion, yaw_from_quaternion, compose, inverse
@@ -39,6 +39,7 @@ class BaseLocalizationNode(Node):
         self.last_scan_time = None
         self.latest_odom_pose = np.array([0.0, 0.0, 0.0])
         self.x_est = np.array([0.0, 0.0, 0.0])
+        self.last_map_crc = None
 
         # TF Handling
         self.tf_buffer = Buffer()
@@ -51,6 +52,20 @@ class BaseLocalizationNode(Node):
         # Start Shared Subscribers (Map and Scan are implemented by child classes)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
+    def is_map_new(self, msg: OccupancyGrid) -> bool:
+        """
+        Computes a CRC32 hash of the map data. 
+        Returns True if the map is new/changed, False if it is identical.
+        """
+        # Convert the map data array to continuous bytes and hash it
+        current_crc = zlib.crc32(bytes(msg.data))
+        
+        if self.last_map_crc == current_crc:
+            return False
+            
+        self.last_map_crc = current_crc
+        return True
+    
     def odom_callback(self, msg: Odometry):
         """Updates control input (u) and tracks raw odometry for TF."""
         v_x = msg.twist.twist.linear.x
@@ -87,18 +102,3 @@ class BaseLocalizationNode(Node):
 
         pose_msg.pose.covariance = tuple(cov_6x6.flatten())
         self.pub_pose.publish(pose_msg)
-
-        # # Broadcast map -> odom TF
-        # map_to_odom = compose(self.x_est, inverse(self.latest_odom_pose))
-
-        # tf = TransformStamped()
-        # tf.header.stamp = stamp
-        # tf.header.frame_id = self.map_frame
-        # tf.child_frame_id = self.odom_frame
-
-        # tf.transform.translation.x = map_to_odom[0]
-        # tf.transform.translation.y = map_to_odom[1]
-        # tf.transform.translation.z = 0.0
-        # tf.transform.rotation = euler_to_quaternion(map_to_odom[2])
-
-        # self.tf_broadcaster.sendTransform(tf)

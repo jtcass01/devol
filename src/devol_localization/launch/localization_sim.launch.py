@@ -14,7 +14,6 @@ def launch_setup(context):
 
     sim_share = get_package_share_directory('devol_sim')
     loc_share = 'devol_localization'
-    namespace = '/devol_drive'
     actions = []
 
     # Start the Simulation Pipeline

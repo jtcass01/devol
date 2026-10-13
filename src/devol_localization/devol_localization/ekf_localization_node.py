@@ -37,6 +37,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
     def map_callback(self, msg: OccupancyGrid):
         """Extracts obstacle coordinates and builds KDTree."""
+        if not self.is_map_new(msg):
+            return
+
         grid = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
 
         # Find the row/col indices of all cells that are likely obstacles (> 50% probability)

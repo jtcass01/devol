@@ -44,6 +44,9 @@ class ParticleFilterNode(BaseLocalizationNode):
 
     def map_callback(self, msg: OccupancyGrid):
         """Converts ROS OccupancyGrid into a distance transform map for the Likelihood field"""
+        if not self.is_map_new(msg):
+            return
+
         # Convert 1D array to 2D numpy array (row-major: Y is rows, X is cols)
         grid = np.array(msg.data, dtype=np.float32).reshape((msg.info.height, msg.info.width))
 
