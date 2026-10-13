@@ -170,18 +170,10 @@ class LocalizationMetricsNode(Node):
 
     @property
     def all_algorithms_ready(self):
-        return (
-            self.ekf_pose is not None
-            and self.pf_pose is not None
-            and self.dr_pose is not None
-        )
+        return self.ekf_pose is not None and self.pf_pose is not None and self.dr_pose is not None
 
     def start_recording_if_ready(self):
-        if (
-            not self.recording_started
-            and self.all_algorithms_ready
-            and self.latest_gt is not None
-        ):
+        if not self.recording_started and self.all_algorithms_ready and self.latest_gt is not None:
             # Start a common time baseline for all algorithms.
             self.t0 = self.get_clock().now().nanoseconds / 1e9
             self.recording_started = True
@@ -197,27 +189,21 @@ class LocalizationMetricsNode(Node):
         self.start_recording_if_ready()
 
         if self.recording_started:
-            self.ekf.update(
-                self.get_sim_time(), self.ekf_pose, self.latest_gt
-            )
+            self.ekf.update(self.get_sim_time(), self.ekf_pose, self.latest_gt)
 
     def pf_callback(self, msg: PoseWithCovarianceStamped):
         self.pf_pose = pose_to_planar(msg.pose.pose)
         self.start_recording_if_ready()
 
         if self.recording_started:
-            self.pf.update(
-                self.get_sim_time(), self.pf_pose, self.latest_gt
-            )
-    
+            self.pf.update(self.get_sim_time(), self.pf_pose, self.latest_gt)
+
     def dr_callback(self, msg: PoseWithCovarianceStamped):
         self.dr_pose = pose_to_planar(msg.pose.pose)
         self.start_recording_if_ready()
 
         if self.recording_started:
-            self.dr.update(
-                self.get_sim_time(), self.dr_pose, self.latest_gt
-            )
+            self.dr.update(self.get_sim_time(), self.dr_pose, self.latest_gt)
 
     def log_to_csv(self, t):
         if self.latest_gt is None:
@@ -340,7 +326,9 @@ def main(args=None):
 
     try:
         while rclpy.ok() and plt.fignum_exists(fig.number):
-            timeout = 0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
+            timeout = (
+                0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
+            )
             executor.spin_once(timeout_sec=timeout)
 
             now = time.monotonic()
