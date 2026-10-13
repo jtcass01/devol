@@ -51,8 +51,7 @@ def launch_setup(context):
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
-            parameters=[{'use_sim_time': True,
-                         'num_particles': arg('pf_num_particles')}],
+            parameters=[{'use_sim_time': True, 'num_particles': arg('pf_num_particles')}],
         )
     )
 
