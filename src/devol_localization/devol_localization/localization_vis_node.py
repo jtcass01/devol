@@ -19,6 +19,7 @@ from devol_localization.utils import odom_to_planar, pose_to_planar
 @dataclass
 class BodyBox:
     """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
+
     x_min: float
     x_max: float
     y_min: float
@@ -30,8 +31,8 @@ class BodyBox:
 # Clearpath A200 + stowed UR5e + Robotiq gripper, from TF at spawn in Gazebo
 DEFAULT_BODY = [
     BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),  # chassis, wheels, top plate
-    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),      # 300 mm sensor arch + VLP-16
-    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),       # stowed UR5e + Robotiq, offset to +y
+    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),  # 300 mm sensor arch + VLP-16
+    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),  # stowed UR5e + Robotiq, offset to +y
 ]
 
 
@@ -125,9 +126,9 @@ class LocalizationVisNode(Node):
                 (box.x_min, box.y_min),
                 (box.x_max, box.y_min),
                 (box.x_max, box.y_max),
-                (box.x_min, box.y_max)
+                (box.x_min, box.y_max),
             ]
-            
+
             # Transform to global map coordinates
             corners_global = []
             for lx, ly in corners_local:
@@ -136,8 +137,13 @@ class LocalizationVisNode(Node):
                 corners_global.append((gx, gy))
 
             poly = Polygon(
-                corners_global, closed=True, facecolor=color, edgecolor='black', 
-                alpha=alpha, linewidth=1, zorder=5
+                corners_global,
+                closed=True,
+                facecolor=color,
+                edgecolor='black',
+                alpha=alpha,
+                linewidth=1,
+                zorder=5,
             )
             self.ax.add_patch(poly)
 

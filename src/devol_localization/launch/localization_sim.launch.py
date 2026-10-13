@@ -73,7 +73,7 @@ def launch_setup(context):
             executable='viz_node',
             name='localization_vis_node',
             output='screen',
-            parameters=[{'use_sim_time': True}]
+            parameters=[{'use_sim_time': True}],
         )
     )
 
@@ -84,7 +84,7 @@ def launch_setup(context):
             executable='metrics_node',
             name='metrics_vis_node',
             output='screen',
-            parameters=[{'use_sim_time': True}]
+            parameters=[{'use_sim_time': True}],
         )
     )
 

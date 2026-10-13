@@ -32,8 +32,12 @@ def inverse(a):
     cos_a: float = np.cos(a[2])
     return np.array([-cos_a * a[0] - sin_a * a[1], sin_a * a[0] - cos_a * a[1], -a[2]])
 
+
 def pose_to_planar(pose: Union[Pose, PoseWithCovarianceStamped]) -> np.ndarray:
+    if isinstance(pose, PoseWithCovarianceStamped):
+        pose = pose.pose.pose
     return np.array([pose.position.x, pose.position.y, yaw_from_quaternion(pose.orientation)])
+
 
 def odom_to_planar(msg: Odometry) -> np.ndarray:
     return pose_to_planar(msg.pose.pose)
