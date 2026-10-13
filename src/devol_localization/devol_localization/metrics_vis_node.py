@@ -98,12 +98,32 @@ class LocalizationMetricsNode(Node):
         self.csv_writer = csv.writer(self.csv_file)
 
         # Write CSV Header
-        self.csv_writer.writerow([
-            'Time(s)', 'GT_X', 'GT_Y', 'GT_Yaw',
-            'EKF_Pos_Err', 'EKF_Pos_RMSE', 'EKF_Pos_Integral', 'EKF_Yaw_Err', 'EKF_Yaw_RMSE', 'EKF_Yaw_Integral',
-            'PF_Pos_Err', 'PF_Pos_RMSE', 'PF_Pos_Integral', 'PF_Yaw_Err', 'PF_Yaw_RMSE', 'PF_Yaw_Integral',
-            'DR_Pos_Err', 'DR_Pos_RMSE', 'DR_Pos_Integral', 'DR_Yaw_Err', 'DR_Yaw_RMSE', 'DR_Yaw_Integral'
-        ])
+        self.csv_writer.writerow(
+            [
+                'Time(s)',
+                'GT_X',
+                'GT_Y',
+                'GT_Yaw',
+                'EKF_Pos_Err',
+                'EKF_Pos_RMSE',
+                'EKF_Pos_Integral',
+                'EKF_Yaw_Err',
+                'EKF_Yaw_RMSE',
+                'EKF_Yaw_Integral',
+                'PF_Pos_Err',
+                'PF_Pos_RMSE',
+                'PF_Pos_Integral',
+                'PF_Yaw_Err',
+                'PF_Yaw_RMSE',
+                'PF_Yaw_Integral',
+                'DR_Pos_Err',
+                'DR_Pos_RMSE',
+                'DR_Pos_Integral',
+                'DR_Yaw_Err',
+                'DR_Yaw_RMSE',
+                'DR_Yaw_Integral',
+            ]
+        )
 
         # Subscribers
         self.create_subscription(Odometry, '/devol_drive/ground_truth/odom', self.gt_callback, 10)
@@ -151,13 +171,28 @@ class LocalizationMetricsNode(Node):
             return
 
         row = [
-            f"{t:.3f}", f"{self.latest_gt[0]:.3f}", f"{self.latest_gt[1]:.3f}", f"{self.latest_gt[2]:.3f}",
-            f"{self.ekf.curr_err_pos:.4f}", f"{self.ekf.curr_rmse_pos:.4f}", f"{self.ekf.integral_pos:.4f}",
-            f"{self.ekf.curr_err_yaw:.4f}", f"{self.ekf.curr_rmse_yaw:.4f}", f"{self.ekf.integral_yaw:.4f}",
-            f"{self.pf.curr_err_pos:.4f}", f"{self.pf.curr_rmse_pos:.4f}", f"{self.pf.integral_pos:.4f}",
-            f"{self.pf.curr_err_yaw:.4f}", f"{self.pf.curr_rmse_yaw:.4f}", f"{self.pf.integral_yaw:.4f}",
-            f"{self.dr.curr_err_pos:.4f}", f"{self.dr.curr_rmse_pos:.4f}", f"{self.dr.integral_pos:.4f}",
-            f"{self.dr.curr_err_yaw:.4f}", f"{self.dr.curr_rmse_yaw:.4f}", f"{self.dr.integral_yaw:.4f}"
+            f'{t:.3f}',
+            f'{self.latest_gt[0]:.3f}',
+            f'{self.latest_gt[1]:.3f}',
+            f'{self.latest_gt[2]:.3f}',
+            f'{self.ekf.curr_err_pos:.4f}',
+            f'{self.ekf.curr_rmse_pos:.4f}',
+            f'{self.ekf.integral_pos:.4f}',
+            f'{self.ekf.curr_err_yaw:.4f}',
+            f'{self.ekf.curr_rmse_yaw:.4f}',
+            f'{self.ekf.integral_yaw:.4f}',
+            f'{self.pf.curr_err_pos:.4f}',
+            f'{self.pf.curr_rmse_pos:.4f}',
+            f'{self.pf.integral_pos:.4f}',
+            f'{self.pf.curr_err_yaw:.4f}',
+            f'{self.pf.curr_rmse_yaw:.4f}',
+            f'{self.pf.integral_yaw:.4f}',
+            f'{self.dr.curr_err_pos:.4f}',
+            f'{self.dr.curr_rmse_pos:.4f}',
+            f'{self.dr.integral_pos:.4f}',
+            f'{self.dr.curr_err_yaw:.4f}',
+            f'{self.dr.curr_rmse_yaw:.4f}',
+            f'{self.dr.integral_yaw:.4f}',
         ]
         self.csv_writer.writerow(row)
         self.csv_file.flush()  # Ensure data is saved immediately in case of crash
@@ -191,8 +226,12 @@ class LocalizationMetricsNode(Node):
             self.axs[i, 1].autoscale_view(True, True, True)
 
             # Dynamically update subplot titles with the Integral Error
-            self.axs[i, 0].set_title(f"{tracker.name} Position Error (m) | Integral: {tracker.integral_pos:.2f}")
-            self.axs[i, 1].set_title(f"{tracker.name} Heading Error (rad) | Integral: {tracker.integral_yaw:.2f}")
+            self.axs[i, 0].set_title(
+                f'{tracker.name} Position Error (m) | Integral: {tracker.integral_pos:.2f}'
+            )
+            self.axs[i, 1].set_title(
+                f'{tracker.name} Heading Error (rad) | Integral: {tracker.integral_yaw:.2f}'
+            )
 
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()

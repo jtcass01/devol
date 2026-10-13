@@ -54,18 +54,18 @@ class BaseLocalizationNode(Node):
 
     def is_map_new(self, msg: OccupancyGrid) -> bool:
         """
-        Computes a CRC32 hash of the map data. 
+        Computes a CRC32 hash of the map data.
         Returns True if the map is new/changed, False if it is identical.
         """
         # Convert the map data array to continuous bytes and hash it
         current_crc = zlib.crc32(bytes(msg.data))
-        
+
         if self.last_map_crc == current_crc:
             return False
-            
+
         self.last_map_crc = current_crc
         return True
-    
+
     def odom_callback(self, msg: Odometry):
         """Updates control input (u) and tracks raw odometry for TF."""
         v_x = msg.twist.twist.linear.x
