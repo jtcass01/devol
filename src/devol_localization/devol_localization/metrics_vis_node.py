@@ -146,16 +146,22 @@ class LocalizationMetricsNode(Node):
 
         # Subscribers
         self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        self.ekf_pose: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose')
-        self.pf_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/pf_pose')
+        self.ekf_pose: Subscriber = Subscriber(
+            self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
+        )
+        self.pf_sub: Subscriber = Subscriber(
+            self, PoseWithCovarianceStamped, '/devol_drive/pf_pose'
+        )
         self.pf_cloud_sub: Subscriber = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
-        self.dr_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/dr_pose')
+        self.dr_sub: Subscriber = Subscriber(
+            self, PoseWithCovarianceStamped, '/devol_drive/dr_pose'
+        )
 
         # Syncronize Subs
         self.ts = ApproximateTimeSynchronizer(
-            [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub], 
-            queue_size=20, 
-            slop=0.1
+            [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub],
+            queue_size=20,
+            slop=0.1,
         )
         self.ts.registerCallback(self.sync_callback)
 
@@ -177,9 +183,14 @@ class LocalizationMetricsNode(Node):
     def all_algorithms_ready(self):
         return self.ekf_pose is not None and self.pf_pose is not None and self.dr_pose is not None
 
-    def sync_callback(self, gt_msg: Odometry, ekf_msg: PoseWithCovarianceStamped, 
-                      pf_msg: PoseWithCovarianceStamped, pf_cloud_msg: PoseArray, 
-                      dr_msg: PoseWithCovarianceStamped):
+    def sync_callback(
+        self,
+        gt_msg: Odometry,
+        ekf_msg: PoseWithCovarianceStamped,
+        pf_msg: PoseWithCovarianceStamped,
+        pf_cloud_msg: PoseArray,
+        dr_msg: PoseWithCovarianceStamped,
+    ):
         """This callback ONLY triggers when a matched set of timestamps arrives."""
         self.gt_pose = odom_to_planar(gt_msg)
         self.ekf_pose = pose_to_planar(ekf_msg)

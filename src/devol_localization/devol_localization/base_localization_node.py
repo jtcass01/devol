@@ -85,15 +85,15 @@ class BaseLocalizationNode(Node):
         if self.last_scan_time is None:
             self.last_scan_time = msg_time
             return None
-            
+
         dt = msg_time - self.last_scan_time
 
         # Prevent massive dt jumps if processing fell way behind
         if dt > 1.0:
-            self.get_logger().warn(f"Large dt detected ({dt:.2f}s). Resetting.")
+            self.get_logger().warn(f'Large dt detected ({dt:.2f}s). Resetting.')
             self.last_scan_time = msg_time
             return None
-            
+
         self.last_scan_time = msg_time
         return dt
 
