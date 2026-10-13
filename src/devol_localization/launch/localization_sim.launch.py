@@ -52,7 +52,7 @@ def launch_setup(context):
             name='particle_filter_node',
             output='screen',
             parameters=[{'use_sim_time': True,
-                         'gz_gui': arg('gz_gui')}],
+                         'num_particles': arg('pf_num_particles')}],
         )
     )
 
