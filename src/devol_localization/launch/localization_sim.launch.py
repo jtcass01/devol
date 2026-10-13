@@ -95,7 +95,7 @@ def generate_launch_description():
     args = [
         ('maze', 'factory', 'World to load'),
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
-        ('max_linear_velocity', '1.5', 'Path follower top speed in m/s'),
+        ('max_linear_velocity', '1.0', 'Path follower top speed in m/s'),
         ('pf_num_particles', '400', 'Number of Particles for Particle Filter'),
         ('gz_gui', 'true', 'Show the Gazebo GUI'),
     ]
