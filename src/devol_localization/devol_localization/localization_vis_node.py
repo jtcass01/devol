@@ -1,6 +1,8 @@
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from dataclasses import dataclass
 
 import rclpy
 from rclpy.node import Node
@@ -10,6 +12,27 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 # ROS 2 Messages
 from nav_msgs.msg import OccupancyGrid, Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
+
+from devol_localization.utils import odom_to_planar, pose_to_planar
+
+
+@dataclass
+class BodyBox:
+    """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+
+
+# Clearpath A200 + stowed UR5e + Robotiq gripper, from TF at spawn in Gazebo
+DEFAULT_BODY = [
+    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),  # chassis, wheels, top plate
+    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),      # 300 mm sensor arch + VLP-16
+    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),       # stowed UR5e + Robotiq, offset to +y
+]
 
 
 class LocalizationVisNode(Node):
@@ -38,7 +61,7 @@ class LocalizationVisNode(Node):
         self.create_subscription(
             OccupancyGrid, '/devol_drive/projected_map', self.map_callback, map_qos
         )
-        self.create_subscription(Odometry, '/devol_drive/odom', self.gt_callback, 10)
+        self.create_subscription(Odometry, '/devol_drive/ground_truth/odom', self.gt_callback, 10)
         self.create_subscription(
             PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self.ekf_callback, 10
         )
@@ -72,19 +95,56 @@ class LocalizationVisNode(Node):
         self.map_extent = [xmin, xmax, ymin, ymax]
 
     def gt_callback(self, msg: Odometry):
-        self.gt_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        self.gt_pose = odom_to_planar(msg)
 
     def ekf_callback(self, msg: PoseWithCovarianceStamped):
-        self.ekf_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        self.ekf_pose = pose_to_planar(msg)
 
     def pf_callback(self, msg: PoseWithCovarianceStamped):
-        self.pf_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        self.pf_pose = pose_to_planar(msg)
 
     def dr_callback(self, msg: PoseWithCovarianceStamped):
-        self.dr_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        self.dr_pose = pose_to_planar(msg)
 
     def cloud_callback(self, msg: PoseArray):
-        self.pf_particles = np.array([[p.position.x, p.position.y] for p in msg.poses])
+        self.pf_particles = np.array([pose_to_planar(p) for p in msg.poses])
+
+    def draw_robot(self, pose, color, alpha=0.6):
+        """Draws the 2D bounding boxes of the robot for a given (x, y, yaw)."""
+        if pose is None:
+            return
+
+        x, y, yaw = pose
+        cos_yaw = np.cos(yaw)
+        sin_yaw = np.sin(yaw)
+
+        # Plot each box footprint
+        for box in DEFAULT_BODY:
+            # 4 corners of the box in the robot's local frame
+            corners_local = [
+                (box.x_min, box.y_min),
+                (box.x_max, box.y_min),
+                (box.x_max, box.y_max),
+                (box.x_min, box.y_max)
+            ]
+            
+            # Transform to global map coordinates
+            corners_global = []
+            for lx, ly in corners_local:
+                gx = x + lx * cos_yaw - ly * sin_yaw
+                gy = y + lx * sin_yaw + ly * cos_yaw
+                corners_global.append((gx, gy))
+
+            poly = Polygon(
+                corners_global, closed=True, facecolor=color, edgecolor='black', 
+                alpha=alpha, linewidth=1, zorder=5
+            )
+            self.ax.add_patch(poly)
+
+        # Draw a small heading line indicating the forward X axis
+        front_x = x + 0.6 * cos_yaw
+        front_y = y + 0.6 * sin_yaw
+        self.ax.plot([x, front_x], [y, front_y], color='black', linewidth=1.5, zorder=6)
 
     def render(self):
         if self.map_grid is None or self.ax is None:
@@ -109,25 +169,23 @@ class LocalizationVisNode(Node):
 
         # Draw Ground Truth
         if self.gt_pose is not None:
-            self.ax.plot(
-                self.gt_pose[0], self.gt_pose[1], 'g*', markersize=12, label='Ground Truth'
-            )
+            self.draw_robot(self.gt_pose, color='green', alpha=0.7)
+            self.ax.plot([], [], color='green', linewidth=4, alpha=0.7, label='Ground Truth')
 
         # Draw EKF Estimate
         if self.ekf_pose is not None:
-            self.ax.plot(self.ekf_pose[0], self.ekf_pose[1], 'bo', markersize=6, label='EKF')
+            self.draw_robot(self.ekf_pose, color='blue', alpha=0.6)
+            self.ax.plot([], [], color='blue', linewidth=4, alpha=0.6, label='EKF')
 
         # Draw PF Estimate
         if self.pf_pose is not None:
-            self.ax.plot(
-                self.pf_pose[0], self.pf_pose[1], 's', color='orange', markersize=6, label='PF'
-            )
+            self.draw_robot(self.pf_pose, color='orange', alpha=0.6)
+            self.ax.plot([], [], color='orange', linewidth=4, alpha=0.6, label='PF')
 
         # Draw Dead Reckoning Estimate
         if self.dr_pose is not None:
-            self.ax.plot(
-                self.dr_pose[0], self.dr_pose[1], 'r^', markersize=6, label='Dead Reckoning'
-            )
+            self.draw_robot(self.dr_pose, color='red', alpha=0.6)
+            self.ax.plot([], [], color='red', linewidth=4, alpha=0.6, label='Dead Reckoning')
 
         self.ax.set_title('Live Localization: EKF vs PF vs DR')
         self.ax.set_xlabel('Meters (X)')
@@ -149,7 +207,7 @@ def main(args=None):
     plt.ion()
     fig, ax = plt.subplots(figsize=(8, 8))
     fig.canvas.manager.set_window_title('Devol Localization Viz')
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.85, 1])
 
     node.fig = fig
     node.ax = ax

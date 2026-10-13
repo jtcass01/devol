@@ -31,7 +31,7 @@ class LaserModel:
         return dists, theta_range
 
     @staticmethod
-    def ray_prob(point: ndarray, map: ndarray, std=0.5):
+    def ray_prob(point: ndarray, map: ndarray, std=0.1):
         i, j = round(point[0]), round(point[1])
         n, m = map.shape
         out_of_bounds_dist = 0
@@ -53,7 +53,7 @@ class LaserModel:
         return exp(-(dist**2) / (2 * std**2)) / sqrt(2 * pi * std**2)
 
     @staticmethod
-    def likelihood_field_range_finder(z_dists, z_thetas, x, map, z_max=4.0, std=0.5):
+    def likelihood_field_range_finder(z_dists, z_thetas, x, map, z_max=4.0, std=0.1):
         q = 1
         eps = 0.02
         n, m = map.shape
@@ -76,7 +76,7 @@ import numpy as np
 
 class ROSLaserModel(LaserModel):
     @staticmethod
-    def ray_prob(point: np.ndarray, map_dict: dict, std=0.5):
+    def ray_prob(point: np.ndarray, map_dict: dict, std=0.1):
         map_data = map_dict['grid']
         info = map_dict['info']
 
@@ -106,7 +106,7 @@ class ROSLaserModel(LaserModel):
         return np.exp(-(dist**2) / (2 * std**2)) / np.sqrt(2 * pi * std**2)
 
     @staticmethod
-    def likelihood_field_range_finder(z_dists, z_thetas, x, map_dict, z_max=4.0, std=0.5):
+    def likelihood_field_range_finder(z_dists, z_thetas, x, map_dict, z_max=4.0, std=0.1):
         q = 1.0
         eps = 0.02
         for z, theta in zip(z_dists, z_thetas):

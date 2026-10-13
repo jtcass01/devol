@@ -74,8 +74,18 @@ def launch_setup(context):
             executable='viz_node',
             name='localization_vis_node',
             output='screen',
-            parameters=[{'use_sim_time': True}],
-            remappings=[('/devol_drive/odom', '/devol_drive/ground_truth/odom')],
+            parameters=[{'use_sim_time': True}]
+        )
+    )
+
+    # Start Metrics Node
+    actions.append(
+        Node(
+            package=loc_share,
+            executable='metrics_node',
+            name='metrics_vis_node',
+            output='screen',
+            parameters=[{'use_sim_time': True}]
         )
     )
 
@@ -88,7 +98,6 @@ def generate_launch_description():
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
         ('max_linear_velocity', '1.5', 'Path follower top speed in m/s'),
         ('gz_gui', 'true', 'Show the Gazebo GUI'),
-        ('k', '1.0', 'Odometry noise scale (alpha = 0.05 k)'),
     ]
 
     return LaunchDescription(

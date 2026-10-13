@@ -1,6 +1,7 @@
+from typing import Union
 import numpy as np
 
-from geometry_msgs.msg import Quaternion
+from geometry_msgs.msg import Quaternion, Pose, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 
 
@@ -31,7 +32,8 @@ def inverse(a):
     cos_a: float = np.cos(a[2])
     return np.array([-cos_a * a[0] - sin_a * a[1], sin_a * a[0] - cos_a * a[1], -a[2]])
 
+def pose_to_planar(pose: Union[Pose, PoseWithCovarianceStamped]) -> np.ndarray:
+    return np.array([pose.position.x, pose.position.y, yaw_from_quaternion(pose.orientation)])
 
 def odom_to_planar(msg: Odometry) -> np.ndarray:
-    pose = msg.pose.pose
-    return np.array([pose.position.x, pose.position.y, yaw_from_quaternion(pose.orientation)])
+    return pose_to_planar(msg.pose.pose)
