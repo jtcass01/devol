@@ -69,21 +69,9 @@ class ParticleFilterNode(BaseLocalizationNode):
         if self.map_dict is None:
             return  # Wait for map
 
-        scan_time = msg.header.stamp.sec + (msg.header.stamp.nanosec / 1e9)
-
-        if self.last_scan_time is None:
-            self.last_scan_time = scan_time
+        dt = self.get_dt_from_header(msg.header)
+        if dt is None:
             return
-
-        dt = scan_time - self.last_scan_time
-
-        # Prevent massive dt jumps if processing fell way behind
-        if dt > 1.0:
-            self.get_logger().warn(f'Large dt detected ({dt:.2f}s). Resetting.')
-            self.last_scan_time = scan_time
-            return
-
-        self.last_scan_time = scan_time
 
         # Extract and Downsample LiDAR points
         step = max(1, len(msg.ranges) // 30)
@@ -99,7 +87,7 @@ class ParticleFilterNode(BaseLocalizationNode):
             return  # No valid measurements
 
         # Handle Laser Offset (shift the particles forward so the rays cast from the laser)
-        laser_offset = self.get_laser_offset(msg.header.frame_id)
+        laser_offset = self.get_laser_offset()
 
         # Run the Particle Filter
         self.particles, self.x_est = particle_filter_2d(

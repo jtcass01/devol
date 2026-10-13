@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
+from message_filters import ApproximateTimeSynchronizer, Subscriber
 
 import rclpy
 from rclpy.node import Node
@@ -62,17 +63,19 @@ class LocalizationVisNode(Node):
         self.create_subscription(
             OccupancyGrid, '/devol_drive/projected_map', self.map_callback, map_qos
         )
-        self.create_subscription(Odometry, '/devol_drive/ground_truth/odom', self.gt_callback, 10)
-        self.create_subscription(
-            PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self.ekf_callback, 10
+        self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
+        self.ekf_pose: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose')
+        self.pf_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/pf_pose')
+        self.pf_cloud_sub: Subscriber = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
+        self.dr_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/dr_pose')
+
+        # Syncronize Subs
+        self.ts = ApproximateTimeSynchronizer(
+            [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub], 
+            queue_size=20, 
+            slop=0.1
         )
-        self.create_subscription(
-            PoseWithCovarianceStamped, '/devol_drive/pf_pose', self.pf_callback, 10
-        )
-        self.create_subscription(
-            PoseWithCovarianceStamped, '/devol_drive/dr_pose', self.dr_callback, 10
-        )  # Added DR sub
-        self.create_subscription(PoseArray, '/devol_drive/pf_pose_cloud', self.cloud_callback, 10)
+        self.ts.registerCallback(self.sync_callback)
 
         # Plotting objects (assigned in main)
         self.fig = None
@@ -89,6 +92,16 @@ class LocalizationVisNode(Node):
             and self.dr_pose is not None
         )
 
+    def sync_callback(self, gt_msg: Odometry, ekf_msg: PoseWithCovarianceStamped, 
+                      pf_msg: PoseWithCovarianceStamped, pf_cloud_msg: PoseArray, 
+                      dr_msg: PoseWithCovarianceStamped):
+        """This callback ONLY triggers when a matched set of timestamps arrives."""
+        self.gt_pose = odom_to_planar(gt_msg)
+        self.ekf_pose = pose_to_planar(ekf_msg)
+        self.pf_particles = np.array([pose_to_planar(p) for p in pf_cloud_msg.poses])
+        self.pf_pose = pose_to_planar(pf_msg)
+        self.dr_pose = pose_to_planar(dr_msg)
+
     def map_callback(self, msg: OccupancyGrid):
         # Convert to visual grayscale
         grid = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
@@ -103,22 +116,7 @@ class LocalizationVisNode(Node):
         xmax = xmin + (msg.info.width * msg.info.resolution)
         ymax = ymin + (msg.info.height * msg.info.resolution)
         self.map_extent = [xmin, xmax, ymin, ymax]
-
-    def gt_callback(self, msg: Odometry):
-        self.gt_pose = odom_to_planar(msg)
-
-    def ekf_callback(self, msg: PoseWithCovarianceStamped):
-        self.ekf_pose = pose_to_planar(msg)
-
-    def pf_callback(self, msg: PoseWithCovarianceStamped):
-        self.pf_pose = pose_to_planar(msg)
-
-    def dr_callback(self, msg: PoseWithCovarianceStamped):
-        self.dr_pose = pose_to_planar(msg)
-
-    def cloud_callback(self, msg: PoseArray):
-        self.pf_particles = np.array([pose_to_planar(p) for p in msg.poses])
-
+        
     def draw_robot(self, pose, color, alpha=0.6):
         """Draws the 2D bounding boxes of the robot for a given (x, y, yaw)."""
         if pose is None:

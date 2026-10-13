@@ -79,7 +79,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Nx2 array of local laser points
         laser_pts = np.vstack((ranges * np.cos(angles), ranges * np.sin(angles))).T
-        laser_offset = self.get_laser_offset(msg.header.frame_id)
+        laser_offset = self.get_laser_offset()
 
         R_offset = np.array(
             [
@@ -160,12 +160,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
         if self.map_data is None:
             return  # Wait for map to load
 
-        current_time = self.get_clock().now().nanoseconds / 1e9
-        if self.last_scan_time is None:
-            self.last_scan_time = current_time
+        dt = self.get_dt_from_header(msg.header)
+        if dt is None:
             return
-        dt = current_time - self.last_scan_time
-        self.last_scan_time = current_time
 
         # Scan Matching
         y_pose, is_valid = self.scan_match(msg)

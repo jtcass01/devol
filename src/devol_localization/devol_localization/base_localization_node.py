@@ -40,6 +40,7 @@ class BaseLocalizationNode(Node):
         self.latest_odom_pose = np.array([0.0, 0.0, 0.0])
         self.x_est = np.array([0.0, 0.0, 0.0])
         self.last_map_crc = None
+        self.last_scan_time = None
 
         # TF Handling
         self.tf_buffer = Buffer()
@@ -53,10 +54,8 @@ class BaseLocalizationNode(Node):
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
     def is_map_new(self, msg: OccupancyGrid) -> bool:
-        """
-        Computes a CRC32 hash of the map data.
-        Returns True if the map is new/changed, False if it is identical.
-        """
+        """Computes a CRC32 hash of the map data.
+        Returns True if the map is new/changed, False if it is identical."""
         # Convert the map data array to continuous bytes and hash it
         current_crc = zlib.crc32(bytes(msg.data))
 
@@ -77,7 +76,28 @@ class BaseLocalizationNode(Node):
             [p.position.x, p.position.y, yaw_from_quaternion(p.orientation)]
         )
 
-    def get_laser_offset(self, laser_frame):
+    def get_dt_from_header(self, header):
+        """Calculates the time delta (dt) from a message header.
+        Updates self.last_scan_time.
+        Returns dt (float) if valid, or None if the loop should be skipped."""
+        msg_time = header.stamp.sec + (header.stamp.nanosec / 1e9)
+
+        if self.last_scan_time is None:
+            self.last_scan_time = msg_time
+            return None
+            
+        dt = msg_time - self.last_scan_time
+
+        # Prevent massive dt jumps if processing fell way behind
+        if dt > 1.0:
+            self.get_logger().warn(f"Large dt detected ({dt:.2f}s). Resetting.")
+            self.last_scan_time = msg_time
+            return None
+            
+        self.last_scan_time = msg_time
+        return dt
+
+    def get_laser_offset(self):
         """Looks up the physical LiDAR mount offset."""
         return np.array([0.32825, 0.0, 0.0])
 

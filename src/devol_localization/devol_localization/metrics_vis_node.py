@@ -2,8 +2,9 @@ import time
 import math
 import csv
 from datetime import datetime
-import numpy as np
 import matplotlib.pyplot as plt
+from message_filters import ApproximateTimeSynchronizer, Subscriber
+from numpy import array
 
 import rclpy
 from rclpy.node import Node
@@ -11,7 +12,7 @@ from rclpy.executors import SingleThreadedExecutor, ExternalShutdownException
 
 # ROS 2 Messages
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
 
 # Assuming these are available as before
 from devol_localization.utils import odom_to_planar, pose_to_planar
@@ -97,9 +98,9 @@ class LocalizationMetricsNode(Node):
         # State Variables
         self.recording_started = False
         self.t0 = None  # Start time for x-axis zeroing
-        self.latest_gt = None
 
         # Initialize Trackers
+        self.gt_pose = None
         self.ekf_pose = None
         self.ekf = ErrorTracker('EKF', 'blue')
         self.pf_pose = None
@@ -133,6 +134,7 @@ class LocalizationMetricsNode(Node):
                 'PF_Yaw_Err',
                 'PF_Yaw_RMSE',
                 'PF_Yaw_Integral',
+                'PF_Num_Particles',
                 'DR_Pos_Err',
                 'DR_Pos_RMSE',
                 'DR_Pos_Integral',
@@ -143,16 +145,19 @@ class LocalizationMetricsNode(Node):
         )
 
         # Subscribers
-        self.create_subscription(Odometry, '/devol_drive/ground_truth/odom', self.gt_callback, 10)
-        self.create_subscription(
-            PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self.ekf_callback, 10
+        self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
+        self.ekf_pose: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose')
+        self.pf_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/pf_pose')
+        self.pf_cloud_sub: Subscriber = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
+        self.dr_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/dr_pose')
+
+        # Syncronize Subs
+        self.ts = ApproximateTimeSynchronizer(
+            [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub], 
+            queue_size=20, 
+            slop=0.1
         )
-        self.create_subscription(
-            PoseWithCovarianceStamped, '/devol_drive/pf_pose', self.pf_callback, 10
-        )
-        self.create_subscription(
-            PoseWithCovarianceStamped, '/devol_drive/dr_pose', self.dr_callback, 10
-        )
+        self.ts.registerCallback(self.sync_callback)
 
         # Matplotlib objects (assigned in main)
         self.fig = None
@@ -172,6 +177,24 @@ class LocalizationMetricsNode(Node):
     def all_algorithms_ready(self):
         return self.ekf_pose is not None and self.pf_pose is not None and self.dr_pose is not None
 
+    def sync_callback(self, gt_msg: Odometry, ekf_msg: PoseWithCovarianceStamped, 
+                      pf_msg: PoseWithCovarianceStamped, pf_cloud_msg: PoseArray, 
+                      dr_msg: PoseWithCovarianceStamped):
+        """This callback ONLY triggers when a matched set of timestamps arrives."""
+        self.gt_pose = odom_to_planar(gt_msg)
+        self.ekf_pose = pose_to_planar(ekf_msg)
+        self.pf_particles = array([pose_to_planar(p) for p in pf_cloud_msg.poses])
+        self.pf_pose = pose_to_planar(pf_msg)
+        self.dr_pose = pose_to_planar(dr_msg)
+
+        self.start_recording_if_ready()
+
+        if self.recording_started:
+            sim_time = self.get_sim_time()
+            self.ekf.update(sim_time, self.ekf_pose, self.gt_pose)
+            self.pf.update(sim_time, self.pf_pose, self.gt_pose)
+            self.dr.update(sim_time, self.dr_pose, self.latest_gt)
+
     def start_recording_if_ready(self):
         if not self.recording_started and self.all_algorithms_ready and self.latest_gt is not None:
             # Start a common time baseline for all algorithms.
@@ -180,30 +203,6 @@ class LocalizationMetricsNode(Node):
             self.get_logger().info(
                 'All localization algorithms ready. Starting metrics collection.'
             )
-
-    def gt_callback(self, msg: Odometry):
-        self.latest_gt = odom_to_planar(msg)
-
-    def ekf_callback(self, msg: PoseWithCovarianceStamped):
-        self.ekf_pose = pose_to_planar(msg.pose.pose)
-        self.start_recording_if_ready()
-
-        if self.recording_started:
-            self.ekf.update(self.get_sim_time(), self.ekf_pose, self.latest_gt)
-
-    def pf_callback(self, msg: PoseWithCovarianceStamped):
-        self.pf_pose = pose_to_planar(msg.pose.pose)
-        self.start_recording_if_ready()
-
-        if self.recording_started:
-            self.pf.update(self.get_sim_time(), self.pf_pose, self.latest_gt)
-
-    def dr_callback(self, msg: PoseWithCovarianceStamped):
-        self.dr_pose = pose_to_planar(msg.pose.pose)
-        self.start_recording_if_ready()
-
-        if self.recording_started:
-            self.dr.update(self.get_sim_time(), self.dr_pose, self.latest_gt)
 
     def log_to_csv(self, t):
         if self.latest_gt is None:
@@ -226,6 +225,7 @@ class LocalizationMetricsNode(Node):
             f'{self.pf.curr_err_yaw:.4f}',
             f'{self.pf.curr_rmse_yaw:.4f}',
             f'{self.pf.integral_yaw:.4f}',
+            f'{self.pf_num_particles}',
             f'{self.dr.curr_err_pos:.4f}',
             f'{self.dr.curr_rmse_pos:.4f}',
             f'{self.dr.integral_pos:.4f}',
@@ -265,9 +265,15 @@ class LocalizationMetricsNode(Node):
             self.axs[i, 1].autoscale_view(True, True, True)
 
             # Dynamically update subplot titles with the Integral Error
-            self.axs[i, 0].set_title(
-                f'{tracker.name} Position Error (m) | Integral: {tracker.integral_pos:.2f}'
-            )
+            if tracker.name == 'PF':
+                self.axs[i, 0].set_title(
+                    f'{tracker.name} Position Error (m) | Integral: {tracker.integral_pos:.2f} | Particles: {self.pf_num_particles}'
+                )
+            else:
+                self.axs[i, 0].set_title(
+                    f'{tracker.name} Position Error (m) | Integral: {tracker.integral_pos:.2f}'
+                )
+
             self.axs[i, 1].set_title(
                 f'{tracker.name} Heading Error (rad) | Integral: {tracker.integral_yaw:.2f}'
             )
