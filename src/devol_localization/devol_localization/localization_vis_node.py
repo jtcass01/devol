@@ -162,11 +162,7 @@ class LocalizationVisNode(Node):
         self.ax.plot([x, front_x], [y, front_y], color='black', linewidth=1.5, zorder=6)
 
     def render(self):
-        if (
-            self.map_grid is None
-            or self.ax is None
-            or not self.all_algorithms_ready
-        ):
+        if self.map_grid is None or self.ax is None or not self.all_algorithms_ready:
             return
         self.ax.clear()
 
@@ -233,12 +229,14 @@ def main(args=None):
     # Precise timing loop adopted from reference
     period = 1.0 / max(node.rate_hz, 0.1)
     next_draw = None
-    
+
     try:
         # plt.fignum_exists checks if the user closed the window manually!
         while rclpy.ok() and plt.fignum_exists(fig.number):
             # Calculate exactly how much time we have left until we need to draw again
-            timeout = 0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
+            timeout = (
+                0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
+            )
 
             # Let ROS process messages in the background
             executor.spin_once(timeout_sec=timeout)
