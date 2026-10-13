@@ -19,22 +19,23 @@ from devol_localization.utils import odom_to_planar, pose_to_planar
 
 class ErrorTracker:
     """Tracks and calculates instantaneous error and RMSE for a specific estimator."""
+
     def __init__(self, name, color):
         self.name = name
         self.color = color
-        
+
         # Cumulative stats for RMSE
         self.sum_sq_pos = 0.0
         self.sum_sq_yaw = 0.0
         self.count = 0
-        
+
         # History arrays for plotting
         self.times = []
         self.err_pos = []
         self.err_yaw = []
         self.rmse_pos = []
         self.rmse_yaw = []
-        
+
         # Current values for CSV logging
         self.curr_err_pos = 0.0
         self.curr_err_yaw = 0.0
@@ -44,27 +45,27 @@ class ErrorTracker:
     def update(self, t, est_pose, gt_pose):
         if gt_pose is None:
             return
-            
+
         # Calculate Position Error (Euclidean distance)
         dx = est_pose[0] - gt_pose[0]
         dy = est_pose[1] - gt_pose[1]
         e_pos = math.hypot(dx, dy)
-        
+
         # Calculate Heading Error (Shortest angular distance wrapped to [-pi, pi])
         dyaw = math.atan2(math.sin(est_pose[2] - gt_pose[2]), math.cos(est_pose[2] - gt_pose[2]))
         e_yaw = abs(dyaw)
-        
+
         # Accumulate for RMSE
         self.sum_sq_pos += e_pos**2
         self.sum_sq_yaw += e_yaw**2
         self.count += 1
-        
+
         # Update Current state
         self.curr_err_pos = e_pos
         self.curr_err_yaw = e_yaw
         self.curr_rmse_pos = math.sqrt(self.sum_sq_pos / self.count)
         self.curr_rmse_yaw = math.sqrt(self.sum_sq_yaw / self.count)
-        
+
         # Append to history for plotting
         self.times.append(t)
         self.err_pos.append(self.curr_err_pos)
@@ -83,7 +84,7 @@ class LocalizationMetricsNode(Node):
         # State Variables
         self.t0 = None  # Start time for x-axis zeroing
         self.latest_gt = None
-        
+
         # Initialize Trackers
         self.ekf = ErrorTracker('EKF', 'blue')
         self.pf = ErrorTracker('PF', 'orange')
@@ -95,20 +96,40 @@ class LocalizationMetricsNode(Node):
         self.csv_filename = f'localization_metrics_{timestamp}.csv'
         self.csv_file = open(self.csv_filename, mode='w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
-        
+
         # Write CSV Header
-        self.csv_writer.writerow([
-            'Time(s)', 'GT_X', 'GT_Y', 'GT_Yaw',
-            'EKF_Pos_Err', 'EKF_Pos_RMSE', 'EKF_Yaw_Err', 'EKF_Yaw_RMSE',
-            'PF_Pos_Err', 'PF_Pos_RMSE', 'PF_Yaw_Err', 'PF_Yaw_RMSE',
-            'DR_Pos_Err', 'DR_Pos_RMSE', 'DR_Yaw_Err', 'DR_Yaw_RMSE'
-        ])
+        self.csv_writer.writerow(
+            [
+                'Time(s)',
+                'GT_X',
+                'GT_Y',
+                'GT_Yaw',
+                'EKF_Pos_Err',
+                'EKF_Pos_RMSE',
+                'EKF_Yaw_Err',
+                'EKF_Yaw_RMSE',
+                'PF_Pos_Err',
+                'PF_Pos_RMSE',
+                'PF_Yaw_Err',
+                'PF_Yaw_RMSE',
+                'DR_Pos_Err',
+                'DR_Pos_RMSE',
+                'DR_Yaw_Err',
+                'DR_Yaw_RMSE',
+            ]
+        )
 
         # Subscribers
         self.create_subscription(Odometry, '/devol_drive/ground_truth/odom', self.gt_callback, 10)
-        self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self.ekf_callback, 10)
-        self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/pf_pose', self.pf_callback, 10)
-        self.create_subscription(PoseWithCovarianceStamped, '/devol_drive/dr_pose', self.dr_callback, 10)
+        self.create_subscription(
+            PoseWithCovarianceStamped, '/devol_drive/ekf_pose', self.ekf_callback, 10
+        )
+        self.create_subscription(
+            PoseWithCovarianceStamped, '/devol_drive/pf_pose', self.pf_callback, 10
+        )
+        self.create_subscription(
+            PoseWithCovarianceStamped, '/devol_drive/dr_pose', self.dr_callback, 10
+        )
 
         # Matplotlib objects (assigned in main)
         self.fig = None
@@ -144,13 +165,22 @@ class LocalizationMetricsNode(Node):
             return
 
         row = [
-            f"{t:.3f}", f"{self.latest_gt[0]:.3f}", f"{self.latest_gt[1]:.3f}", f"{self.latest_gt[2]:.3f}",
-            f"{self.ekf.curr_err_pos:.4f}", f"{self.ekf.curr_rmse_pos:.4f}",
-            f"{self.ekf.curr_err_yaw:.4f}", f"{self.ekf.curr_rmse_yaw:.4f}",
-            f"{self.pf.curr_err_pos:.4f}", f"{self.pf.curr_rmse_pos:.4f}",
-            f"{self.pf.curr_err_yaw:.4f}", f"{self.pf.curr_rmse_yaw:.4f}",
-            f"{self.dr.curr_err_pos:.4f}", f"{self.dr.curr_rmse_pos:.4f}",
-            f"{self.dr.curr_err_yaw:.4f}", f"{self.dr.curr_rmse_yaw:.4f}"
+            f'{t:.3f}',
+            f'{self.latest_gt[0]:.3f}',
+            f'{self.latest_gt[1]:.3f}',
+            f'{self.latest_gt[2]:.3f}',
+            f'{self.ekf.curr_err_pos:.4f}',
+            f'{self.ekf.curr_rmse_pos:.4f}',
+            f'{self.ekf.curr_err_yaw:.4f}',
+            f'{self.ekf.curr_rmse_yaw:.4f}',
+            f'{self.pf.curr_err_pos:.4f}',
+            f'{self.pf.curr_rmse_pos:.4f}',
+            f'{self.pf.curr_err_yaw:.4f}',
+            f'{self.pf.curr_rmse_yaw:.4f}',
+            f'{self.dr.curr_err_pos:.4f}',
+            f'{self.dr.curr_rmse_pos:.4f}',
+            f'{self.dr.curr_err_yaw:.4f}',
+            f'{self.dr.curr_rmse_yaw:.4f}',
         ]
         self.csv_writer.writerow(row)
         self.csv_file.flush()  # Ensure data is saved immediately in case of crash
@@ -166,13 +196,13 @@ class LocalizationMetricsNode(Node):
         for i, tracker in enumerate(self.trackers):
             if tracker.count == 0:
                 continue
-                
+
             l_err_p, l_rm_p, l_err_y, l_rm_y = self.lines[tracker.name]
-            
+
             # Position Data
             l_err_p.set_data(tracker.times, tracker.err_pos)
             l_rm_p.set_data(tracker.times, tracker.rmse_pos)
-            
+
             # Yaw Data
             l_err_y.set_data(tracker.times, tracker.err_yaw)
             l_rm_y.set_data(tracker.times, tracker.rmse_yaw)
@@ -207,23 +237,23 @@ def main(args=None):
     # Create line objects for fast redrawing
     for i, tracker in enumerate(node.trackers):
         # Position Error Subplot (Column 0)
-        l_err_p, = axs[i, 0].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
-        l_rm_p, = axs[i, 0].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
-        axs[i, 0].set_title(f"{tracker.name} Position Error (m)")
+        (l_err_p,) = axs[i, 0].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
+        (l_rm_p,) = axs[i, 0].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
+        axs[i, 0].set_title(f'{tracker.name} Position Error (m)')
         axs[i, 0].grid(True, linestyle='--', alpha=0.6)
         axs[i, 0].legend(loc='upper left')
 
         # Heading Error Subplot (Column 1)
-        l_err_y, = axs[i, 1].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
-        l_rm_y, = axs[i, 1].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
-        axs[i, 1].set_title(f"{tracker.name} Heading Error (rad)")
+        (l_err_y,) = axs[i, 1].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
+        (l_rm_y,) = axs[i, 1].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
+        axs[i, 1].set_title(f'{tracker.name} Heading Error (rad)')
         axs[i, 1].grid(True, linestyle='--', alpha=0.6)
         axs[i, 1].legend(loc='upper left')
 
     # X-axis labels for the bottom row
-    axs[2, 0].set_xlabel("Time (s)")
-    axs[2, 1].set_xlabel("Time (s)")
-    
+    axs[2, 0].set_xlabel('Time (s)')
+    axs[2, 1].set_xlabel('Time (s)')
+
     plt.tight_layout()
 
     node.fig = fig
@@ -251,6 +281,7 @@ def main(args=None):
         plt.close(fig)
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == '__main__':
     main()
