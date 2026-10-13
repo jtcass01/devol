@@ -146,8 +146,7 @@ class LocalizationMetricsNode(Node):
 
         # Subscribers
         self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        self.ekf_pose: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
+        self.ekf_sub: Subscriber = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
         )
         self.pf_sub: Subscriber = Subscriber(
             self, PoseWithCovarianceStamped, '/devol_drive/pf_pose'
@@ -161,11 +160,11 @@ class LocalizationMetricsNode(Node):
         self.ts = ApproximateTimeSynchronizer(
             [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub],
             queue_size=20,
-            slop=0.1,
+            slop=0.5,
         )
         self.ts.registerCallback(self.sync_callback)
 
-        # Matplotlib objects (assigned in main)
+        # Matplotlib objects
         self.fig = None
         self.axs = None
         self.lines = {}
@@ -194,7 +193,7 @@ class LocalizationMetricsNode(Node):
         """This callback ONLY triggers when a matched set of timestamps arrives."""
         self.gt_pose = odom_to_planar(gt_msg)
         self.ekf_pose = pose_to_planar(ekf_msg)
-        self.pf_particles = array([pose_to_planar(p) for p in pf_cloud_msg.poses])
+        self.pf_num_particles = len(pf_cloud_msg.poses)
         self.pf_pose = pose_to_planar(pf_msg)
         self.dr_pose = pose_to_planar(dr_msg)
 
@@ -204,10 +203,10 @@ class LocalizationMetricsNode(Node):
             sim_time = self.get_sim_time()
             self.ekf.update(sim_time, self.ekf_pose, self.gt_pose)
             self.pf.update(sim_time, self.pf_pose, self.gt_pose)
-            self.dr.update(sim_time, self.dr_pose, self.latest_gt)
+            self.dr.update(sim_time, self.dr_pose, self.gt_pose)
 
     def start_recording_if_ready(self):
-        if not self.recording_started and self.all_algorithms_ready and self.latest_gt is not None:
+        if not self.recording_started and self.all_algorithms_ready and self.gt_pose is not None:
             # Start a common time baseline for all algorithms.
             self.t0 = self.get_clock().now().nanoseconds / 1e9
             self.recording_started = True
@@ -216,14 +215,14 @@ class LocalizationMetricsNode(Node):
             )
 
     def log_to_csv(self, t):
-        if self.latest_gt is None:
+        if self.gt_pose is None:
             return
 
         row = [
             f'{t:.3f}',
-            f'{self.latest_gt[0]:.3f}',
-            f'{self.latest_gt[1]:.3f}',
-            f'{self.latest_gt[2]:.3f}',
+            f'{self.gt_pose[0]:.3f}',
+            f'{self.gt_pose[1]:.3f}',
+            f'{self.gt_pose[2]:.3f}',
             f'{self.ekf.curr_err_pos:.4f}',
             f'{self.ekf.curr_rmse_pos:.4f}',
             f'{self.ekf.integral_pos:.4f}',

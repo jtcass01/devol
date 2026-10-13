@@ -64,7 +64,7 @@ class LocalizationVisNode(Node):
             OccupancyGrid, '/devol_drive/projected_map', self.map_callback, map_qos
         )
         self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        self.ekf_pose: Subscriber = Subscriber(
+        self.ekf_sub: Subscriber = Subscriber(
             self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
         )
         self.pf_sub: Subscriber = Subscriber(
@@ -79,7 +79,7 @@ class LocalizationVisNode(Node):
         self.ts = ApproximateTimeSynchronizer(
             [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub],
             queue_size=20,
-            slop=0.1,
+            slop=0.5,
         )
         self.ts.registerCallback(self.sync_callback)
 

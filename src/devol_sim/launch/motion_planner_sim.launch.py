@@ -39,7 +39,7 @@ ARGS = {
         '1.5',
         'Path follower top speed in m/s (a real Husky A200 tops out at 1.0)',
     ),
-    'octomap_resolution': ('0.05', 'Octomap voxel size in m'),
+    'octomap_resolution': ('0.2', 'Octomap voxel size in m'),
     'gz_gui': ('true', 'Open the Gazebo GUI (false runs the server headless)'),
     'rviz': ('true', 'Open RViz'),
     'use_cameras': ('false', 'Simulate the RGB-D cameras (costly; not needed for localization)'),
@@ -223,7 +223,7 @@ def launch_setup(context):
                 {
                     'pointcloud_file': os.path.join(world_dir, 'static_world.pcd'),
                     'frame_id': 'map',
-                    'publish_rate': 0.01,
+                    'publish_rate': 1.0,
                     'topic_name': 'static_map_pointcloud',
                     'namespace': ns,
                 }

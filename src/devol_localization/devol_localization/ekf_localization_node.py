@@ -92,7 +92,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         current_pose = self.x_est.copy()
         prev_error = float('inf')
 
-        max_iter = 20
+        max_iter = 50
         tolerance = 1e-4
 
         for _ in range(max_iter):
@@ -104,7 +104,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             # Find the closest Map points (Q) for every Global Scan point (P)
             distances, indices = self.map_data['kdtree'].query(global_pts)
 
-            # Reject outlier points that are too far from any wall (> 1.0 meters)
+            # Reject outlier points that are too far from any wall
             good_matches = distances < 1.0
             if np.sum(good_matches) < 10:
                 break  # Lost tracking
@@ -150,8 +150,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Format final pose
         current_pose[2] = (current_pose[2] + np.pi) % (2 * np.pi) - np.pi
 
-        # Consider the match "valid" if the final average distance to walls is less than 20cm
-        is_valid = prev_error < 0.20
+        # Consider the match "valid" if the final average distance to walls is less than 10cm
+        is_valid = prev_error < 0.2
 
         return current_pose, is_valid
 
