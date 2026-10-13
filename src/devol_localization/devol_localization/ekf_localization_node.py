@@ -150,10 +150,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Format final pose
         current_pose[2] = (current_pose[2] + np.pi) % (2 * np.pi) - np.pi
 
-        # Consider the match "valid" if the final average distance to walls is less than 10cm
+        # Consider the match "valid" if the final average distance to walls is less than 20cm
         is_valid = prev_error < 0.2
 
-        return current_pose, is_valid
+        return current_pose, is_valid, prev_error
 
     def scan_callback(self, msg: LaserScan):
         """The main loop of the EKF."""
@@ -165,11 +165,13 @@ class EKFLocalizationNode(BaseLocalizationNode):
             return
 
         # Scan Matching
-        y_pose, is_valid = self.scan_match(msg)
+        y_pose, is_valid, match_error = self.scan_match(msg)
 
         # Run the Extended Kalman Filter!
         if is_valid:
-            # We got a successful scan-match! Run Predict + Update
+            error_scale = max(1.0, (match_error / 0.05) ** 2)
+            W_dynamic = self.W_pose * error_scale
+
             self.x_est, self.covariance = EKF(
                 DiffDrive=self.diff_drive,
                 y_pose=y_pose,
@@ -178,7 +180,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
                 u=self.u,
                 dt=dt,
                 V=self.V,
-                W_pose=self.W_pose,
+                W_pose=W_dynamic,
             )
         else:
             # No valid scan match. Just do the Prediction step manually using odometry.

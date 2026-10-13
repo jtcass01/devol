@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from numpy.linalg import pinv
+from numpy.linalg import inv
 from devol_localization.differential_drive import DifferentialDrive
 
 
@@ -35,10 +35,15 @@ def EKF(
 
     # S and R (Kalman Gain)
     S = H @ sigma_prediction @ H.T + W_pose
-    R = sigma_prediction @ H.T @ pinv(S)
+    R = sigma_prediction @ H.T @ inv(S)
 
-    # Final State and Covariance Update
+    # State update
     x_hat_2 = x_hat_prediction + R @ innovation_error
-    sigma_2 = sigma_prediction - R @ H @ sigma_prediction
+
+    # Covariance update using the Joseph Form:
+    I_RH = np.eye(3) - R @ H
+
+    sigma_2 = I_RH @ sigma_prediction @ I_RH.T + R @ W_pose @ R.T
+    sigma_2 = (sigma_2 + sigma_2.T) / 2.0
 
     return x_hat_2, sigma_2
