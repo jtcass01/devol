@@ -37,7 +37,7 @@ class ParticleFilterNode(BaseLocalizationNode):
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
-        self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 10)
+        self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
 
         self.get_logger().info('Particle Filter Node Started!')
@@ -69,12 +69,21 @@ class ParticleFilterNode(BaseLocalizationNode):
         if self.map_dict is None:
             return  # Wait for map
 
-        current_time = self.get_clock().now().nanoseconds / 1e9
+        scan_time = msg.header.stamp.sec + (msg.header.stamp.nanosec / 1e9)
+        
         if self.last_scan_time is None:
-            self.last_scan_time = current_time
+            self.last_scan_time = scan_time
             return
-        dt = current_time - self.last_scan_time
-        self.last_scan_time = current_time
+            
+        dt = scan_time - self.last_scan_time
+
+        # Prevent massive dt jumps if processing fell way behind
+        if dt > 1.0:
+            self.get_logger().warn(f"Large dt detected ({dt:.2f}s). Resetting.")
+            self.last_scan_time = scan_time
+            return
+
+        self.last_scan_time = scan_time
 
         # Extract and Downsample LiDAR points
         step = max(1, len(msg.ranges) // 30)
