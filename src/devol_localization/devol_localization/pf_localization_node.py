@@ -1,11 +1,25 @@
 from typing import Optional, Tuple
 from scipy.ndimage import distance_transform_edt
-from numpy import (ndarray, array, diag, cov, 
-                   float32 as np_float32, ones_like, 
-                   deg2rad, searchsorted, cumsum,
-                   zeros, average, arctan2, cos, sin,
-                   copy as np_copy, arange, exp as np_exp,
-                   max as np_max)
+from numpy import (
+    ndarray,
+    array,
+    diag,
+    cov,
+    float32 as np_float32,
+    ones_like,
+    deg2rad,
+    searchsorted,
+    cumsum,
+    zeros,
+    average,
+    arctan2,
+    cos,
+    sin,
+    copy as np_copy,
+    arange,
+    exp as np_exp,
+    max as np_max,
+)
 from numpy.random import multivariate_normal, uniform, normal
 
 import rclpy
@@ -67,7 +81,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         dt: Optional[float] = self.get_dt_from_header(msg.header)
         if dt is None:
             return
-        
+
         self.particles, self.laser_poses = self._predict(dt=dt)
 
     def map_callback(self, msg: OccupancyGrid):
@@ -104,8 +118,7 @@ class ParticleFilterNode(BaseLocalizationNode):
             return  # No valid measurements
 
         # Run the Particle Filter using Odometry values and the Unicycle model
-        self.particles, self.x_est = self._update(z_dists=z_dists,
-                                                  z_thetas=z_thetas)
+        self.particles, self.x_est = self._update(z_dists=z_dists, z_thetas=z_thetas)
 
         # Publish state and particles
         self.publish_state(msg.header.stamp)
@@ -131,16 +144,20 @@ class ParticleFilterNode(BaseLocalizationNode):
     def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
         ## Apply the motion model to the samples (Prediction Step)
         # Create noise proportional to the velocity commands for each particle
-        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
-        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(
+            self.omega
+        )
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(
+            self.omega
+        )
 
         new_particles: ndarray = array(
             [
                 UnicycleMotionModel.forward(
-                    particle, 
-                    array([normal(self.v, sigma_v), normal(self.omega, sigma_w)]), 
-                    zeros(3), 
-                    dt
+                    particle,
+                    array([normal(self.v, sigma_v), normal(self.omega, sigma_w)]),
+                    zeros(3),
+                    dt,
                 )
                 for particle in self.particles
             ]
@@ -167,8 +184,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         log_weights = array(
             [
                 LaserModel.likelihood_field_range_finder(
-                    z_dists=z_dists, z_thetas=z_thetas, 
-                    x=particle, map_dict=self.map_dict, std=0.1
+                    z_dists=z_dists, z_thetas=z_thetas, x=particle, map_dict=self.map_dict, std=0.1
                 )
                 for particle in self.laser_poses
             ],
@@ -211,6 +227,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         indexes = searchsorted(cumulative_sum, pointers)
 
         return particles[indexes]
+
 
 def main(args=None):
     rclpy.init(args=args)
