@@ -1,11 +1,23 @@
 from typing import Optional, Tuple
 from scipy.ndimage import distance_transform_edt
-from numpy import (ndarray, array, cov, 
-                   float32 as np_float32, ones_like, 
-                   searchsorted, cumsum,
-                   average, arctan2, cos, sin,
-                   copy as np_copy, arange, exp as np_exp,
-                   max as np_max, zeros)
+from numpy import (
+    ndarray,
+    array,
+    cov,
+    float32 as np_float32,
+    ones_like,
+    searchsorted,
+    cumsum,
+    average,
+    arctan2,
+    cos,
+    sin,
+    copy as np_copy,
+    arange,
+    exp as np_exp,
+    max as np_max,
+    zeros,
+)
 from numpy.random import multivariate_normal, uniform, normal
 
 import rclpy
@@ -123,8 +135,12 @@ class ParticleFilterNode(BaseLocalizationNode):
     def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
         ## Apply the motion model to the samples (Prediction Step)
         # Create noise proportional to the velocity commands for each particle
-        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
-        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(
+            self.omega
+        )
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(
+            self.omega
+        )
 
         new_particles: ndarray = array(
             [

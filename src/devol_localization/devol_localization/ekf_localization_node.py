@@ -14,7 +14,7 @@ from numpy import (
     where,
     int8 as np_int8,
     eye,
-    arctan2
+    arctan2,
 )
 from numpy.linalg import svd, det, inv
 
@@ -191,8 +191,16 @@ class EKFLocalizationNode(BaseLocalizationNode):
         A: ndarray = UnicycleMotionModel.linearize(state=new_x_est, u=self.u, dt=dt)
 
         # Proportional Control Noise Covariance (M)
-        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega) + 0.001
-        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega) + 0.001
+        sigma_v: float = (
+            self.alpha_tv_causedby_tv * abs(self.v)
+            + self.alpha_tv_causedby_rv * abs(self.omega)
+            + 0.001
+        )
+        sigma_w: float = (
+            self.alpha_rv_causedby_tv * abs(self.v)
+            + self.alpha_rv_causedby_rv * abs(self.omega)
+            + 0.001
+        )
         M: ndarray = diag([sigma_v**2, sigma_w**2])
 
         # Control Jacobian (V_u): Maps the [v, omega] noise into [x, y, theta] space
