@@ -15,7 +15,7 @@ from numpy import (
     cos,
     sin,
     copy as np_copy,
-    arange
+    arange,
 )
 from numpy.random import uniform, multivariate_normal
 
@@ -45,7 +45,7 @@ def particle_filter_2d(
     z_dists: list,
     z_thetas: list,
     laser_offset: ndarray,
-    V: ndarray
+    V: ndarray,
 ) -> Tuple[ndarray, ndarray]:
     ## Predict
     # Apply the motion model to the samples (Prediction Step)
@@ -73,11 +73,7 @@ def particle_filter_2d(
     weights = array(
         [
             sensor_model.likelihood_field_range_finder(
-                z_dists=z_dists,
-                z_thetas=z_thetas,
-                x=particle,
-                map_dict=map_dict,
-                std=0.1
+                z_dists=z_dists, z_thetas=z_thetas, x=particle, map_dict=map_dict, std=0.1
             )
             for particle in laser_poses
         ],
