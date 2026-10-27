@@ -1,8 +1,8 @@
 from typing import Tuple, Optional
 import rclpy
-import numpy as np
 from nav_msgs.msg import Odometry
-from numpy import diag, deg2rad, array, ndarray, zeros, pi, sin, cos
+from numpy import diag, deg2rad, array, ndarray, sin, cos
+from numpy.random import normal
 
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel
@@ -12,14 +12,6 @@ from devol_localization.utils import wrap_angle
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose')
-
-        # Covariances
-        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
-        # Proportional Control Noise Parameters
-        self.alpha_tv_causedby_tv: float = 0.05
-        self.alpha_tv_causedby_rv: float = 0.01
-        self.alpha_rv_causedby_tv: float = 0.01
-        self.alpha_rv_causedby_rv: float = 0.05
 
         self.get_logger().info('Dead Reckoning Node Started!')
 
@@ -47,8 +39,8 @@ class DeadReckoningNode(BaseLocalizationNode):
                                                    u=self.u, dt=dt)
 
         # Proportional Control Noise Covariance (M)
-        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
-        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega) + 0.001
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega) + 0.001
         M: ndarray = diag([sigma_v**2, sigma_w**2])
 
         # Control Jacobian (V_u): Maps the [v, omega] noise into [x, y, theta] space
@@ -64,7 +56,8 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         # Predict: Apply model forward kinematics
         new_x_est: ndarray = UnicycleMotionModel.forward(
-            state=new_x_est, u=self.u, noise=zeros(3), dt=dt
+            state=new_x_est, u=self.u, 
+            noise=normal(0.0, [0.005, 0.005, 0.001]), dt=dt
         )
 
         # Update the covariance

@@ -1,9 +1,8 @@
-"""This DifferentialDrive model comes from Introduction of Robotics course notes."""
+"""This DifferentialDrive model was modified from Introduction of Robotics course notes."""
 
 # Import Libraries
 from numpy import array, cos, sin, pi, ndarray, eye, atleast_2d
 
-from devol_localization.utils import wrap_angle
 
 class DifferentialDrive(object):
     """

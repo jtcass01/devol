@@ -1,11 +1,11 @@
 from typing import Optional, Tuple
 from scipy.ndimage import distance_transform_edt
-from numpy import (ndarray, array, diag, cov, 
+from numpy import (ndarray, array, cov, 
                    float32 as np_float32, ones_like, 
-                   deg2rad, searchsorted, cumsum,
-                   zeros, average, arctan2, cos, sin,
+                   searchsorted, cumsum,
+                   average, arctan2, cos, sin,
                    copy as np_copy, arange, exp as np_exp,
-                   max as np_max)
+                   max as np_max, zeros)
 from numpy.random import multivariate_normal, uniform, normal
 
 import rclpy
@@ -19,7 +19,6 @@ from geometry_msgs.msg import PoseArray, Pose
 # Import devol localization classes
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.laser_model import LaserModel
-from devol_localization.particle_filter import particle_filter_2d, low_variance_resample
 from devol_localization.utils import euler_to_quaternion
 from devol_localization.motion_models import UnicycleMotionModel
 
@@ -32,12 +31,6 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         self.map_dict = None
         self.num_particles: int = int(self.get_parameter('num_particles').value)
-
-        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
-        self.alpha_tv_causedby_tv: float = 0.05
-        self.alpha_tv_causedby_rv: float = 0.01
-        self.alpha_rv_causedby_tv: float = 0.01
-        self.alpha_rv_causedby_rv: float = 0.05
 
         # Initialize particles clustered around starting origin
         self.particles: ndarray = multivariate_normal(
@@ -131,8 +124,8 @@ class ParticleFilterNode(BaseLocalizationNode):
     def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
         ## Apply the motion model to the samples (Prediction Step)
         # Create noise proportional to the velocity commands for each particle
-        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
-        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega) + 0.001
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega) + 0.001
 
         new_particles: ndarray = array(
             [
@@ -145,6 +138,10 @@ class ParticleFilterNode(BaseLocalizationNode):
                 for particle in self.particles
             ]
         )
+
+        # Inject independent X and Y lateral slip noise directly to the array
+        new_particles[:, 0] += normal(0.0, 0.005, self.num_particles)
+        new_particles[:, 1] += normal(0.0, 0.005, self.num_particles)
 
         # Calculate where the laser actually is for each newly predicted particle
         laser_poses: ndarray = np_copy(new_particles)

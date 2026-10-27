@@ -1,5 +1,6 @@
 import time
-import numpy as np
+from typing import List
+from numpy import array, ndarray, int8 as np_int8, full, cos, sin
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
@@ -107,26 +108,26 @@ class LocalizationVisNode(Node):
         dr_msg: PoseWithCovarianceStamped,
     ):
         """This callback ONLY triggers when a matched set of timestamps arrives."""
-        self.gt_pose = odom_to_planar(gt_msg)
-        self.ekf_pose = pose_to_planar(ekf_msg)
-        self.pf_particles = np.array([pose_to_planar(p) for p in pf_cloud_msg.poses])
-        self.pf_pose = pose_to_planar(pf_msg)
-        self.dr_pose = pose_to_planar(dr_msg)
+        self.gt_pose: ndarray = odom_to_planar(gt_msg)
+        self.ekf_pose: ndarray = pose_to_planar(ekf_msg)
+        self.pf_particles: ndarray = array([pose_to_planar(p) for p in pf_cloud_msg.poses])
+        self.pf_pose: ndarray = pose_to_planar(pf_msg)
+        self.dr_pose: ndarray = pose_to_planar(dr_msg)
 
     def map_callback(self, msg: OccupancyGrid):
         # Convert to visual grayscale
-        grid = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
-        vis_map = np.full(grid.shape, 200, dtype=np.uint8)  # Unknown = Gray
+        grid: ndarray = array(msg.data, dtype=np_int8).reshape((msg.info.height, msg.info.width))
+        vis_map: ndarray = full(grid.shape, 200, dtype=np_int8)  # Unknown = Gray
         vis_map[grid == 0] = 255  # Free = White
         vis_map[grid > 50] = 0  # Obstacle = Black
-        self.map_grid = vis_map
+        self.map_grid: ndarray = vis_map
 
         # Calculate physical boundaries of the map in meters
-        xmin = msg.info.origin.position.x
-        ymin = msg.info.origin.position.y
-        xmax = xmin + (msg.info.width * msg.info.resolution)
-        ymax = ymin + (msg.info.height * msg.info.resolution)
-        self.map_extent = [xmin, xmax, ymin, ymax]
+        xmin: float = msg.info.origin.position.x
+        ymin: float = msg.info.origin.position.y
+        xmax: float = xmin + (msg.info.width * msg.info.resolution)
+        ymax: float = ymin + (msg.info.height * msg.info.resolution)
+        self.map_extent: List[float] = [xmin, xmax, ymin, ymax]
 
     def draw_robot(self, pose, color, alpha=0.6):
         """Draws the 2D bounding boxes of the robot for a given (x, y, yaw)."""
@@ -134,8 +135,8 @@ class LocalizationVisNode(Node):
             return
 
         x, y, yaw = pose
-        cos_yaw = np.cos(yaw)
-        sin_yaw = np.sin(yaw)
+        cos_yaw = cos(yaw)
+        sin_yaw = sin(yaw)
 
         # Plot each box footprint
         for box in DEFAULT_BODY:

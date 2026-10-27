@@ -1,6 +1,6 @@
 import numpy as np
 import zlib
-from numpy import ndarray, array, linspace, isinf, isnan
+from numpy import ndarray, array, linspace, isinf, isnan, diag, deg2rad
 
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
@@ -38,6 +38,12 @@ class BaseLocalizationNode(Node):
         self.v: float = 0.0
         self.omega: float = 0.0
         self.x_est: ndarray = array([0.0, 0.0, 0.0])
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
+        # Proportional Control Noise Parameters
+        self.alpha_tv_causedby_tv: float = 0.05
+        self.alpha_tv_causedby_rv: float = 0.01
+        self.alpha_rv_causedby_tv: float = 0.01
+        self.alpha_rv_causedby_rv: float = 0.05
 
         self.latest_odom_pose = np.array([0.0, 0.0, 0.0])
         self.last_map_crc = None

@@ -14,8 +14,7 @@ from numpy import (
     where,
     int8 as np_int8,
     eye,
-    pi,
-    arctan2,
+    arctan2
 )
 from numpy.linalg import svd, det, inv
 
@@ -37,15 +36,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         super().__init__('ekf_localization_node', '/devol_drive/ekf_pose')
 
         self.map_data = None
-
-        # Covariances
-        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
-        # Proportional Control Noise Parameters
-        self.alpha_tv_causedby_tv: float = 0.05
-        self.alpha_tv_causedby_rv: float = 0.01
-        self.alpha_rv_causedby_tv: float = 0.01
-        self.alpha_rv_causedby_rv: float = 0.05
 
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
@@ -200,8 +191,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         A: ndarray = UnicycleMotionModel.linearize(state=new_x_est, u=self.u, dt=dt)
 
         # Proportional Control Noise Covariance (M)
-        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
-        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega) + 0.001
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega) + 0.001
         M: ndarray = diag([sigma_v**2, sigma_w**2])
 
         # Control Jacobian (V_u): Maps the [v, omega] noise into [x, y, theta] space
