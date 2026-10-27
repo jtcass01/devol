@@ -4,6 +4,7 @@
 from numpy import array, cos, sin, pi, ndarray, eye, atleast_2d
 
 
+
 class DifferentialDrive(object):
     """
     Implementation of Differential Drive kinematics.

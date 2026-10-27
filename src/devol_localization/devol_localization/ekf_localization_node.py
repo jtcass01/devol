@@ -58,7 +58,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         dt: Optional[float] = self.get_dt_from_header(msg.header)
         if dt is None:
             return
-        
+
         # predict step (Using Odometry Twist)
         self.x_est, self.covariance = self._predict(dt=dt)
 
@@ -197,11 +197,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Control Jacobian (V_u): Maps the [v, omega] noise into [x, y, theta] space
         theta: float = new_x_est[2]
-        V_u: ndarray = array([
-            [cos(theta) * dt, 0.0],
-            [sin(theta) * dt, 0.0],
-            [0.0, dt]
-        ])
+        V_u: ndarray = array([[cos(theta) * dt, 0.0], [sin(theta) * dt, 0.0], [0.0, dt]])
 
         # Mapped Process Noise (R)
         R: ndarray = V_u @ M @ V_u.T
