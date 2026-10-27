@@ -1,14 +1,15 @@
 import numpy as np
 import zlib
+from numpy import (ndarray, array, linspace, isinf, isnan)
 
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
 from nav_msgs.msg import Odometry, OccupancyGrid
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from sensor_msgs.msg import LaserScan
 
-from devol_localization.differential_drive import DifferentialDrive
-from devol_localization.utils import euler_to_quaternion, yaw_from_quaternion, compose, inverse
+from devol_localization.utils import euler_to_quaternion
 
 
 class BaseLocalizationNode(Node):
@@ -25,20 +26,20 @@ class BaseLocalizationNode(Node):
         self.declare_parameter('base_frame', 'a200_base_link')
 
         # Retrieve Parameters
-        self.odom_topic = self.get_parameter('odom_topic').value
-        self.map_topic = self.get_parameter('map_topic').value
-        self.scan_topic = self.get_parameter('scan_topic').value
-        self.pose_topic = self.get_parameter('pose_topic').value
-        self.map_frame = self.get_parameter('map_frame').value
-        self.odom_frame = self.get_parameter('odom_frame').value
-        self.base_frame = self.get_parameter('base_frame').value
+        self.odom_topic: str = self.get_parameter('odom_topic').value
+        self.map_topic: str = self.get_parameter('map_topic').value
+        self.scan_topic: str = self.get_parameter('scan_topic').value
+        self.pose_topic: str = self.get_parameter('pose_topic').value
+        self.map_frame: str = self.get_parameter('map_frame').value
+        self.odom_frame: str = self.get_parameter('odom_frame').value
+        self.base_frame: str = self.get_parameter('base_frame').value
 
         # Shared State and Models
-        self.diff_drive = DifferentialDrive(L=0.555, R=0.165)
-        self.u = np.array([0.0, 0.0])
-        self.last_scan_time = None
+        self.v: float = 0.0
+        self.omega: float = 0.0
+        self.x_est: ndarray = array([0.0, 0.0, 0.0])
+
         self.latest_odom_pose = np.array([0.0, 0.0, 0.0])
-        self.x_est = np.array([0.0, 0.0, 0.0])
         self.last_map_crc = None
         self.last_scan_time = None
 
@@ -53,6 +54,11 @@ class BaseLocalizationNode(Node):
         # Start Shared Subscribers (Map and Scan are implemented by child classes)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        self.v = msg.twist.twist.linear.x
+        self.omega = msg.twist.twist.angular.z
+
     def is_map_new(self, msg: OccupancyGrid) -> bool:
         """Computes a CRC32 hash of the map data.
         Returns True if the map is new/changed, False if it is identical."""
@@ -64,17 +70,6 @@ class BaseLocalizationNode(Node):
 
         self.last_map_crc = current_crc
         return True
-
-    def odom_callback(self, msg: Odometry):
-        """Updates control input (u) and tracks raw odometry for TF."""
-        v_x = msg.twist.twist.linear.x
-        omega = msg.twist.twist.angular.z
-        self.u = self.diff_drive.inverse(self.x_est, np.array([v_x, omega]))
-
-        p = msg.pose.pose
-        self.latest_odom_pose = np.array(
-            [p.position.x, p.position.y, yaw_from_quaternion(p.orientation)]
-        )
 
     def get_dt_from_header(self, header):
         """Calculates the time delta (dt) from a message header.
@@ -97,6 +92,21 @@ class BaseLocalizationNode(Node):
         self.last_scan_time = msg_time
         return dt
 
+    def preprocess_scan(self, msg: LaserScan):
+        """Standardizes LiDAR extraction for all algorithms."""
+        angles: ndarray = linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
+        ranges: ndarray = array(msg.ranges)
+
+        # Filter out infinite/bad rays
+        eps = 0.02
+        valid = (
+            (ranges > msg.range_min)
+            & (ranges < (msg.range_max - eps))
+            & ~isinf(ranges)
+            & ~isnan(ranges)
+        )
+        return ranges[valid], angles[valid]
+    
     def get_laser_offset(self):
         """Looks up the physical LiDAR mount offset."""
         return np.array([0.32825, 0.0, 0.0])
