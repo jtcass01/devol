@@ -5,7 +5,7 @@ class LaserModel:
     @staticmethod
     def likelihood_field_range_finder(
         z_dists: ndarray, z_thetas: ndarray, x: ndarray, map_dict: dict, std: float = 0.1
-    ):
+    ) -> float:
         map_data = map_dict['grid']
         info = map_dict['info']
         res = info.resolution

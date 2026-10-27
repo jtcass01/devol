@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 from scipy.spatial import KDTree
 from numpy import (
     ndarray,
@@ -23,12 +23,13 @@ import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 
 # Import devol localization classes
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel
+from devol_localization.utils import wrap_angle
 
 
 class EKFLocalizationNode(BaseLocalizationNode):
@@ -37,10 +38,14 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         self.map_data = None
 
-        # EKF Covariances
+        # Covariances
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
-        self.V: ndarray = diag([0.05**2, 0.05**2, deg2rad(2.0) ** 2])
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
+        # Proportional Control Noise Parameters
+        self.alpha_tv_causedby_tv: float = 0.05
+        self.alpha_tv_causedby_rv: float = 0.01
+        self.alpha_rv_causedby_tv: float = 0.01
+        self.alpha_rv_causedby_rv: float = 0.05
 
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
@@ -52,6 +57,19 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 10)
 
         self.get_logger().info('EKF Localization Node Started!')
+
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
+
+        dt: Optional[float] = self.get_dt_from_header(msg.header)
+        if dt is None:
+            return
+        
+        # predict step (Using Odometry Twist)
+        self.x_est, self.covariance = self._predict(dt=dt)
 
     def map_callback(self, msg: OccupancyGrid):
         """Extracts obstacle coordinates and builds KDTree."""
@@ -76,13 +94,13 @@ class EKFLocalizationNode(BaseLocalizationNode):
             f'Map received. Built KDTree with {len(map_points)} obstacle points.'
         )
 
-    def scan_match(self, msg: LaserScan):
+    def scan_match(self, msg: LaserScan, max_iter: int = 50, tolerance: float = 1e-4):
         """2D Iterative Closest Point using SVD."""
         # Filter out invalid rays
         ranges, angles = self.preprocess_scan(msg=msg)
 
         if len(ranges) < 10:
-            return array([0.0, 0.0, 0.0]), False  # Not enough valid points
+            return array([0.0, 0.0, 0.0]), False, 0.0  # Not enough valid points
 
         # Nx2 array of local laser points
         laser_pts: ndarray = vstack((ranges * cos(angles), ranges * sin(angles))).T
@@ -98,9 +116,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         current_pose: ndarray = self.x_est.copy()
         prev_error: float = float('inf')
-
-        max_iter = 50
-        tolerance = 1e-4
 
         for _ in range(max_iter):
             # Transform local scan points into the global map frame
@@ -155,7 +170,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             prev_error = mean_error
 
         # Format final pose
-        current_pose[2] = (current_pose[2] + pi) % (2 * pi) - pi
+        current_pose = wrap_angle(wrap_angle)
 
         # Consider the match "valid" if the final average distance to walls is less than 20cm
         is_valid: bool = prev_error < 0.2
@@ -167,50 +182,78 @@ class EKFLocalizationNode(BaseLocalizationNode):
         if self.map_data is None:
             return  # Wait for map to load
 
-        dt: Optional[float] = self.get_dt_from_header(msg.header)
-        if dt is None:
-            return
-
-        # predict step (Using Odometry Twist)
-        u: ndarray = array([self.v, self.omega])
-        ## Calculate the Jacobian using the previous step.
-        A: ndarray = UnicycleMotionModel.linearize(state=self.x_est, u=u, dt=dt)
-        ## Forward project th emean state
-        self.x_est: ndarray = UnicycleMotionModel.forward(
-            state=self.x_est, u=u, noise=zeros(3), dt=dt
-        )
-        ## Update the covariance
-        self.covariance: ndarray = A @ self.covariance @ A.T + self.V
-
         # update step (Using LaserScan ICP)
         y_pose, is_valid, match_error = self.scan_match(msg)
 
         if is_valid:
-            error_scale: float = max(1.0, (match_error / 0.05) ** 2)
-            W_dynamic: ndarray = self.W_pose * error_scale
-
-            # Observation matrix (H is identity because we observe the direct [x, y, theta] pose from ICP scan matching)
-            H: ndarray = eye(3)
-
-            # Innovation covariance (S)
-            S: ndarray = H @ self.covariance @ H.T + W_dynamic
-
-            # Kalman Gain (K)
-            K: ndarray = self.covariance @ H.T @ inv(S)
-
-            # Innovation (y_tilde) is the difference between observation and prediction
-            y_tilde: ndarray = y_pose - self.x_est
-            y_tilde[2] = (y_tilde[2] + pi) % (2 * pi) - pi  # Wrap angle error
-
-            # Update the state estimate and shrink the covariance
-            self.x_est: ndarray = self.x_est + K @ y_tilde
-            self.covariance: ndarray = (eye(3) - K @ H) @ self.covariance
-
-        # Wrap heading to [-pi, pi] to prevent runaway angle values over time
-        self.x_est[2] = (self.x_est[2] + pi) % (2 * pi) - pi
+            self.x_est, self.covariance = self._update(y_pose, match_error)
 
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
+
+    def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
+        """Prediction step. Apply Kinematic model"""
+        new_x_est: ndarray = self.x_est
+        new_cov: ndarray = self.covariance
+
+        # Calculate the Jacobian using the previous step.
+        A: ndarray = UnicycleMotionModel.linearize(state=new_x_est, u=self.u, dt=dt)
+
+        # Proportional Control Noise Covariance (M)
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+        M: ndarray = diag([sigma_v**2, sigma_w**2])
+
+        # Control Jacobian (V_u): Maps the [v, omega] noise into [x, y, theta] space
+        theta: float = new_x_est[2]
+        V_u: ndarray = array([
+            [cos(theta) * dt, 0.0],
+            [sin(theta) * dt, 0.0],
+            [0.0, dt]
+        ])
+
+        # Mapped Process Noise (R)
+        R: ndarray = V_u @ M @ V_u.T
+
+        # Predict: Apply model forward kinematics
+        new_x_est: ndarray = UnicycleMotionModel.forward(
+            state=new_x_est, u=self.u, noise=zeros(3), dt=dt
+        )
+
+        # Update the covariance
+        new_cov: ndarray = A @ new_cov @ A.T + R
+        new_x_est: ndarray = wrap_angle(new_x_est)
+
+        return new_x_est, new_cov
+
+    def _update(self, y_pose: ndarray, match_error: float) -> Tuple[ndarray, ndarray]:
+        new_x_est: ndarray = self.x_est
+        new_cov: ndarray = self.covariance
+
+        error_scale: float = max(1.0, (match_error / 0.05) ** 2)
+        W_dynamic: ndarray = self.W_pose * error_scale
+
+        # Observation matrix (H is identity because we observe the direct [x, y, theta] pose from ICP scan matching)
+        H: ndarray = eye(3)
+
+        # Innovation covariance (S)
+        S: ndarray = H @ new_cov @ H.T + W_dynamic
+
+        # Kalman Gain (K)
+        K: ndarray = new_cov @ H.T @ inv(S)
+
+        # Innovation (y_tilde) is the difference between observation and prediction
+        y_tilde: ndarray = y_pose - new_x_est
+        y_tilde: ndarray = wrap_angle(y_tilde)  # Wrap angle error
+
+        # Update the state estimate and shrink the covariance
+        new_x_est: ndarray = new_x_est + K @ y_tilde
+        new_cov: ndarray = (eye(3) - K @ H) @ new_cov
+
+        # Wrap heading to [-pi, pi] to prevent runaway angle values over time
+        new_x_est = wrap_angle(new_x_est)
+
+        return new_x_est, new_cov
 
 
 def main(args=None):

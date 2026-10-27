@@ -1,14 +1,18 @@
-from typing import Optional
-import numpy as np
+from typing import Optional, Tuple
 from scipy.ndimage import distance_transform_edt
-from numpy import ndarray, array, diag, cov, float32 as np_float32, ones_like, deg2rad
-from numpy.random import multivariate_normal
+from numpy import (ndarray, array, diag, cov, 
+                   float32 as np_float32, ones_like, 
+                   deg2rad, searchsorted, cumsum,
+                   zeros, average, arctan2, cos, sin,
+                   copy as np_copy, arange, exp as np_exp,
+                   max as np_max)
+from numpy.random import multivariate_normal, uniform, normal
 
 import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseArray, Pose
 
@@ -30,12 +34,16 @@ class ParticleFilterNode(BaseLocalizationNode):
         self.num_particles: int = int(self.get_parameter('num_particles').value)
 
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
-        self.V: ndarray = diag([0.05**2, 0.05**2, deg2rad(2.0) ** 2])
+        self.alpha_tv_causedby_tv: float = 0.05
+        self.alpha_tv_causedby_rv: float = 0.01
+        self.alpha_rv_causedby_tv: float = 0.01
+        self.alpha_rv_causedby_rv: float = 0.05
 
         # Initialize particles clustered around starting origin
         self.particles: ndarray = multivariate_normal(
             self.x_est, self.covariance, self.num_particles
         )
+        self.laser_poses: ndarray
 
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
@@ -49,6 +57,18 @@ class ParticleFilterNode(BaseLocalizationNode):
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
 
         self.get_logger().info('Particle Filter Node Started!')
+
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
+
+        dt: Optional[float] = self.get_dt_from_header(msg.header)
+        if dt is None:
+            return
+        
+        self.particles, self.laser_poses = self._predict(dt=dt)
 
     def map_callback(self, msg: OccupancyGrid):
         """Converts ROS OccupancyGrid into a distance transform map for the Likelihood field"""
@@ -74,11 +94,8 @@ class ParticleFilterNode(BaseLocalizationNode):
 
     def scan_callback(self, msg: LaserScan):
         """The main loop of the PF: computes dt, downsamples scan, runs PF, and publishes results."""
-        if self.map_dict is None:
-            return  # Wait for map
-
-        dt: Optional[float] = self.get_dt_from_header(msg.header)
-        if dt is None:
+        # Wait for map and ensure odometry has ran at least once.
+        if self.map_dict is None or not hasattr(self, 'laser_poses'):
             return
 
         z_dists, z_thetas = self.preprocess_scan(msg=msg)
@@ -86,23 +103,9 @@ class ParticleFilterNode(BaseLocalizationNode):
         if len(z_dists) == 0:
             return  # No valid measurements
 
-        # Handle Laser Offset (shift the particles forward so the rays cast from the laser)
-        laser_offset: ndarray = self.get_laser_offset()
-
         # Run the Particle Filter using Odometry values and the Unicycle model
-        self.particles, self.x_est = particle_filter_2d(
-            particles=self.particles,
-            map_dict=self.map_dict,
-            motion_model=UnicycleMotionModel,
-            sensor_model=LaserModel,
-            resample=low_variance_resample,
-            u=array([self.v, self.omega]),
-            dt=dt,
-            z_dists=z_dists,
-            z_thetas=z_thetas,
-            laser_offset=laser_offset,
-            V=self.V,
-        )
+        self.particles, self.x_est = self._update(z_dists=z_dists,
+                                                  z_thetas=z_thetas)
 
         # Publish state and particles
         self.publish_state(msg.header.stamp)
@@ -125,6 +128,89 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         self.pub_particles.publish(cloud_msg)
 
+    def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
+        ## Apply the motion model to the samples (Prediction Step)
+        # Create noise proportional to the velocity commands for each particle
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega)
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega)
+
+        new_particles: ndarray = array(
+            [
+                UnicycleMotionModel.forward(
+                    particle, 
+                    array([normal(self.v, sigma_v), normal(self.omega, sigma_w)]), 
+                    zeros(3), 
+                    dt
+                )
+                for particle in self.particles
+            ]
+        )
+
+        # Calculate where the laser actually is for each newly predicted particle
+        laser_poses: ndarray = np_copy(new_particles)
+        laser_offset: ndarray = self.get_laser_offset()
+        # Shift X and Y based on the laser's physical mount and the robot's current yaw
+        laser_poses[:, 0] += laser_offset[0] * cos(laser_poses[:, 2]) - laser_offset[1] * sin(
+            laser_poses[:, 2]
+        )
+        laser_poses[:, 1] += laser_offset[0] * sin(laser_poses[:, 2]) + laser_offset[1] * cos(
+            laser_poses[:, 2]
+        )
+        # Shift Yaw
+        laser_poses[:, 2] += laser_offset[2]
+
+        return new_particles, laser_poses
+
+    def _update(self, z_dists: list, z_thetas: list):
+        ## Update
+        # Computes log probabilities
+        log_weights = array(
+            [
+                LaserModel.likelihood_field_range_finder(
+                    z_dists=z_dists, z_thetas=z_thetas, 
+                    x=particle, map_dict=self.map_dict, std=0.1
+                )
+                for particle in self.laser_poses
+            ],
+            dtype=float,
+        )
+
+        # shift all weights so their highest value is 0.
+        max_log_weights: ndarray = np_max(log_weights)
+        weights: ndarray = np_exp(log_weights - max_log_weights)
+
+        # Prevent division by zero
+        weights += 1e-40
+        # normalize (\eta)
+        weights /= sum(weights)
+
+        # Estimate the state based on the weighted average of particles
+        x_est: ndarray = average(self.particles, axis=0, weights=weights)
+
+        # Wrap angle
+        x_est[2] = arctan2(
+            average(sin(self.particles[:, 2]), weights=weights),
+            average(cos(self.particles[:, 2]), weights=weights),
+        )
+
+        # Resample
+        new_particles: ndarray = ParticleFilterNode.low_variance_resample(self.particles, weights)
+
+        return new_particles, x_est
+
+    @staticmethod
+    def low_variance_resample(particles: ndarray, weights: ndarray) -> ndarray:
+        N = len(particles)
+
+        # Generate a single random start point between 0 and 1/N
+        step = 1.0 / N
+        pointers = uniform(0, step) + arange(N) * step
+
+        # Find where those evenly spaced pointers land in the cumulative weight array
+        cumulative_sum = cumsum(weights)
+        indexes = searchsorted(cumulative_sum, pointers)
+
+        return particles[indexes]
 
 def main(args=None):
     rclpy.init(args=args)

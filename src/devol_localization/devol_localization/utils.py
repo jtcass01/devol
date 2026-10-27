@@ -1,5 +1,6 @@
 from typing import Union
 import numpy as np
+from numpy import ndarray, pi
 
 from geometry_msgs.msg import Quaternion, Pose, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
@@ -11,6 +12,12 @@ def euler_to_quaternion(yaw):
 
 def yaw_from_quaternion(q):
     return np.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+
+
+def wrap_angle(x: ndarray) -> ndarray:
+    """Wrap heading to [-pi, pi] to prevent runaway angle values over time"""
+    x[2] = (x[2] + pi) % (2 * pi) - pi
+    return x
 
 
 def compose(a, b):

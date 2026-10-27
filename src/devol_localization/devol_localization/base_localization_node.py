@@ -56,8 +56,9 @@ class BaseLocalizationNode(Node):
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
-        self.v = msg.twist.twist.linear.x
-        self.omega = msg.twist.twist.angular.z
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
 
     def is_map_new(self, msg: OccupancyGrid) -> bool:
         """Computes a CRC32 hash of the map data.
