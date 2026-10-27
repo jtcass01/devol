@@ -1,8 +1,22 @@
 from typing import Optional
 from scipy.spatial import KDTree
-from numpy import (ndarray, array, zeros, diag, deg2rad, mean, 
-                   sum, sin, cos, vstack, where, int8 as np_int8, 
-                   eye, pi, arctan2)
+from numpy import (
+    ndarray,
+    array,
+    zeros,
+    diag,
+    deg2rad,
+    mean,
+    sum,
+    sin,
+    cos,
+    vstack,
+    where,
+    int8 as np_int8,
+    eye,
+    pi,
+    arctan2,
+)
 from numpy.linalg import svd, det, inv
 
 import rclpy
@@ -15,6 +29,7 @@ from sensor_msgs.msg import LaserScan
 # Import devol localization classes
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel
+
 
 class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
@@ -70,8 +85,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             return array([0.0, 0.0, 0.0]), False  # Not enough valid points
 
         # Nx2 array of local laser points
-        laser_pts: ndarray = vstack((ranges * cos(angles), 
-                                     ranges * sin(angles))).T
+        laser_pts: ndarray = vstack((ranges * cos(angles), ranges * sin(angles))).T
         laser_offset: ndarray = self.get_laser_offset()
 
         R_offset: ndarray = array(
@@ -91,8 +105,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         for _ in range(max_iter):
             # Transform local scan points into the global map frame
             theta: float = current_pose[2]
-            R_curr: ndarray = array([[cos(theta), -sin(theta)], 
-                                     [sin(theta), cos(theta)]])
+            R_curr: ndarray = array([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])
             global_pts: ndarray = (R_curr @ local_pts.T).T + current_pose[:2]
 
             # Find the closest Map points (Q) for every Global Scan point (P)
@@ -161,14 +174,14 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # predict step (Using Odometry Twist)
         u: ndarray = array([self.v, self.omega])
         ## Calculate the Jacobian using the previous step.
-        A: ndarray = UnicycleMotionModel.linearize(state=self.x_est, 
-                                                   u=u, dt=dt)
+        A: ndarray = UnicycleMotionModel.linearize(state=self.x_est, u=u, dt=dt)
         ## Forward project th emean state
-        self.x_est: ndarray = UnicycleMotionModel.forward(state=self.x_est, u=u, 
-                                                          noise=zeros(3), dt=dt)
+        self.x_est: ndarray = UnicycleMotionModel.forward(
+            state=self.x_est, u=u, noise=zeros(3), dt=dt
+        )
         ## Update the covariance
         self.covariance: ndarray = A @ self.covariance @ A.T + self.V
-        
+
         # update step (Using LaserScan ICP)
         y_pose, is_valid, match_error = self.scan_match(msg)
 

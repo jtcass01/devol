@@ -1,6 +1,6 @@
 import numpy as np
 import zlib
-from numpy import (ndarray, array, linspace, isinf, isnan)
+from numpy import ndarray, array, linspace, isinf, isnan
 
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
@@ -106,7 +106,7 @@ class BaseLocalizationNode(Node):
             & ~isnan(ranges)
         )
         return ranges[valid], angles[valid]
-    
+
     def get_laser_offset(self):
         """Looks up the physical LiDAR mount offset."""
         return np.array([0.32825, 0.0, 0.0])

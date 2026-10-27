@@ -22,15 +22,15 @@ from devol_localization.laser_model import ROSLaserModel
 
 def low_variance_resample(particles: ndarray, weights: ndarray) -> ndarray:
     N = len(particles)
-    
+
     # Generate a single random start point between 0 and 1/N
     step = 1.0 / N
     pointers = uniform(0, step) + arange(N) * step
-    
+
     # Find where those evenly spaced pointers land in the cumulative weight array
     cumulative_sum = cumsum(weights)
     indexes = searchsorted(cumulative_sum, pointers)
-    
+
     return particles[indexes]
 
 
@@ -45,7 +45,7 @@ def particle_filter_2d(
     z_dists: list,
     z_thetas: list,
     laser_offset: ndarray,
-    V: ndarray
+    V: ndarray,
 ) -> Tuple[ndarray, ndarray]:
     ## Predict
     # Apply the motion model to the samples (Prediction Step)

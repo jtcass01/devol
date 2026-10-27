@@ -159,30 +159,31 @@ class DifferentialDrive(object):
 
         return array([psi_left, psi_right])
 
+
 class UnicycleMotionModel:
     @staticmethod
     def forward(state, u, noise, dt):
         v = u[0] + noise[0]
         omega = u[1] + noise[1]
-        
+
         # Support both 1D arrays (single state) and 2D arrays (particle cloud)
         is_1d = state.ndim == 1
         state_arr = atleast_2d(state).copy()
-        
+
         theta = state_arr[:, 2]
         state_arr[:, 0] += v * cos(theta) * dt
         state_arr[:, 1] += v * sin(theta) * dt
         state_arr[:, 2] += omega * dt + noise[2]
-        
+
         return state_arr[0] if is_1d else state_arr
 
     @staticmethod
     def linearize(state, u, dt):
         v = u[0]
         theta = state[2]
-        
+
         A = eye(3)
         A[0, 2] = -v * sin(theta) * dt
-        A[1, 2] =  v * cos(theta) * dt
-        
+        A[1, 2] = v * cos(theta) * dt
+
         return A

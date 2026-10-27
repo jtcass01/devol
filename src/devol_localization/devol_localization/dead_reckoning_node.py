@@ -16,12 +16,7 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         self.last_time = None
 
-        self.odom_sub = self.create_subscription(
-            Odometry,
-            self.odom_topic,
-            self.odom_callback,
-            10
-        )
+        self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.get_logger().info('Dead Reckoning Node Started!')
 
@@ -41,14 +36,12 @@ class DeadReckoningNode(BaseLocalizationNode):
         u: ndarray = array([v, omega])
 
         # Get the Jacobian matrix before moving the state
-        A: ndarray = UnicycleMotionModel.linearize(state=self.x_est,
-                                                   u=u,
-                                                   dt=dt)
+        A: ndarray = UnicycleMotionModel.linearize(state=self.x_est, u=u, dt=dt)
 
         # Predict: Apply model forward kinematics
-        self.x_est: ndarray = UnicycleMotionModel.forward(state=self.x_est,
-                                                          u=u, noise=zeros(3),
-                                                          dt=dt)
+        self.x_est: ndarray = UnicycleMotionModel.forward(
+            state=self.x_est, u=u, noise=zeros(3), dt=dt
+        )
         # Wrap heading to [-pi, pi]
         self.x_est[2] = (self.x_est[2] + np.pi) % (2 * np.pi) - np.pi
 

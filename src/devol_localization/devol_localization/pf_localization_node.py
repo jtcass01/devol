@@ -1,8 +1,7 @@
 from typing import Optional
 import numpy as np
 from scipy.ndimage import distance_transform_edt
-from numpy import (ndarray, array, diag, cov, 
-                   float32 as np_float32, ones_like, deg2rad)
+from numpy import ndarray, array, diag, cov, float32 as np_float32, ones_like, deg2rad
 from numpy.random import multivariate_normal
 
 import rclpy
@@ -19,6 +18,7 @@ from devol_localization.laser_model import LaserModel
 from devol_localization.particle_filter import particle_filter_2d, low_variance_resample
 from devol_localization.utils import euler_to_quaternion
 from devol_localization.motion_models import UnicycleMotionModel
+
 
 class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
@@ -45,7 +45,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         )
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
-        
+
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
 
         self.get_logger().info('Particle Filter Node Started!')
@@ -56,7 +56,9 @@ class ParticleFilterNode(BaseLocalizationNode):
             return
 
         # Convert 1D array to 2D numpy array
-        grid: ndarray = array(msg.data, dtype=np_float32).reshape((msg.info.height, msg.info.width))
+        grid: ndarray = array(msg.data, dtype=np_float32).reshape(
+            (msg.info.height, msg.info.width)
+        )
 
         # Create binary map where obstacle = 0, free space = 1
         binary_map: ndarray = ones_like(grid)
@@ -99,7 +101,7 @@ class ParticleFilterNode(BaseLocalizationNode):
             z_dists=z_dists,
             z_thetas=z_thetas,
             laser_offset=laser_offset,
-            V=self.V
+            V=self.V,
         )
 
         # Publish state and particles
