@@ -101,7 +101,7 @@ class ParticleFilterNode(BaseLocalizationNode):
             z_dists=z_dists,
             z_thetas=z_thetas,
             laser_offset=laser_offset,
-            V=self.V,
+            V=self.V
         )
 
         # Publish state and particles

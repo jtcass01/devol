@@ -15,9 +15,9 @@ from numpy import (
     cos,
     sin,
     copy as np_copy,
+    arange
 )
-from numpy.random import uniform, multivariate_normal, arange
-from devol_localization.laser_model import ROSLaserModel
+from numpy.random import uniform, multivariate_normal
 
 
 def low_variance_resample(particles: ndarray, weights: ndarray) -> ndarray:
@@ -38,14 +38,14 @@ def particle_filter_2d(
     particles: ndarray,
     map_dict: dict,
     motion_model: Any,
-    sensor_model: ROSLaserModel,
+    sensor_model: Any,
     resample: callable,
     u: ndarray,
     dt: float,
     z_dists: list,
     z_thetas: list,
     laser_offset: ndarray,
-    V: ndarray,
+    V: ndarray
 ) -> Tuple[ndarray, ndarray]:
     ## Predict
     # Apply the motion model to the samples (Prediction Step)
@@ -77,8 +77,7 @@ def particle_filter_2d(
                 z_thetas=z_thetas,
                 x=particle,
                 map_dict=map_dict,
-                z_max=20.0,
-                std=0.1,
+                std=0.1
             )
             for particle in laser_poses
         ],
