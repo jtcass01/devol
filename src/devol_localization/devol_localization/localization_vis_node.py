@@ -1,6 +1,6 @@
 import time
 from typing import List
-from numpy import array, ndarray, int8 as np_int8, full, cos, sin
+from numpy import array, ndarray, int8 as np_int8, full, cos, sin, uint8 as np_uint8
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
@@ -117,7 +117,7 @@ class LocalizationVisNode(Node):
     def map_callback(self, msg: OccupancyGrid):
         # Convert to visual grayscale
         grid: ndarray = array(msg.data, dtype=np_int8).reshape((msg.info.height, msg.info.width))
-        vis_map: ndarray = full(grid.shape, 200, dtype=np_int8)  # Unknown = Gray
+        vis_map: ndarray = full(grid.shape, 200, dtype=np_uint8)  # Unknown = Gray
         vis_map[grid == 0] = 255  # Free = White
         vis_map[grid > 50] = 0  # Obstacle = Black
         self.map_grid: ndarray = vis_map

@@ -17,8 +17,11 @@ from numpy import (
     exp as np_exp,
     max as np_max,
     zeros,
+    vstack,
+    where,
+    pi
 )
-from numpy.random import multivariate_normal, uniform, normal
+from numpy.random import multivariate_normal, uniform, normal, choice
 
 import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
@@ -93,8 +96,23 @@ class ParticleFilterNode(BaseLocalizationNode):
         distance_grid: ndarray = distance_transform_edt(binary_map)
         edt_map: ndarray = distance_grid * msg.info.resolution
 
+        # Pre-compute free space coordinates for the escape hatch
+        free_y, free_x = where(binary_map == 1)
+        res: float = msg.info.resolution
+        ox: float = msg.info.origin.position.x
+        oy: float = msg.info.origin.position.y
+
+        # Convert pixel indices to real-world coordinates 
+        free_world_x: ndarray = free_x * res + ox + (res / 2.0)
+        free_world_y: ndarray = free_y * res + oy + (res / 2.0)
+
         # Store in dict to pass to LaserModel easily
-        self.map_dict: dict = {'grid': edt_map, 'info': msg.info}
+        self.map_dict: dict = {
+            'grid': edt_map, 
+            'info': msg.info,
+            'free_x': free_world_x,
+            'free_y': free_world_y
+        }
         self.get_logger().info('Map received and Euclidean Distance Transform computed.')
 
     def scan_callback(self, msg: LaserScan):
@@ -205,13 +223,33 @@ class ParticleFilterNode(BaseLocalizationNode):
         )
 
         # Resample
-        new_particles: ndarray = ParticleFilterNode.low_variance_resample(self.particles, weights)
+        escape_fraction = 0.05  # Reserve 5% of particles
+        num_random = int(self.num_particles * escape_fraction)
+        num_normal = self.num_particles - num_random
+        normal_particles: ndarray = ParticleFilterNode.low_variance_resample(self.particles, weights, num_samples=num_normal)
 
-        return new_particles, x_est
+        # Draw fresh random particles uniformly from map freespace 
+        free_x = self.map_dict.get('free_x', array([]))
+        free_y = self.map_dict.get('free_y', array([]))
+
+        if len(free_x) > 0:
+            rand_indices = choice(len(free_x), size=num_random, replace=True)
+            random_particles = zeros((num_random, 3))
+            random_particles[:, 0] = free_x[rand_indices]
+            random_particles[:, 1] = free_y[rand_indices]
+            random_particles[:, 2] = uniform(-pi, pi, num_random)
+        else:
+            # Safe fallback if map processing missed freespace coordinates
+            random_particles = multivariate_normal(x_est, cov(self.particles, rowvar=False), num_random)
+
+        # Combine both groups to form the new generation
+        new_particles: ndarray = vstack((normal_particles, random_particles))
+
+        return new_particles, x_est, True
 
     @staticmethod
-    def low_variance_resample(particles: ndarray, weights: ndarray) -> ndarray:
-        N = len(particles)
+    def low_variance_resample(particles: ndarray, weights: ndarray, num_samples: Optional[int] = None) -> ndarray:
+        N = len(particles) if num_samples is None else num_samples
 
         # Generate a single random start point between 0 and 1/N
         step = 1.0 / N

@@ -15,6 +15,9 @@ from numpy import (
     int8 as np_int8,
     eye,
     arctan2,
+    trace,
+    sqrt,
+    clip
 )
 from numpy.linalg import svd, det, inv
 
@@ -108,6 +111,11 @@ class EKFLocalizationNode(BaseLocalizationNode):
         current_pose: ndarray = self.x_est.copy()
         prev_error: float = float('inf')
 
+        # Calculate adaptive correspondence gate based on positional covariance
+        pos_variance = trace(self.covariance[:2, :2])
+        #  3-sigma radius, clamped between 0.5m and 2.0m
+        search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
+
         for _ in range(max_iter):
             # Transform local scan points into the global map frame
             theta: float = current_pose[2]
@@ -117,8 +125,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
             # Find the closest Map points (Q) for every Global Scan point (P)
             distances, indices = self.map_data['kdtree'].query(global_pts)
 
-            # Reject outlier points that are too far from any wall
-            good_matches: ndarray = distances < 1.0
+            # Reject outlier points using the adaptive search radius
+            good_matches: ndarray = distances < search_radius
             if sum(good_matches) < 10:
                 break  # Lost tracking
 
@@ -161,7 +169,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             prev_error = mean_error
 
         # Format final pose
-        current_pose = wrap_angle(wrap_angle)
+        current_pose = wrap_angle(current_pose)
 
         # Consider the match "valid" if the final average distance to walls is less than 20cm
         is_valid: bool = prev_error < 0.2
@@ -177,7 +185,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
         y_pose, is_valid, match_error = self.scan_match(msg)
 
         if is_valid:
-            self.x_est, self.covariance = self._update(y_pose, match_error)
+            self.x_est, self.covariance, accepted = self._update(y_pose, match_error)
+
+            if not accepted:
+                self.get_logger().debug("ICP match rejected by Mahalanobis check.")
 
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
@@ -221,7 +232,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         return new_x_est, new_cov
 
-    def _update(self, y_pose: ndarray, match_error: float) -> Tuple[ndarray, ndarray]:
+    def _update(self, y_pose: ndarray, match_error: float) -> Tuple[ndarray, ndarray, bool]:
         new_x_est: ndarray = self.x_est
         new_cov: ndarray = self.covariance
 
@@ -234,12 +245,23 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Innovation covariance (S)
         S: ndarray = H @ new_cov @ H.T + W_dynamic
 
-        # Kalman Gain (K)
-        K: ndarray = new_cov @ H.T @ inv(S)
-
         # Innovation (y_tilde) is the difference between observation and prediction
         y_tilde: ndarray = y_pose - new_x_est
-        y_tilde: ndarray = wrap_angle(y_tilde)  # Wrap angle error
+        y_tilde: ndarray = wrap_angle(y_tilde)
+
+        # Statistical Acceptance Test
+        mahalanobis_sq = y_tilde.T @ inv(S) @ y_tilde
+
+        # Chi-square threshold for 3 degrees of freedom at 95% confidence
+        chi2_threshold = 7.815
+
+        if mahalanobis_sq > chi2_threshold:
+            # The observation is statistically absurd given our current belief.
+            # Reject the update and keep our prior estimate.
+            return new_x_est, new_cov, False
+
+        # Kalman Gain (K)
+        K: ndarray = new_cov @ H.T @ inv(S)
 
         # Update the state estimate and shrink the covariance
         new_x_est: ndarray = new_x_est + K @ y_tilde
@@ -248,7 +270,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Wrap heading to [-pi, pi] to prevent runaway angle values over time
         new_x_est = wrap_angle(new_x_est)
 
-        return new_x_est, new_cov
+        return new_x_est, new_cov, True
 
 
 def main(args=None):
