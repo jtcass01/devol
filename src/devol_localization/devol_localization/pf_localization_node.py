@@ -19,7 +19,7 @@ from numpy import (
     zeros,
     vstack,
     where,
-    pi
+    pi,
 )
 from numpy.random import multivariate_normal, uniform, normal, choice
 
@@ -102,16 +102,16 @@ class ParticleFilterNode(BaseLocalizationNode):
         ox: float = msg.info.origin.position.x
         oy: float = msg.info.origin.position.y
 
-        # Convert pixel indices to real-world coordinates 
+        # Convert pixel indices to real-world coordinates
         free_world_x: ndarray = free_x * res + ox + (res / 2.0)
         free_world_y: ndarray = free_y * res + oy + (res / 2.0)
 
         # Store in dict to pass to LaserModel easily
         self.map_dict: dict = {
-            'grid': edt_map, 
+            'grid': edt_map,
             'info': msg.info,
             'free_x': free_world_x,
-            'free_y': free_world_y
+            'free_y': free_world_y,
         }
         self.get_logger().info('Map received and Euclidean Distance Transform computed.')
 
@@ -226,9 +226,11 @@ class ParticleFilterNode(BaseLocalizationNode):
         escape_fraction = 0.05  # Reserve 5% of particles
         num_random = int(self.num_particles * escape_fraction)
         num_normal = self.num_particles - num_random
-        normal_particles: ndarray = ParticleFilterNode.low_variance_resample(self.particles, weights, num_samples=num_normal)
+        normal_particles: ndarray = ParticleFilterNode.low_variance_resample(
+            self.particles, weights, num_samples=num_normal
+        )
 
-        # Draw fresh random particles uniformly from map freespace 
+        # Draw fresh random particles uniformly from map freespace
         free_x = self.map_dict.get('free_x', array([]))
         free_y = self.map_dict.get('free_y', array([]))
 
@@ -240,7 +242,9 @@ class ParticleFilterNode(BaseLocalizationNode):
             random_particles[:, 2] = uniform(-pi, pi, num_random)
         else:
             # Safe fallback if map processing missed freespace coordinates
-            random_particles = multivariate_normal(x_est, cov(self.particles, rowvar=False), num_random)
+            random_particles = multivariate_normal(
+                x_est, cov(self.particles, rowvar=False), num_random
+            )
 
         # Combine both groups to form the new generation
         new_particles: ndarray = vstack((normal_particles, random_particles))
@@ -248,7 +252,9 @@ class ParticleFilterNode(BaseLocalizationNode):
         return new_particles, x_est, True
 
     @staticmethod
-    def low_variance_resample(particles: ndarray, weights: ndarray, num_samples: Optional[int] = None) -> ndarray:
+    def low_variance_resample(
+        particles: ndarray, weights: ndarray, num_samples: Optional[int] = None
+    ) -> ndarray:
         N = len(particles) if num_samples is None else num_samples
 
         # Generate a single random start point between 0 and 1/N

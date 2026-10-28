@@ -17,7 +17,7 @@ from numpy import (
     arctan2,
     trace,
     sqrt,
-    clip
+    clip,
 )
 from numpy.linalg import svd, det, inv
 
@@ -188,7 +188,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             self.x_est, self.covariance, accepted = self._update(y_pose, match_error)
 
             if not accepted:
-                self.get_logger().debug("ICP match rejected by Mahalanobis check.")
+                self.get_logger().debug('ICP match rejected by Mahalanobis check.')
 
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
