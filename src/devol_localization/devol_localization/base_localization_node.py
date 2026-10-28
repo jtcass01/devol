@@ -57,9 +57,6 @@ class BaseLocalizationNode(Node):
         # Shared Publishers
         self.pub_pose = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
 
-        # Start Shared Subscribers (Map and Scan are implemented by child classes)
-        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
-
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
         self.v: float = msg.twist.twist.linear.x

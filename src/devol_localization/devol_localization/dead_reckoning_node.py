@@ -13,6 +13,8 @@ class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose')
 
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+
         self.get_logger().info('Dead Reckoning Node Started!')
 
     def odom_callback(self, msg: Odometry):

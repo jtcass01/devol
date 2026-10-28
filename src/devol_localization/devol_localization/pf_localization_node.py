@@ -6,6 +6,7 @@ from numpy import (
     cov,
     float32 as np_float32,
     ones_like,
+    ones,
     searchsorted,
     cumsum,
     average,
@@ -51,7 +52,12 @@ class ParticleFilterNode(BaseLocalizationNode):
         self.particles: ndarray = multivariate_normal(
             self.x_est, self.covariance, self.num_particles
         )
-        self.laser_poses: ndarray
+        self.weights: ndarray = ones(self.num_particles) / self.num_particles
+        self.laser_poses: ndarray = None
+
+        # Adaptive injection moving averages
+        self.slow_avg_lik = 0.0
+        self.fast_avg_lik = 0.0
 
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
@@ -61,9 +67,13 @@ class ParticleFilterNode(BaseLocalizationNode):
         )
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
 
+        # Open a CSV file for logging tuning metrics
+        self.tuning_log_file = open('pf_tuning_metrics.csv', 'w')
+        self.tuning_log_file.write('time,n_eff,avg_raw_likelihood\n')
         self.get_logger().info('Particle Filter Node Started!')
 
     def odom_callback(self, msg: Odometry):
@@ -118,7 +128,7 @@ class ParticleFilterNode(BaseLocalizationNode):
     def scan_callback(self, msg: LaserScan):
         """The main loop of the PF: computes dt, downsamples scan, runs PF, and publishes results."""
         # Wait for map and ensure odometry has ran at least once.
-        if self.map_dict is None or not hasattr(self, 'laser_poses'):
+        if self.map_dict is None or self.laser_poses is None:
             return
 
         z_dists, z_thetas = self.preprocess_scan(msg=msg)
@@ -206,50 +216,90 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         # shift all weights so their highest value is 0.
         max_log_weights: ndarray = np_max(log_weights)
-        weights: ndarray = np_exp(log_weights - max_log_weights)
+        step_weights: ndarray = np_exp(log_weights - max_log_weights)
+
+        # Calculate raw likelihood average for the adaptive injection logic
+        avg_raw_likelihood = average(step_weights)
+
+        # Initialize running averages on the very first update
+        if self.slow_avg_lik == 0.0:
+            self.slow_avg_lik = avg_raw_likelihood
+            self.fast_avg_lik = avg_raw_likelihood
+
+        # Update exponential moving averages (standard AMCL alpha values)
+        self.slow_avg_lik += 0.001 * (avg_raw_likelihood - self.slow_avg_lik)
+        self.fast_avg_lik += 0.1 * (avg_raw_likelihood - self.fast_avg_lik)
+
+        # Multiply the new step weights into the running weight accumulator
+        self.weights *= step_weights
 
         # Prevent division by zero
-        weights += 1e-40
+        self.weights += 1e-40
         # normalize (\eta)
-        weights /= sum(weights)
+        self.weights /= sum(self.weights)
+
+        # Calculate Effective Sample Size (N_eff)
+        n_eff = 1.0 / sum(self.weights ** 2)
+
+        # Log to file
+        current_time = self.get_clock().now().nanoseconds / 1e9
+        self.tuning_log_file.write(f'{current_time:.3f},{n_eff:.1f},{avg_raw_likelihood:.6f}\n')
+        self.tuning_log_file.flush()
 
         # Estimate the state based on the weighted average of particles
-        x_est: ndarray = average(self.particles, axis=0, weights=weights)
+        x_est: ndarray = average(self.particles, axis=0, weights=self.weights)
 
         # Wrap angle
         x_est[2] = arctan2(
-            average(sin(self.particles[:, 2]), weights=weights),
-            average(cos(self.particles[:, 2]), weights=weights),
+            average(sin(self.particles[:, 2]), weights=self.weights),
+            average(cos(self.particles[:, 2]), weights=self.weights),
         )
 
-        # Resample
-        escape_fraction = 0.05  # Reserve 5% of particles
-        num_random = int(self.num_particles * escape_fraction)
-        num_normal = self.num_particles - num_random
-        normal_particles: ndarray = ParticleFilterNode.low_variance_resample(
-            self.particles, weights, num_samples=num_normal
-        )
+        # Conditional Resampling: Only resample if N_eff drops below 50%
+        if n_eff < (self.num_particles / 2.0):
+            # Calculate adaptive escape fraction
+            escape_fraction = 0.0
+            if self.slow_avg_lik > 0 and self.fast_avg_lik < self.slow_avg_lik:
+                # The fast average dropped below the slow average; spike injection rate.
+                escape_fraction = 1.0 - (self.fast_avg_lik / self.slow_avg_lik)
 
-        # Draw fresh random particles uniformly from map freespace
-        free_x = self.map_dict.get('free_x', array([]))
-        free_y = self.map_dict.get('free_y', array([]))
+            # Cap the maximum injeciton
+            escape_fraction = max(0.0, min(0.20, escape_fraction))
 
-        if len(free_x) > 0:
-            rand_indices = choice(len(free_x), size=num_random, replace=True)
-            random_particles = zeros((num_random, 3))
-            random_particles[:, 0] = free_x[rand_indices]
-            random_particles[:, 1] = free_y[rand_indices]
-            random_particles[:, 2] = uniform(-pi, pi, num_random)
-        else:
-            # Safe fallback if map processing missed freespace coordinates
-            random_particles = multivariate_normal(
-                x_est, cov(self.particles, rowvar=False), num_random
+            num_random = int(self.num_particles * escape_fraction)
+            num_normal = self.num_particles - num_random
+            normal_particles: ndarray = ParticleFilterNode.low_variance_resample(
+                self.particles, self.weights, num_samples=num_normal
             )
 
-        # Combine both groups to form the new generation
-        new_particles: ndarray = vstack((normal_particles, random_particles))
+            # Draw fresh random particles uniformly from map freespace
+            free_x = self.map_dict.get('free_x', array([]))
+            free_y = self.map_dict.get('free_y', array([]))
 
-        return new_particles, x_est, True
+            if num_random > 0:
+                if len(free_x) > 0:
+                    rand_indices = choice(len(free_x), size=num_random, replace=True)
+                    random_particles = zeros((num_random, 3))
+                    random_particles[:, 0] = free_x[rand_indices]
+                    random_particles[:, 1] = free_y[rand_indices]
+                    random_particles[:, 2] = uniform(-pi, pi, num_random)
+                else:
+                    # Safe fallback if map processing missed freespace coordinates
+                    random_particles = multivariate_normal(
+                        x_est, cov(self.particles, rowvar=False), num_random
+                    )
+
+                # Combine both groups to form the new generation
+                new_particles: ndarray = vstack((normal_particles, random_particles))
+            else:
+                new_particles = normal_particles
+
+            # Reset weights to uniform after a resample event
+            self.weights = ones(self.num_particles) /  self.num_particles
+        else:
+            new_particles = self.particles
+
+        return new_particles, x_est
 
     @staticmethod
     def low_variance_resample(
@@ -267,6 +317,11 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         return particles[indexes]
 
+    def destroy_node(self):
+        """Ensure the log file is closed cleanly on shutdown."""
+        if hasattr(self, 'tuning_log_file') and not self.tuning_log_file.closed:
+            self.tuning_log_file.close()
+        super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
