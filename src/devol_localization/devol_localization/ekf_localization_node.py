@@ -34,12 +34,21 @@ from devol_localization.motion_models import UnicycleMotionModel
 from devol_localization.utils import wrap_angle
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('ekf_localization_node', '/devol_drive/ekf_pose')
 
         self.map_data = None
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
+
+        # State variables.
+        self.x_est: ndarray = array([0.0, 0.0, 0.0, 1.0]) # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0)**2, 0.3**2])
+        self.q_yaw_scale: nd = 0.02
 
         # Time synchronization variables
         self.odom_buffer = []
@@ -66,7 +75,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         t_odom = stamp.sec + stamp.nanosec * 1e-9
         
         v = msg.twist.twist.linear.x
-        omega = msg.twist.twist.angular.z
+        omega = msg.twist.twist.angular.z / self.x_est[3]
         
         # Add to the buffer
         self.odom_buffer.append((t_odom, v, omega))
@@ -82,8 +91,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         obstacle_y, obstacle_x = where(grid > 50)
 
         # Convert indices to real-world metric coordinates
-        map_pts_x: ndarray = msg.info.origin.position.x + obstacle_x * (msg.info.resolution / 2)
-        map_pts_y: ndarray = msg.info.origin.position.y + obstacle_y * (msg.info.resolution / 2)
+        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
+        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
 
         # Stack into an Nx2 array of obstacle points
         map_points: ndarray = vstack((map_pts_x, map_pts_y)).T
@@ -100,7 +109,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         ranges, angles = self.preprocess_scan(msg=msg)
 
         if len(ranges) < 10:
-            return array([0.0, 0.0, 0.0]), False, 0.0  # Not enough valid points
+            return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
 
         # Nx2 array of local laser points
         laser_pts: ndarray = vstack((ranges * cos(angles), ranges * sin(angles))).T
@@ -114,7 +123,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         )
         local_pts: ndarray = (R_offset @ laser_pts.T).T + laser_offset[:2]
 
-        current_pose: ndarray = self.x_est.copy()
+        current_pose: ndarray = self.x_est[:3].copy()
         prev_error: float = float('inf')
 
         # Calculate adaptive correspondence gate based on positional covariance
@@ -164,7 +173,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             # Optimal Translation (t_delta)
             t_delta: ndarray = centroid_Q - R_delta @ centroid_P
 
-            # Apply the delta transformation to our current pose guess
+            # Apply the delta transformation to current pose guess
             current_pose[:2] = R_delta @ current_pose[:2] + t_delta
             current_pose[2] += arctan2(R_delta[1, 0], R_delta[0, 0])
 
@@ -210,7 +219,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         stamp = msg.header.stamp
         t_scan = stamp.sec + stamp.nanosec * 1e-9
 
-        # Initialize our time tracker on the very first scan
+        # Initialize time tracker on the very first scan
         if self.last_time is None:
             self.last_time = t_scan
             return
@@ -252,11 +261,14 @@ class EKFLocalizationNode(BaseLocalizationNode):
         new_cov: ndarray = self.covariance
 
         # Package the inputs for the motion model
-        u: ndarray = array([v, omega])
+        s: float = new_x_est[3]
+        u: ndarray = array([v, s*omega])
 
         # Calculate the Jacobian using the previous step.
-        A: ndarray = UnicycleMotionModel.linearize(state=new_x_est, 
-                                                   u=u, dt=dt)
+        A: ndarray = eye(4)
+        A[:3, :3]: ndarray = UnicycleMotionModel.linearize(state=new_x_est[:3], 
+                                                           u=u, dt=dt)
+        A[2, 3] = omega*dt
 
         # Proportional Control Noise Covariance (M)
         sigma_v: float = (
@@ -273,12 +285,16 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Mapped Process Noise (R)
         theta: float = new_x_est[2]
-        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0]])
+        G = array([[cos(theta), 0.0], 
+                   [sin(theta), 0.0], 
+                   [0.0, 1.0], 
+                   [0.0, 0.0]])
         R: ndarray = G @ M @ G.T * dt
+        R[3, 3] += self.q_yaw_scale**2 * dt
 
         # Predict: Apply model forward kinematics
-        new_x_est: ndarray = UnicycleMotionModel.forward(
-            state=new_x_est, u=u, noise=zeros(3), dt=dt
+        new_x_est[:3]: ndarray = UnicycleMotionModel.forward(
+            state=new_x_est[:3], u=u, noise=zeros(3), dt=dt
         )
 
         # Update the covariance
@@ -294,15 +310,14 @@ class EKFLocalizationNode(BaseLocalizationNode):
         error_scale: float = max(1.0, (match_error / 0.05) ** 2)
         W_dynamic: ndarray = self.W_pose * error_scale
 
-        # Observation matrix (H is identity because we observe the direct [x, y, theta] pose from ICP scan matching)
-        H: ndarray = eye(3)
+        # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
+        H: ndarray = eye(3, 4)
 
         # Innovation covariance (S)
         S: ndarray = H @ new_cov @ H.T + W_dynamic
 
         # Innovation (y_tilde) is the difference between observation and prediction
-        y_tilde: ndarray = y_pose - new_x_est
-        y_tilde: ndarray = wrap_angle(y_tilde)
+        y_tilde: ndarray = wrap_angle(y_pose - new_x_est[:3])
 
         # Statistical Acceptance Test
         mahalanobis_sq = y_tilde.T @ inv(S) @ y_tilde
@@ -311,8 +326,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         chi2_threshold = 7.815
 
         if mahalanobis_sq > chi2_threshold:
-            # The observation is statistically absurd given our current belief.
-            # Reject the update and keep our prior estimate.
+            # The observation is statistically absurd given current belief.
+            # Reject the update and keep prior estimate.
             return new_x_est, new_cov, False
 
         # Kalman Gain (K)
@@ -320,7 +335,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Update the state estimate and shrink the covariance
         new_x_est: ndarray = new_x_est + K @ y_tilde
-        new_cov: ndarray = (eye(3) - K @ H) @ new_cov
+        new_x_est[3] = clip(new_x_est[3], 0.5, 1.2)
+        new_cov: ndarray = (eye(4) - K @ H) @ new_cov
 
         # Wrap heading to [-pi, pi] to prevent runaway angle values over time
         new_x_est = wrap_angle(new_x_est)

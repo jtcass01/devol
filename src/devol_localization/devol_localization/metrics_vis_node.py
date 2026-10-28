@@ -17,6 +17,10 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
 from devol_localization.utils import odom_to_planar, pose_to_planar
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 class ErrorTracker:
     """Tracks and calculates instantaneous error and RMSE for a specific estimator."""
 

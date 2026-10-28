@@ -12,6 +12,10 @@ from sensor_msgs.msg import LaserScan
 from devol_localization.utils import euler_to_quaternion
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 class BaseLocalizationNode(Node):
     def __init__(self, node_name, pose_topic: str = '/devol_drive/pose'):
         super().__init__(node_name)

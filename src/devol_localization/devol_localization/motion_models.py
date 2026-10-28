@@ -4,6 +4,10 @@
 from numpy import array, cos, sin, pi, ndarray, eye, atleast_2d
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 class DifferentialDrive(object):
     """
     Implementation of Differential Drive kinematics.

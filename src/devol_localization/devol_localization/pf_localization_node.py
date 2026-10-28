@@ -40,6 +40,10 @@ from devol_localization.utils import euler_to_quaternion
 from devol_localization.motion_models import UnicycleMotionModel
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('particle_filter_node', '/devol_drive/pf_pose')

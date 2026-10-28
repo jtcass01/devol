@@ -5,6 +5,10 @@ from geometry_msgs.msg import Quaternion, Pose, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 def euler_to_quaternion(yaw):
     return Quaternion(x=0.0, y=0.0, z=sin(yaw / 2.0), w=cos(yaw / 2.0))
 

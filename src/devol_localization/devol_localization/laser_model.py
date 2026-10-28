@@ -1,6 +1,10 @@
 from numpy import cos, sin, ndarray, round as np_round, clip, abs, sum as np_sum
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 class LaserModel:
     @staticmethod
     def likelihood_field_range_finder(

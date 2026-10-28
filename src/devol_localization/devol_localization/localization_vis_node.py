@@ -18,6 +18,10 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
 from devol_localization.utils import odom_to_planar, pose_to_planar
 
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
 @dataclass
 class BodyBox:
     """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""

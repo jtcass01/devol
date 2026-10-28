@@ -7,6 +7,8 @@ from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel
 from devol_localization.utils import wrap_angle
 
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
