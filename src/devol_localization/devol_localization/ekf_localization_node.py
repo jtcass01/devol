@@ -73,7 +73,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Convert ROS timestamp to a float in seconds
         stamp = msg.header.stamp
         t_odom = stamp.sec + stamp.nanosec * 1e-9
-        
+
         v = msg.twist.twist.linear.x
         omega = msg.twist.twist.angular.z / self.x_est[3]
         
@@ -91,6 +91,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         obstacle_y, obstacle_x = where(grid > 50)
 
         # Convert indices to real-world metric coordinates
+        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
+        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
         map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
         map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
 
@@ -187,17 +189,22 @@ class EKFLocalizationNode(BaseLocalizationNode):
         current_pose = wrap_angle(current_pose)
 
         # Consider the match "valid" if the final average distance to walls is less than 20cm
-        is_valid: bool = self.inlier_fraction_check(current_pose=current_pose,
-                                                    local_pts=local_pts)
+        is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
 
         return current_pose, is_valid, prev_error
 
-    def inlier_fraction_check(self, current_pose: ndarray, local_pts: ndarray, 
-                              distance_threshold: float = 0.15, valid_threshold: float = 0.8) -> bool:
+    def inlier_fraction_check(
+        self,
+        current_pose: ndarray,
+        local_pts: ndarray,
+        distance_threshold: float = 0.15,
+        valid_threshold: float = 0.8,
+    ) -> bool:
         # Project scan points to the global map frame using the pose
         final_theta: float = current_pose[2]
-        R_final: ndarray = array([[cos(final_theta), -sin(final_theta)], 
-                                  [sin(final_theta), cos(final_theta)]])
+        R_final: ndarray = array(
+            [[cos(final_theta), -sin(final_theta)], [sin(final_theta), cos(final_theta)]]
+        )
         final_global_pts: ndarray = (R_final @ local_pts.T).T + current_pose[:2]
 
         # Query distances to the nearest map points.
@@ -227,12 +234,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Process all buffered odom messages stamped AT or BEFORE the scan time
         while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
             t_odom, v, omega = self.odom_buffer.pop(0)
-            
+
             dt = t_odom - self.last_time
             if dt > 0:
                 self.x_est, self.covariance = self._predict(v, omega, dt)
                 self.last_time = t_odom
-                
+
             # Keep track of the latest velocities for the partial step
             self.current_v = v
             self.current_omega = omega
@@ -240,7 +247,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Add one final partial step exactly up to the scan timestamp
         dt_partial = t_scan - self.last_time
         if dt_partial > 0:
-            self.x_est, self.covariance = self._predict(self.current_v, self.current_omega, dt_partial)
+            self.x_est, self.covariance = self._predict(
+                self.current_v, self.current_omega, dt_partial
+            )
             self.last_time = t_scan
 
         # update step (Using LaserScan ICP)
@@ -272,14 +281,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Proportional Control Noise Covariance (M)
         sigma_v: float = (
-            self.alpha_tv_causedby_tv * abs(v)
-            + self.alpha_tv_causedby_rv * abs(omega)
-            + 0.001
+            self.alpha_tv_causedby_tv * abs(v) + self.alpha_tv_causedby_rv * abs(omega) + 0.001
         )
         sigma_w: float = (
-            self.alpha_rv_causedby_tv * abs(v)
-            + self.alpha_rv_causedby_rv * abs(omega)
-            + 0.001
+            self.alpha_rv_causedby_tv * abs(v) + self.alpha_rv_causedby_rv * abs(omega) + 0.001
         )
         M: ndarray = diag([sigma_v**2, sigma_w**2])
 
