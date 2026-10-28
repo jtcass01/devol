@@ -40,10 +40,10 @@ class BaseLocalizationNode(Node):
         self.x_est: ndarray = array([0.0, 0.0, 0.0])
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
         # Proportional Control Noise Parameters
-        self.alpha_tv_causedby_tv: float = 0.05
+        self.alpha_tv_causedby_tv: float = 0.10
         self.alpha_tv_causedby_rv: float = 0.01
         self.alpha_rv_causedby_tv: float = 0.01
-        self.alpha_rv_causedby_rv: float = 0.05
+        self.alpha_rv_causedby_rv: float = 0.20
 
         self.latest_odom_pose = np.array([0.0, 0.0, 0.0])
         self.last_map_crc = None

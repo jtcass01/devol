@@ -16,8 +16,8 @@ class LaserModel:
         pts_y = x[1] + z_dists * sin(ray_thetas)
 
         # Conversion to map indices
-        cols: ndarray = np_round((pts_x - info.origin.position.x) / res).astype(int)
-        rows: ndarray = np_round((pts_y - info.origin.position.y) / res).astype(int)
+        cols: ndarray = np_round((pts_x - info.origin.position.x) / res - 0.5).astype(int)
+        rows: ndarray = np_round((pts_y - info.origin.position.y) / res - 0.5).astype(int)
         height, width = map_data.shape
 
         # Out of bounds handling

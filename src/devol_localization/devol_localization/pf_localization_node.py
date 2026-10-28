@@ -21,6 +21,7 @@ from numpy import (
     vstack,
     where,
     pi,
+    mean as np_mean
 )
 from numpy.random import multivariate_normal, uniform, normal, choice
 
@@ -53,7 +54,6 @@ class ParticleFilterNode(BaseLocalizationNode):
             self.x_est, self.covariance, self.num_particles
         )
         self.weights: ndarray = ones(self.num_particles) / self.num_particles
-        self.laser_poses: ndarray = None
 
         # Adaptive injection moving averages
         self.slow_avg_lik = 0.0
@@ -86,7 +86,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         if dt is None:
             return
 
-        self.particles, self.laser_poses = self._predict(dt=dt)
+        self.particles = self._predict(dt=dt)
 
     def map_callback(self, msg: OccupancyGrid):
         """Converts ROS OccupancyGrid into a distance transform map for the Likelihood field"""
@@ -128,7 +128,7 @@ class ParticleFilterNode(BaseLocalizationNode):
     def scan_callback(self, msg: LaserScan):
         """The main loop of the PF: computes dt, downsamples scan, runs PF, and publishes results."""
         # Wait for map and ensure odometry has ran at least once.
-        if self.map_dict is None or self.laser_poses is None:
+        if self.map_dict is None:
             return
 
         z_dists, z_thetas = self.preprocess_scan(msg=msg)
@@ -160,7 +160,7 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         self.pub_particles.publish(cloud_msg)
 
-    def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
+    def _predict(self, dt: float) -> ndarray:
         ## Apply the motion model to the samples (Prediction Step)
         # Create noise proportional to the velocity commands for each particle
         sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(
@@ -186,8 +186,12 @@ class ParticleFilterNode(BaseLocalizationNode):
         new_particles[:, 0] += normal(0.0, 0.005, self.num_particles)
         new_particles[:, 1] += normal(0.0, 0.005, self.num_particles)
 
+        return new_particles
+
+    def _update(self, z_dists: list, z_thetas: list):
+        ## Update
         # Calculate where the laser actually is for each newly predicted particle
-        laser_poses: ndarray = np_copy(new_particles)
+        laser_poses: ndarray = np_copy(self.particles)
         laser_offset: ndarray = self.get_laser_offset()
         # Shift X and Y based on the laser's physical mount and the robot's current yaw
         laser_poses[:, 0] += laser_offset[0] * cos(laser_poses[:, 2]) - laser_offset[1] * sin(
@@ -199,17 +203,13 @@ class ParticleFilterNode(BaseLocalizationNode):
         # Shift Yaw
         laser_poses[:, 2] += laser_offset[2]
 
-        return new_particles, laser_poses
-
-    def _update(self, z_dists: list, z_thetas: list):
-        ## Update
         # Computes log probabilities
         log_weights = array(
             [
                 LaserModel.likelihood_field_range_finder(
                     z_dists=z_dists, z_thetas=z_thetas, x=particle, map_dict=self.map_dict, std=0.1
                 )
-                for particle in self.laser_poses
+                for particle in laser_poses
             ],
             dtype=float,
         )
@@ -219,7 +219,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         step_weights: ndarray = np_exp(log_weights - max_log_weights)
 
         # Calculate raw likelihood average for the adaptive injection logic
-        avg_raw_likelihood = average(step_weights)
+        avg_raw_likelihood = np_mean(np_exp(log_weights / len(laser_poses)))
 
         # Initialize running averages on the very first update
         if self.slow_avg_lik == 0.0:
@@ -263,8 +263,8 @@ class ParticleFilterNode(BaseLocalizationNode):
                 # The fast average dropped below the slow average; spike injection rate.
                 escape_fraction = 1.0 - (self.fast_avg_lik / self.slow_avg_lik)
 
-            # Cap the maximum injeciton
-            escape_fraction = max(0.0, min(0.20, escape_fraction))
+            # Cap the maximum injection
+            escape_fraction = max(0.0, min(0.05, escape_fraction))
 
             num_random = int(self.num_particles * escape_fraction)
             num_normal = self.num_particles - num_random

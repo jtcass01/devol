@@ -1,7 +1,7 @@
 from typing import Tuple, Optional
 import rclpy
 from nav_msgs.msg import Odometry
-from numpy import diag, deg2rad, array, ndarray, sin, cos
+from numpy import diag, deg2rad, array, ndarray, sin, cos, zeros
 from numpy.random import normal
 
 from devol_localization.base_localization_node import BaseLocalizationNode
@@ -61,7 +61,7 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         # Predict: Apply model forward kinematics
         new_x_est: ndarray = UnicycleMotionModel.forward(
-            state=new_x_est, u=self.u, noise=normal(0.0, [0.005, 0.005, 0.001]), dt=dt
+            state=new_x_est, u=self.u, noise=zeros(3), dt=dt
         )
 
         # Update the covariance
