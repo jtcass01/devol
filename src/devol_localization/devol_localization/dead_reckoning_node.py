@@ -57,7 +57,8 @@ class DeadReckoningNode(BaseLocalizationNode):
         V_u: ndarray = array([[cos(theta) * dt, 0.0], [sin(theta) * dt, 0.0], [0.0, dt]])
 
         # Mapped Process Noise (R)
-        R: ndarray = V_u @ M @ V_u.T
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0]])
+        R: ndarray = G @ M @ G.T * dt
 
         # Predict: Apply model forward kinematics
         new_x_est: ndarray = UnicycleMotionModel.forward(

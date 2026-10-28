@@ -1,1 +1,0 @@
-Time(s),GT_X,GT_Y,GT_Yaw,EKF_Pos_Err,EKF_Pos_RMSE,EKF_Pos_Integral,EKF_Yaw_Err,EKF_Yaw_RMSE,EKF_Yaw_Integral,PF_Pos_Err,PF_Pos_RMSE,PF_Pos_Integral,PF_Yaw_Err,PF_Yaw_RMSE,PF_Yaw_Integral,PF_Num_Particles,DR_Pos_Err,DR_Pos_RMSE,DR_Pos_Integral,DR_Yaw_Err,DR_Yaw_RMSE,DR_Yaw_Integral

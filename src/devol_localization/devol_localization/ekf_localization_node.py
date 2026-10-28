@@ -1,4 +1,3 @@
-import csv
 from typing import Optional, Tuple
 from scipy.spatial import KDTree
 from numpy import (
@@ -42,14 +41,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.map_data = None
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
 
-        # Initialize CSV logging file
-        self.stats_file_path = 'ekf_gate_stats.csv'
-        with open(self.stats_file_path, mode='w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                ['timestamp', 'search_radius', 'pos_variance', 'icp_valid', 'mahalanobis_accepted']
-            )
-
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
             depth=1,
@@ -86,8 +77,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         obstacle_y, obstacle_x = where(grid > 50)
 
         # Convert indices to real-world metric coordinates
-        map_pts_x: ndarray = msg.info.origin.position.x + obstacle_x * msg.info.resolution
-        map_pts_y: ndarray = msg.info.origin.position.y + obstacle_y * msg.info.resolution
+        map_pts_x: ndarray = msg.info.origin.position.x + obstacle_x * (msg.info.resolution/2)
+        map_pts_y: ndarray = msg.info.origin.position.y + obstacle_y * (msg.info.resolution/2)
 
         # Stack into an Nx2 array of obstacle points
         map_points: ndarray = vstack((map_pts_x, map_pts_y)).T
@@ -98,9 +89,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             f'Map received. Built KDTree with {len(map_points)} obstacle points.'
         )
 
-    def scan_match(
-        self, msg: LaserScan, search_radius: float, max_iter: int = 50, tolerance: float = 1e-4
-    ):
+    def scan_match(self, msg: LaserScan, max_iter: int = 50, tolerance: float = 1e-4):
         """2D Iterative Closest Point using SVD."""
         # Filter out invalid rays
         ranges, angles = self.preprocess_scan(msg=msg)
@@ -122,6 +111,11 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         current_pose: ndarray = self.x_est.copy()
         prev_error: float = float('inf')
+
+        # Calculate adaptive correspondence gate based on positional covariance
+        pos_variance = trace(self.covariance[:2, :2])
+        #  3-sigma radius, clamped between 0.5m and 2.0m
+        search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
 
         for _ in range(max_iter):
             # Transform local scan points into the global map frame
@@ -188,30 +182,15 @@ class EKFLocalizationNode(BaseLocalizationNode):
         if self.map_data is None:
             return  # Wait for map to load
 
-        # Calculate adaptive correspondence gate based on positional covariance
-        pos_variance = trace(self.covariance[:2, :2])
-        #  3-sigma radius, clamped between 0.5m and 2.0m
-        search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
-
         # update step (Using LaserScan ICP)
-        y_pose, is_valid, match_error = self.scan_match(msg, search_radius)
+        y_pose, is_valid, match_error = self.scan_match(msg)
 
-        accepted = False
         if is_valid:
             self.x_est, self.covariance, accepted = self._update(y_pose, match_error)
 
-        timestamp = msg.header.stamp.sec + (msg.header.stamp.nanosec * 1e-9)
-        with open(self.stats_file_path, mode='a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    f'{timestamp:.6f}',
-                    f'{search_radius:.4f}',
-                    f'{pos_variance:.6f}',
-                    int(is_valid),
-                    int(accepted),
-                ]
-            )
+            if not accepted:
+                self.get_logger().debug('ICP match rejected by Mahalanobis check.')
+
 
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
@@ -242,11 +221,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         V_u: ndarray = array([[cos(theta) * dt, 0.0], [sin(theta) * dt, 0.0], [0.0, dt]])
 
         # Mapped Process Noise (R)
-        R: ndarray = V_u @ M @ V_u.T
-
-        # Add ambient drift that scales linearly with time (dt) to prevent covariance stagnation
-        # at high odometry rates where dt^2 becomes vanishingly small.
-        Q_ambient: ndarray = diag([0.05**2, 0.05**2, deg2rad(2.0) ** 2]) * dt
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0]])
+        R: ndarray = G @ M @ G.T * dt
 
         # Predict: Apply model forward kinematics
         new_x_est: ndarray = UnicycleMotionModel.forward(
@@ -254,7 +230,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         )
 
         # Update the covariance
-        new_cov: ndarray = A @ new_cov @ A.T + R + Q_ambient
+        new_cov: ndarray = A @ new_cov @ A.T + R
         new_x_est: ndarray = wrap_angle(new_x_est)
 
         return new_x_est, new_cov
