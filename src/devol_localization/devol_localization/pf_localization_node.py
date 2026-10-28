@@ -174,7 +174,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         sigma_w = max(0.02, sigma_w)
 
         # Draw noise applied to the distance and heading moved using sqrt(dt)
-        sqrt_dt = dt ** 0.5
+        sqrt_dt = dt**0.5
 
         # Calculate nominal distances and headings moved in this timestep
         dist_moved = self.v * dt
