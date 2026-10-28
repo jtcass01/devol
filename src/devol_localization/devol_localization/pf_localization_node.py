@@ -239,7 +239,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         self.weights /= sum(self.weights)
 
         # Calculate Effective Sample Size (N_eff)
-        n_eff = 1.0 / sum(self.weights ** 2)
+        n_eff = 1.0 / sum(self.weights**2)
 
         # Log to file
         current_time = self.get_clock().now().nanoseconds / 1e9
@@ -295,7 +295,7 @@ class ParticleFilterNode(BaseLocalizationNode):
                 new_particles = normal_particles
 
             # Reset weights to uniform after a resample event
-            self.weights = ones(self.num_particles) /  self.num_particles
+            self.weights = ones(self.num_particles) / self.num_particles
         else:
             new_particles = self.particles
 
@@ -322,6 +322,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         if hasattr(self, 'tuning_log_file') and not self.tuning_log_file.closed:
             self.tuning_log_file.close()
         super().destroy_node()
+
 
 def main(args=None):
     rclpy.init(args=args)

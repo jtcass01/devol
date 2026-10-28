@@ -46,8 +46,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.stats_file_path = 'ekf_gate_stats.csv'
         with open(self.stats_file_path, mode='w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['timestamp', 'search_radius', 'pos_variance', 'icp_valid', 'mahalanobis_accepted'])
-        
+            writer.writerow(
+                ['timestamp', 'search_radius', 'pos_variance', 'icp_valid', 'mahalanobis_accepted']
+            )
+
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
             depth=1,
@@ -96,7 +98,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
             f'Map received. Built KDTree with {len(map_points)} obstacle points.'
         )
 
-    def scan_match(self, msg: LaserScan, search_radius: float, max_iter: int = 50, tolerance: float = 1e-4):
+    def scan_match(
+        self, msg: LaserScan, search_radius: float, max_iter: int = 50, tolerance: float = 1e-4
+    ):
         """2D Iterative Closest Point using SVD."""
         # Filter out invalid rays
         ranges, angles = self.preprocess_scan(msg=msg)
@@ -199,13 +203,15 @@ class EKFLocalizationNode(BaseLocalizationNode):
         timestamp = msg.header.stamp.sec + (msg.header.stamp.nanosec * 1e-9)
         with open(self.stats_file_path, mode='a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([
-                f"{timestamp:.6f}",
-                f"{search_radius:.4f}",
-                f"{pos_variance:.6f}",
-                int(is_valid),
-                int(accepted)
-            ])
+            writer.writerow(
+                [
+                    f'{timestamp:.6f}',
+                    f'{search_radius:.4f}',
+                    f'{pos_variance:.6f}',
+                    int(is_valid),
+                    int(accepted),
+                ]
+            )
 
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
@@ -240,7 +246,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Add ambient drift that scales linearly with time (dt) to prevent covariance stagnation
         # at high odometry rates where dt^2 becomes vanishingly small.
-        Q_ambient: ndarray = diag([0.05**2, 0.05**2, deg2rad(2.0)**2]) * dt
+        Q_ambient: ndarray = diag([0.05**2, 0.05**2, deg2rad(2.0) ** 2]) * dt
 
         # Predict: Apply model forward kinematics
         new_x_est: ndarray = UnicycleMotionModel.forward(
