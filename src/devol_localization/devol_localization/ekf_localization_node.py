@@ -41,6 +41,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.map_data = None
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
 
+        # Time synchronization variables
+        self.odom_buffer = []
+        self.last_time = None
+        self.current_v = 0.0
+        self.current_omega = 0.0
+
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
             depth=1,
@@ -55,16 +61,15 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
-        self.v: float = msg.twist.twist.linear.x
-        self.omega: float = msg.twist.twist.angular.z
-        self.u: ndarray = array([self.v, self.omega])
-
-        dt: Optional[float] = self.get_dt_from_header(msg.header)
-        if dt is None:
-            return
-
-        # predict step (Using Odometry Twist)
-        self.x_est, self.covariance = self._predict(dt=dt)
+        # Convert ROS timestamp to a float in seconds
+        stamp = msg.header.stamp
+        t_odom = stamp.sec + stamp.nanosec * 1e-9
+        
+        v = msg.twist.twist.linear.x
+        omega = msg.twist.twist.angular.z
+        
+        # Add to the buffer
+        self.odom_buffer.append((t_odom, v, omega))
 
     def map_callback(self, msg: OccupancyGrid):
         """Extracts obstacle coordinates and builds KDTree."""
@@ -173,14 +178,61 @@ class EKFLocalizationNode(BaseLocalizationNode):
         current_pose = wrap_angle(current_pose)
 
         # Consider the match "valid" if the final average distance to walls is less than 20cm
-        is_valid: bool = prev_error < 0.2
+        is_valid: bool = self.inlier_fraction_check(current_pose=current_pose,
+                                                    local_pts=local_pts)
 
         return current_pose, is_valid, prev_error
+
+    def inlier_fraction_check(self, current_pose: ndarray, local_pts: ndarray, 
+                              distance_threshold: float = 0.15, valid_threshold: float = 0.8) -> bool:
+        # Project scan points to the global map frame using the pose
+        final_theta: float = current_pose[2]
+        R_final: ndarray = array([[cos(final_theta), -sin(final_theta)], 
+                                  [sin(final_theta), cos(final_theta)]])
+        final_global_pts: ndarray = (R_final @ local_pts.T).T + current_pose[:2]
+
+        # Query distances to the nearest map points.
+        final_distances, _ = self.map_data['kdtree'].query(final_global_pts)
+
+        # Calculate the fraction of points within distance_threshold
+        inliers = sum(final_distances <= distance_threshold)
+        inlier_fraction = float(inliers) / len(final_global_pts)
+
+        # Consider the match "valid" if within valid_threshold
+        return inlier_fraction >= valid_threshold
 
     def scan_callback(self, msg: LaserScan):
         """The main loop of the EKF."""
         if self.map_data is None:
             return  # Wait for map to load
+
+        # Get exact timestamp of the laser scan
+        stamp = msg.header.stamp
+        t_scan = stamp.sec + stamp.nanosec * 1e-9
+
+        # Initialize our time tracker on the very first scan
+        if self.last_time is None:
+            self.last_time = t_scan
+            return
+
+        # Process all buffered odom messages stamped AT or BEFORE the scan time
+        while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
+            t_odom, v, omega = self.odom_buffer.pop(0)
+            
+            dt = t_odom - self.last_time
+            if dt > 0:
+                self.x_est, self.covariance = self._predict(v, omega, dt)
+                self.last_time = t_odom
+                
+            # Keep track of the latest velocities for the partial step
+            self.current_v = v
+            self.current_omega = omega
+
+        # Add one final partial step exactly up to the scan timestamp
+        dt_partial = t_scan - self.last_time
+        if dt_partial > 0:
+            self.x_est, self.covariance = self._predict(self.current_v, self.current_omega, dt_partial)
+            self.last_time = t_scan
 
         # update step (Using LaserScan ICP)
         y_pose, is_valid, match_error = self.scan_match(msg)
@@ -194,38 +246,39 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
 
-    def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
+    def _predict(self, v: float, omega: float, dt: float) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
         new_x_est: ndarray = self.x_est
         new_cov: ndarray = self.covariance
 
+        # Package the inputs for the motion model
+        u: ndarray = array([v, omega])
+
         # Calculate the Jacobian using the previous step.
-        A: ndarray = UnicycleMotionModel.linearize(state=new_x_est, u=self.u, dt=dt)
+        A: ndarray = UnicycleMotionModel.linearize(state=new_x_est, 
+                                                   u=u, dt=dt)
 
         # Proportional Control Noise Covariance (M)
         sigma_v: float = (
-            self.alpha_tv_causedby_tv * abs(self.v)
-            + self.alpha_tv_causedby_rv * abs(self.omega)
+            self.alpha_tv_causedby_tv * abs(v)
+            + self.alpha_tv_causedby_rv * abs(omega)
             + 0.001
         )
         sigma_w: float = (
-            self.alpha_rv_causedby_tv * abs(self.v)
-            + self.alpha_rv_causedby_rv * abs(self.omega)
+            self.alpha_rv_causedby_tv * abs(v)
+            + self.alpha_rv_causedby_rv * abs(omega)
             + 0.001
         )
         M: ndarray = diag([sigma_v**2, sigma_w**2])
 
-        # Control Jacobian (V_u): Maps the [v, omega] noise into [x, y, theta] space
-        theta: float = new_x_est[2]
-        V_u: ndarray = array([[cos(theta) * dt, 0.0], [sin(theta) * dt, 0.0], [0.0, dt]])
-
         # Mapped Process Noise (R)
+        theta: float = new_x_est[2]
         G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0]])
         R: ndarray = G @ M @ G.T * dt
 
         # Predict: Apply model forward kinematics
         new_x_est: ndarray = UnicycleMotionModel.forward(
-            state=new_x_est, u=self.u, noise=zeros(3), dt=dt
+            state=new_x_est, u=u, noise=zeros(3), dt=dt
         )
 
         # Update the covariance

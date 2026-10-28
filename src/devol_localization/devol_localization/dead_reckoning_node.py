@@ -1,8 +1,7 @@
 from typing import Tuple, Optional
 import rclpy
 from nav_msgs.msg import Odometry
-from numpy import diag, deg2rad, array, ndarray, sin, cos, zeros
-from numpy.random import normal
+from numpy import diag, array, ndarray, sin, cos, zeros
 
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel

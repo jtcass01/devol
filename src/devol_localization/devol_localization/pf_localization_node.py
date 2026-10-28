@@ -170,15 +170,34 @@ class ParticleFilterNode(BaseLocalizationNode):
             self.omega
         )
 
+        # Add a small floor (0.02) to heading noise to maintain diversity when stopped
+        sigma_w = max(0.02, sigma_w)
+
+        # Draw noise applied to the distance and heading moved using sqrt(dt)
+        sqrt_dt = dt ** 0.5
+
+        # Calculate nominal distances and headings moved in this timestep
+        dist_moved = self.v * dt
+        heading_moved = self.omega * dt
+
+        # Vectorized generation of noisy movements (std_dev = sigma * sqrt(dt))
+        noisy_dists = normal(dist_moved, sigma_v * sqrt_dt, self.num_particles)
+        noisy_headings = normal(heading_moved, sigma_w * sqrt_dt, self.num_particles)
+
+        # Convert back to effective velocities since UnicycleMotionModel expects velocity inputs
+        noisy_vs = noisy_dists / dt
+        noisy_ws = noisy_headings / dt
+
+        # Apply the forward model using the noisy velocities for each particle
         new_particles: ndarray = array(
             [
                 UnicycleMotionModel.forward(
-                    particle,
-                    array([normal(self.v, sigma_v), normal(self.omega, sigma_w)]),
+                    self.particles[i],
+                    array([noisy_vs[i], noisy_ws[i]]),
                     zeros(3),
                     dt,
                 )
-                for particle in self.particles
+                for i in range(self.num_particles)
             ]
         )
 
@@ -219,7 +238,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         step_weights: ndarray = np_exp(log_weights - max_log_weights)
 
         # Calculate raw likelihood average for the adaptive injection logic
-        avg_raw_likelihood = np_mean(np_exp(log_weights / len(laser_poses)))
+        avg_raw_likelihood = np_mean(np_exp(log_weights / len(z_dists)))
 
         # Initialize running averages on the very first update
         if self.slow_avg_lik == 0.0:
