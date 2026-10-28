@@ -21,7 +21,7 @@ from numpy import (
     vstack,
     where,
     pi,
-    mean as np_mean
+    mean as np_mean,
 )
 from numpy.random import multivariate_normal, uniform, normal, choice
 
