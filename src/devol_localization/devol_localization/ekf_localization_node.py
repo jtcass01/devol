@@ -77,8 +77,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         obstacle_y, obstacle_x = where(grid > 50)
 
         # Convert indices to real-world metric coordinates
-        map_pts_x: ndarray = msg.info.origin.position.x + obstacle_x * (msg.info.resolution/2)
-        map_pts_y: ndarray = msg.info.origin.position.y + obstacle_y * (msg.info.resolution/2)
+        map_pts_x: ndarray = msg.info.origin.position.x + obstacle_x * (msg.info.resolution / 2)
+        map_pts_y: ndarray = msg.info.origin.position.y + obstacle_y * (msg.info.resolution / 2)
 
         # Stack into an Nx2 array of obstacle points
         map_points: ndarray = vstack((map_pts_x, map_pts_y)).T
@@ -190,7 +190,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
             if not accepted:
                 self.get_logger().debug('ICP match rejected by Mahalanobis check.')
-
 
         # Publish state
         self.publish_pose_and_tf(msg.header.stamp, self.covariance)
