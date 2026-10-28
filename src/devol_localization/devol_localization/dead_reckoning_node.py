@@ -10,6 +10,7 @@ from devol_localization.utils import wrap_angle
 __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'
 
+
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
         super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose')

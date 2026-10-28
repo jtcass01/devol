@@ -46,8 +46,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
 
         # State variables.
-        self.x_est: ndarray = array([0.0, 0.0, 0.0, 1.0]) # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
-        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0)**2, 0.3**2])
+        self.x_est: ndarray = array(
+            [0.0, 0.0, 0.0, 1.0]
+        )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
         self.q_yaw_scale: nd = 0.02
 
         # Time synchronization variables
@@ -76,7 +78,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         v = msg.twist.twist.linear.x
         omega = msg.twist.twist.angular.z / self.x_est[3]
-        
+
         # Add to the buffer
         self.odom_buffer.append((t_odom, v, omega))
 
@@ -271,13 +273,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Package the inputs for the motion model
         s: float = new_x_est[3]
-        u: ndarray = array([v, s*omega])
+        u: ndarray = array([v, s * omega])
 
         # Calculate the Jacobian using the previous step.
         A: ndarray = eye(4)
-        A[:3, :3]: ndarray = UnicycleMotionModel.linearize(state=new_x_est[:3], 
-                                                           u=u, dt=dt)
-        A[2, 3] = omega*dt
+        A[:3, :3]: ndarray = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
+        A[2, 3] = omega * dt
 
         # Proportional Control Noise Covariance (M)
         sigma_v: float = (
@@ -290,10 +291,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Mapped Process Noise (R)
         theta: float = new_x_est[2]
-        G = array([[cos(theta), 0.0], 
-                   [sin(theta), 0.0], 
-                   [0.0, 1.0], 
-                   [0.0, 0.0]])
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
         R: ndarray = G @ M @ G.T * dt
         R[3, 3] += self.q_yaw_scale**2 * dt
 
