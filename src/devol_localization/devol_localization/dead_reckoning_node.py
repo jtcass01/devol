@@ -56,10 +56,14 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         # Proportional Control Noise Covariance (M)
         sigma_v: float = (
-            self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(self.omega) + 0.001
+            self.alpha_tv_causedby_tv * abs(self.v)
+            + self.alpha_tv_causedby_rv * abs(self.omega)
+            + 0.001
         )
         sigma_w: float = (
-            self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(self.omega) + 0.001
+            self.alpha_rv_causedby_tv * abs(self.v)
+            + self.alpha_rv_causedby_rv * abs(self.omega)
+            + 0.001
         )
         M: ndarray = diag([sigma_v**2, sigma_w**2])
 
