@@ -46,6 +46,13 @@ class BaseLocalizationNode(Node):
         self.v: float = 0.0
         self.omega: float = 0.0
         self.x_est: ndarray = array([0.0, 0.0, 0.0])
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
+
+        # Proportional Control Noise Parameters
+        self.alpha_tv_causedby_tv: float = 0.10
+        self.alpha_tv_causedby_rv: float = 0.01
+        self.alpha_rv_causedby_tv: float = 0.01
+        self.alpha_rv_causedby_rv: float = 0.20
 
         self.latest_odom_pose = array([0.0, 0.0, 0.0])
         self.last_map_crc = None
@@ -58,12 +65,13 @@ class BaseLocalizationNode(Node):
 
         # Shared Publishers
         self.pub_pose = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
-
-        # Start Shared Subscribers (Map and Scan are implemented by child classes)
-        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+        self.runtime_pub = self.create_publisher(PointStamped, self.runtime_topic, 10)
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
         self.v: float = msg.twist.twist.linear.x
         self.omega: float = msg.twist.twist.angular.z
         self.u: ndarray = array([self.v, self.omega])
