@@ -15,7 +15,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='jakeadelic',
+    maintainer='Jacob Taylor Cassady',
     maintainer_email='jacobtaylorcassady@outlook.com',
     description='Map-based localization for the devol mobile manipulator (EKF and particle filter).',
     license='TODO: License declaration',
@@ -31,7 +31,8 @@ setup(
             'dr_node = devol_localization.dead_reckoning_node:main',
             'ground_truth_node = devol_localization.ground_truth_node:main',
             'viz_node = devol_localization.localization_vis_node:main',
-            'metrics_node = devol_localization.metrics_vis_node:main',
+            'metrics_node = devol_localization.metrics_node:main',
+            'kidnapper_node = devol_localization.kidnapper_node:main',
         ],
     },
 )

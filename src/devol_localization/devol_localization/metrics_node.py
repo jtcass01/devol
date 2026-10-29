@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import time
 import math
 import csv
@@ -16,6 +18,10 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
 
 # Assuming these are available as before
 from devol_localization.utils import odom_to_planar, pose_to_planar
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 class ErrorTracker:

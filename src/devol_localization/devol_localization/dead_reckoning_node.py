@@ -1,62 +1,105 @@
+#!/usr/bin/env python3
+
+from typing import Tuple, Optional
+from time import perf_counter
+from numpy import diag, array, ndarray, sin, cos, zeros, deg2rad, eye
+
 import rclpy
-import numpy as np
 from nav_msgs.msg import Odometry
-from numpy import diag, deg2rad, array, ndarray, zeros
 
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel
+from devol_localization.utils import wrap_angle
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose')
+        super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose',
+                         runtime_topic='/devol_drive/dr_pose/runtime')
 
-        self.covariance = np.diag([0.1**2, 0.1**2, np.deg2rad(5.0) ** 2])
-        self.V = np.diag([0.05**2, 0.05**2, np.deg2rad(2.0) ** 2])  # Process noise
+        # State variables.
+        self.x_est: ndarray = array(
+            [0.0, 0.0, 0.0, 1.0]
+        )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
+        self.q_yaw_scale: float = 0.02
 
-        self.last_time = None
-
-        self.odom_sub = self.create_subscription(
-            Odometry,
-            self.odom_topic,
-            self.odom_callback,
-            10
-        )
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.get_logger().info('Dead Reckoning Node Started!')
 
     def odom_callback(self, msg: Odometry):
         """Overrides base class implementation"""
-        current_time: float = self.get_clock().now().nanoseconds / 1e9
-        if self.last_time is None:
-            self.last_time = current_time
+        start_time: float = perf_counter()
+
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z / self.x_est[3]
+
+        dt: Optional[float] = self.get_dt_from_header(msg.header)
+        if dt is None:
             return
 
-        dt: float = current_time - self.last_time
-        self.last_time: float = current_time
+        self.x_est, self.covariance = self._predict(dt=dt)
+        self.localization_runtime += perf_counter() - start_time
 
-        # Extract velocities (twist) from the Odometry message
-        v: float = msg.twist.twist.linear.x
-        omega: float = msg.twist.twist.angular.z
-        u: ndarray = array([v, omega])
+        # Publish Pose, TF, and Runtime using the base class
+        self.publish_pose_and_tf_runtime(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime
+        )
+        
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
+    
+    def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
+        """Prediction step. Apply Kinematic model"""
+        new_x_est: ndarray = self.x_est
+        new_cov: ndarray = self.covariance
 
-        # Get the Jacobian matrix before moving the state
-        A: ndarray = UnicycleMotionModel.linearize(state=self.x_est,
-                                                   u=u,
-                                                   dt=dt)
+        # Package the inputs for the motion model
+        s: float = new_x_est[3]
+        u: ndarray = array([self.v, s * self.omega])
+
+        # Calculate the Jacobian using the previous step.
+        A: ndarray = eye(4)
+        A[:3, :3] = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
+        A[2, 3] = self.omega * dt
+
+        # Proportional Control Noise Covariance (M)
+        sigma_v: float = (
+            self.alpha_tv_causedby_tv * abs(self.v)
+            + self.alpha_tv_causedby_rv * abs(self.omega)
+            + 0.001
+        )
+        sigma_w: float = (
+            self.alpha_rv_causedby_tv * abs(self.v)
+            + self.alpha_rv_causedby_rv * abs(self.omega)
+            + 0.001
+        )
+        M: ndarray = diag([sigma_v**2, sigma_w**2])
+
+        # Mapped Process Noise (R)
+        theta: float = new_x_est[2]
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
+        R: ndarray = G @ M @ G.T * dt
+        R[3, 3] += self.q_yaw_scale**2 * dt
 
         # Predict: Apply model forward kinematics
-        self.x_est: ndarray = UnicycleMotionModel.forward(state=self.x_est,
-                                                          u=u, noise=zeros(3),
-                                                          dt=dt)
-        # Wrap heading to [-pi, pi]
-        self.x_est[2] = (self.x_est[2] + np.pi) % (2 * np.pi) - np.pi
+        new_x_est[:3] = UnicycleMotionModel.forward(
+            state=new_x_est[:3], u=u, noise=zeros(3), dt=dt
+        )
+        new_x_est: ndarray = wrap_angle(new_x_est)
 
-        # Update the covariance matrix
-        self.covariance = A @ self.covariance @ A.T + self.V
+        # Update the covariance
+        new_cov: ndarray = A @ new_cov @ A.T + R
 
-        # Use Base class to publish Pose and TF
-        self.publish_pose_and_tf(self.get_clock().now().to_msg(), self.covariance)
+        return new_x_est, new_cov
 
 
 def main(args=None):

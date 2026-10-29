@@ -1,278 +1,274 @@
-import time
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
-from dataclasses import dataclass
+#!/usr/bin/env python3
+
+from math import hypot, atan2, sin, cos, sqrt
+from csv import writer
+from datetime import datetime
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 
-import rclpy
+from rclpy import init, spin, try_shutdown
 from rclpy.node import Node
-from rclpy.executors import SingleThreadedExecutor, ExternalShutdownException
-from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.executors import ExternalShutdownException
 
 # ROS 2 Messages
-from nav_msgs.msg import OccupancyGrid, Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, PointStamped
 
 from devol_localization.utils import odom_to_planar, pose_to_planar
 
 
-@dataclass
-class BodyBox:
-    """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
-
-    x_min: float
-    x_max: float
-    y_min: float
-    y_max: float
-    z_min: float
-    z_max: float
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
-# Clearpath A200 + stowed UR5e + Robotiq gripper, from TF at spawn in Gazebo
-DEFAULT_BODY = [
-    BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),  # chassis, wheels, top plate
-    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),  # 300 mm sensor arch + VLP-16
-    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),  # stowed UR5e + Robotiq, offset to +y
-]
+class ErrorTracker:
+    """Tracks and calculates instantaneous error and RMSE for a specific estimator."""
+
+    def __init__(self, name):
+        self.name = name
+
+        # Cumulative stats for RMSE
+        self.sum_sq_pos = 0.0
+        self.sum_sq_yaw = 0.0
+        self.count = 0
+
+        # Cumulative stats for Integral of Absolute Error
+        self.integral_pos = 0.0
+        self.integral_yaw = 0.0
+        self.last_time = None
+
+        # Current values for CSV logging
+        self.curr_err_pos = 0.0
+        self.curr_err_yaw = 0.0
+        self.curr_rmse_pos = 0.0
+        self.curr_rmse_yaw = 0.0
+
+    def update(self, t, est_pose, gt_pose):
+        if gt_pose is None:
+            return
+
+        # Calculate Position Error (Euclidean distance)
+        dx = est_pose[0] - gt_pose[0]
+        dy = est_pose[1] - gt_pose[1]
+        e_pos = hypot(dx, dy)
+
+        # Calculate Heading Error (Shortest angular distance wrapped to [-pi, pi])
+        dyaw = atan2(sin(est_pose[2] - gt_pose[2]), cos(est_pose[2] - gt_pose[2]))
+        e_yaw = abs(dyaw)
+
+        # Acculate Integral Error with Trapezoidal Rule
+        if self.last_time is not None:
+            dt = t - self.last_time
+            if dt > 0:
+                self.integral_pos += ((self.curr_err_pos + e_pos) / 2.0) * dt
+                self.integral_yaw += ((self.curr_err_yaw + e_yaw) / 2.0) * dt
+        self.last_time = t
+
+        # Accumulate for RMSE
+        self.sum_sq_pos += e_pos**2
+        self.sum_sq_yaw += e_yaw**2
+        self.count += 1
+
+        # Update Current state
+        self.curr_err_pos = e_pos
+        self.curr_err_yaw = e_yaw
+        self.curr_rmse_pos = sqrt(self.sum_sq_pos / self.count)
+        self.curr_rmse_yaw = sqrt(self.sum_sq_yaw / self.count)
 
 
-class LocalizationVisNode(Node):
+class LocalizationLoggingNode(Node):
     def __init__(self):
-        super().__init__('localization_vis_node')
+        super().__init__('localization_logging_node')
 
         self.declare_parameter('rate_hz', 10.0)
         self.rate_hz = self.get_parameter('rate_hz').value
 
         # State Variables
-        self.map_grid = None
-        self.map_extent = None  # [xmin, xmax, ymin, ymax] in meters
+        self.recording_started = False
+        self.t0 = None  # Start time for x-axis zeroing
 
+        # Initialize Trackers
         self.gt_pose = None
         self.ekf_pose = None
+        self.ekf_runtime = 0.0
+        self.ekf = ErrorTracker('EKF')
         self.pf_pose = None
+        self.pf_runtime = 0.0
+        self.pf_num_particles = 0
+        self.pf = ErrorTracker('PF')
         self.dr_pose = None
-        self.pf_particles = None
+        self.dr_runtime = 0.0
+        self.dr = ErrorTracker('DR')
+
+        # Write CSV Header
+        self.csv_writer.writerow(
+            [
+                'Time(s)',
+                'GT_X',
+                'GT_Y',
+                'GT_Yaw',
+                'EKF_Pos_Err',
+                'EKF_Pos_RMSE',
+                'EKF_Pos_Integral',
+                'EKF_Yaw_Err',
+                'EKF_Yaw_RMSE',
+                'EKF_Yaw_Integral',
+                'EKF_Runtime',
+                'PF_Pos_Err',
+                'PF_Pos_RMSE',
+                'PF_Pos_Integral',
+                'PF_Yaw_Err',
+                'PF_Yaw_RMSE',
+                'PF_Yaw_Integral',
+                'PF_Num_Particles',
+                'PF_Runtime',
+                'DR_Pos_Err',
+                'DR_Pos_RMSE',
+                'DR_Pos_Integral',
+                'DR_Yaw_Err',
+                'DR_Yaw_RMSE',
+                'DR_Yaw_Integral',
+                'DR_Runtime',            ]
+        )
 
         # Subscribers
-        map_qos = QoSProfile(
-            depth=1,
-            reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
-        )
-        self.create_subscription(
-            OccupancyGrid, '/devol_drive/projected_map', self.map_callback, map_qos
-        )
-        self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        self.ekf_sub: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
-        )
-        self.pf_sub: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/pf_pose'
-        )
-        self.pf_cloud_sub: Subscriber = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
-        self.dr_sub: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/dr_pose'
-        )
+        self.gt_sub = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
+        
+        self.ekf_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose')
+        self.ekf_rt_sub = Subscriber(self, PointStamped, '/devol_drive/ekf_pose/runtime')
+        
+        self.pf_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/pf_pose')
+        self.pf_cloud_sub = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
+        self.pf_rt_sub = Subscriber(self, PointStamped, '/devol_drive/pf_pose/runtime')
+        
+        self.dr_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/dr_pose')
+        self.dr_rt_sub = Subscriber(self, PointStamped, '/devol_drive/dr_pose/runtime')
 
         # Syncronize Subs
         self.ts = ApproximateTimeSynchronizer(
-            [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub],
+            [
+                self.gt_sub, 
+                self.ekf_sub, self.ekf_rt_sub, 
+                self.pf_sub, self.pf_cloud_sub, self.pf_rt_sub, 
+                self.dr_sub, self.dr_rt_sub
+            ],
             queue_size=20,
             slop=0.5,
         )
         self.ts.registerCallback(self.sync_callback)
 
-        # Plotting objects (assigned in main)
-        self.fig = None
-        self.ax = None
+        # Timer for logging
+        timer_period = 1.0 / self.rate_hz
+        self.timer = self.create_timer(timer_period, self.timer_callback)
 
-        self.get_logger().info(f'Visualization Node Started at {self.rate_hz} Hz')
+        self.get_logger().info(f'Logging Node Started. Writing to {self.csv_filename} at {self.rate_hz} Hz')
+
+    def get_sim_time(self):
+        """Returns time in seconds. Initializes t0 on first call."""
+        t = self.get_clock().now().nanoseconds / 1e9
+        if self.t0 is None:
+            self.t0 = t
+        return t - self.t0
 
     @property
     def all_algorithms_ready(self):
-        return (
-            self.gt_pose is not None
-            and self.ekf_pose is not None
-            and self.pf_pose is not None
-            and self.dr_pose is not None
-        )
+        return self.ekf_pose is not None and self.pf_pose is not None and self.dr_pose is not None
 
     def sync_callback(
         self,
         gt_msg: Odometry,
         ekf_msg: PoseWithCovarianceStamped,
+        ekf_rt_msg: PointStamped,
         pf_msg: PoseWithCovarianceStamped,
         pf_cloud_msg: PoseArray,
+        pf_rt_msg: PointStamped,
         dr_msg: PoseWithCovarianceStamped,
+        dr_rt_msg: PointStamped,
     ):
         """This callback ONLY triggers when a matched set of timestamps arrives."""
         self.gt_pose = odom_to_planar(gt_msg)
+
         self.ekf_pose = pose_to_planar(ekf_msg)
-        self.pf_particles = np.array([pose_to_planar(p) for p in pf_cloud_msg.poses])
+        self.ekf_runtime = ekf_rt_msg.point.x
+
+        self.pf_num_particles = len(pf_cloud_msg.poses)
         self.pf_pose = pose_to_planar(pf_msg)
+        self.pf_runtime = pf_rt_msg.point.x
+
         self.dr_pose = pose_to_planar(dr_msg)
+        self.dr_runtime = dr_rt_msg.point.x
 
-    def map_callback(self, msg: OccupancyGrid):
-        # Convert to visual grayscale
-        grid = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
-        vis_map = np.full(grid.shape, 200, dtype=np.uint8)  # Unknown = Gray
-        vis_map[grid == 0] = 255  # Free = White
-        vis_map[grid > 50] = 0  # Obstacle = Black
-        self.map_grid = vis_map
+        self.start_recording_if_ready()
 
-        # Calculate physical boundaries of the map in meters
-        xmin = msg.info.origin.position.x
-        ymin = msg.info.origin.position.y
-        xmax = xmin + (msg.info.width * msg.info.resolution)
-        ymax = ymin + (msg.info.height * msg.info.resolution)
-        self.map_extent = [xmin, xmax, ymin, ymax]
+        if self.recording_started:
+            sim_time = self.get_sim_time()
+            self.ekf.update(sim_time, self.ekf_pose, self.gt_pose)
+            self.pf.update(sim_time, self.pf_pose, self.gt_pose)
+            self.dr.update(sim_time, self.dr_pose, self.gt_pose)
 
-    def draw_robot(self, pose, color, alpha=0.6):
-        """Draws the 2D bounding boxes of the robot for a given (x, y, yaw)."""
-        if pose is None:
-            return
-
-        x, y, yaw = pose
-        cos_yaw = np.cos(yaw)
-        sin_yaw = np.sin(yaw)
-
-        # Plot each box footprint
-        for box in DEFAULT_BODY:
-            # 4 corners of the box in the robot's local frame
-            corners_local = [
-                (box.x_min, box.y_min),
-                (box.x_max, box.y_min),
-                (box.x_max, box.y_max),
-                (box.x_min, box.y_max),
-            ]
-
-            # Transform to global map coordinates
-            corners_global = []
-            for lx, ly in corners_local:
-                gx = x + lx * cos_yaw - ly * sin_yaw
-                gy = y + lx * sin_yaw + ly * cos_yaw
-                corners_global.append((gx, gy))
-
-            poly = Polygon(
-                corners_global,
-                closed=True,
-                facecolor=color,
-                edgecolor='black',
-                alpha=alpha,
-                linewidth=1,
-                zorder=5,
-            )
-            self.ax.add_patch(poly)
-
-        # Draw a small heading line indicating the forward X axis
-        front_x = x + 0.6 * cos_yaw
-        front_y = y + 0.6 * sin_yaw
-        self.ax.plot([x, front_x], [y, front_y], color='black', linewidth=1.5, zorder=6)
-
-    def render(self):
-        if self.map_grid is None or self.ax is None or not self.all_algorithms_ready:
-            return
-        self.ax.clear()
-
-        # Draw Map directly in physical meters!
-        self.ax.imshow(self.map_grid, cmap='gray', origin='lower', extent=self.map_extent)
-
-        # Draw PF Particles
-        if self.pf_particles is not None and len(self.pf_particles) > 0:
-            self.ax.plot(
-                self.pf_particles[:, 0],
-                self.pf_particles[:, 1],
-                '.',
-                color='gray',
-                markersize=2,
-                alpha=0.5,
-                label='PF Particles',
+    def start_recording_if_ready(self):
+        if not self.recording_started and self.all_algorithms_ready and self.gt_pose is not None:
+            # Start a common time baseline for all algorithms.
+            self.t0 = self.get_clock().now().nanoseconds / 1e9
+            self.recording_started = True
+            self.get_logger().info(
+                'All localization algorithms ready. Starting metrics collection.'
             )
 
-        # Draw Ground Truth
-        if self.gt_pose is not None:
-            self.draw_robot(self.gt_pose, color='green', alpha=0.7)
-            self.ax.plot([], [], color='green', linewidth=4, alpha=0.7, label='Ground Truth')
+    def timer_callback(self):
+        if not self.recording_started or self.gt_pose is None:
+            return
 
-        # Draw EKF Estimate
-        if self.ekf_pose is not None:
-            self.draw_robot(self.ekf_pose, color='blue', alpha=0.6)
-            self.ax.plot([], [], color='blue', linewidth=4, alpha=0.6, label='EKF')
+        t = self.get_sim_time()
+        row = [
+            f'{t:.3f}',
+            f'{self.gt_pose[0]:.3f}',
+            f'{self.gt_pose[1]:.3f}',
+            f'{self.gt_pose[2]:.3f}',
+            f'{self.ekf.curr_err_pos:.4f}',
+            f'{self.ekf.curr_rmse_pos:.4f}',
+            f'{self.ekf.integral_pos:.4f}',
+            f'{self.ekf.curr_err_yaw:.4f}',
+            f'{self.ekf.curr_rmse_yaw:.4f}',
+            f'{self.ekf.integral_yaw:.4f}',
+            f'{self.ekf_runtime:.6f}',
+            f'{self.pf.curr_err_pos:.4f}',
+            f'{self.pf.curr_rmse_pos:.4f}',
+            f'{self.pf.integral_pos:.4f}',
+            f'{self.pf.curr_err_yaw:.4f}',
+            f'{self.pf.curr_rmse_yaw:.4f}',
+            f'{self.pf.integral_yaw:.4f}',
+            f'{self.pf_num_particles}',
+            f'{self.pf_runtime:.6f}',
+            f'{self.dr.curr_err_pos:.4f}',
+            f'{self.dr.curr_rmse_pos:.4f}',
+            f'{self.dr.integral_pos:.4f}',
+            f'{self.dr.curr_err_yaw:.4f}',
+            f'{self.dr.curr_rmse_yaw:.4f}',
+            f'{self.dr.integral_yaw:.4f}',
+            f'{self.dr_runtime:.6f}',
+        ]
+        self.csv_writer.writerow(row)
+        self.csv_file.flush()  # Ensure data is saved immediately in case of crash
 
-        # Draw PF Estimate
-        if self.pf_pose is not None:
-            self.draw_robot(self.pf_pose, color='orange', alpha=0.6)
-            self.ax.plot([], [], color='orange', linewidth=4, alpha=0.6, label='PF')
-
-        # Draw Dead Reckoning Estimate
-        if self.dr_pose is not None:
-            self.draw_robot(self.dr_pose, color='red', alpha=0.6)
-            self.ax.plot([], [], color='red', linewidth=4, alpha=0.6, label='Dead Reckoning')
-
-        self.ax.set_title('Live Localization: EKF vs PF vs DR')
-        self.ax.set_xlabel('Meters (X)')
-        self.ax.set_ylabel('Meters (Y)')
-        self.ax.legend(loc='upper right', bbox_to_anchor=(1.25, 1))
-
-        # Flush GUI events
-        self.fig.canvas.draw_idle()
-        self.fig.canvas.flush_events()
+    def destroy_node(self):
+        """Safely close CSV when destroyed"""
+        if hasattr(self, 'csv_file') and not self.csv_file.closed:
+            self.csv_file.close()
+        super().destroy_node()
 
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = LocalizationVisNode()
-    executor = SingleThreadedExecutor()
-    executor.add_node(node)
-
-    # Setup Matplotlib
-    plt.ion()
-    fig, ax = plt.subplots(figsize=(8, 8))
-    fig.canvas.manager.set_window_title('Devol Localization Viz')
-    plt.tight_layout(rect=[0, 0, 0.85, 1])
-
-    node.fig = fig
-    node.ax = ax
-
-    # Precise timing loop adopted from reference
-    period = 1.0 / max(node.rate_hz, 0.1)
-    next_draw = None
+    init(args=args)
+    node = LocalizationLoggingNode()
 
     try:
-        # plt.fignum_exists checks if the user closed the window manually!
-        while rclpy.ok() and plt.fignum_exists(fig.number):
-            # Calculate exactly how much time we have left until we need to draw again
-            timeout = (
-                0.05 if next_draw is None else max(0.0, min(0.05, next_draw - time.monotonic()))
-            )
-
-            # Let ROS process messages in the background
-            executor.spin_once(timeout_sec=timeout)
-
-            # Check if it's time to render the next frame
-            now = time.monotonic()
-
-            if not node.all_algorithms_ready or node.map_grid is None:
-                next_draw = None
-                continue
-
-            if next_draw is None:
-                next_draw = now
-
-            if now >= next_draw:
-                node.render()
-                next_draw += period
-
-                if next_draw < now:  # Prevent getting stuck behind
-                    next_draw = now + period
-
+        # We can just spin normally now since there's no GUI to update!
+        spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        plt.close(fig)
         node.destroy_node()
-        rclpy.try_shutdown()
+        try_shutdown()
 
 
 if __name__ == '__main__':
