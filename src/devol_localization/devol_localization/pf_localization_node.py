@@ -1,4 +1,7 @@
-from typing import Optional, Tuple
+#!/usr/bin/env python3
+
+from typing import Optional
+from time import perf_counter
 from scipy.ndimage import distance_transform_edt
 from numpy import (
     ndarray,
@@ -46,7 +49,8 @@ __email__ = 'jcassad1@jh.edu'
 
 class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('particle_filter_node', '/devol_drive/pf_pose')
+        super().__init__('particle_filter_node', '/devol_drive/pf_pose',
+                         runtime_topic='/devol_drive/pf_pose/runtime')
 
         self.declare_parameter('num_particles', '500')
 
@@ -62,6 +66,9 @@ class ParticleFilterNode(BaseLocalizationNode):
         # Adaptive injection moving averages
         self.slow_avg_lik = 0.0
         self.fast_avg_lik = 0.0
+        
+        # Total runtime accumulator
+        self.localization_runtime = 0.0
 
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
@@ -75,13 +82,11 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
 
-        # Open a CSV file for logging tuning metrics
-        self.tuning_log_file = open('pf_tuning_metrics.csv', 'w')
-        self.tuning_log_file.write('time,n_eff,avg_raw_likelihood\n')
         self.get_logger().info('Particle Filter Node Started!')
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
+        start_time: float = perf_counter()
         self.v: float = msg.twist.twist.linear.x
         self.omega: float = msg.twist.twist.angular.z
         self.u: ndarray = array([self.v, self.omega])
@@ -91,10 +96,14 @@ class ParticleFilterNode(BaseLocalizationNode):
             return
 
         self.particles = self._predict(dt=dt)
+        self.localization_runtime += perf_counter() - start_time
 
     def map_callback(self, msg: OccupancyGrid):
         """Converts ROS OccupancyGrid into a distance transform map for the Likelihood field"""
+        start_time: float = perf_counter()
+
         if not self.is_map_new(msg):
+            self.localization_runtime += perf_counter() - start_time
             return
 
         # Convert 1D array to 2D numpy array
@@ -128,20 +137,26 @@ class ParticleFilterNode(BaseLocalizationNode):
             'free_y': free_world_y,
         }
         self.get_logger().info('Map received and Euclidean Distance Transform computed.')
+        self.localization_runtime += perf_counter() - start_time
 
     def scan_callback(self, msg: LaserScan):
         """The main loop of the PF: computes dt, downsamples scan, runs PF, and publishes results."""
+        start_time: float = perf_counter()
+
         # Wait for map and ensure odometry has ran at least once.
         if self.map_dict is None:
+            self.localization_runtime += perf_counter() - start_time
             return
 
         z_dists, z_thetas = self.preprocess_scan(msg=msg)
 
         if len(z_dists) == 0:
+            self.localization_runtime += perf_counter() - start_time
             return  # No valid measurements
 
         # Run the Particle Filter using Odometry values and the Unicycle model
         self.particles, self.x_est = self._update(z_dists=z_dists, z_thetas=z_thetas)
+        self.localization_runtime += perf_counter() - start_time
 
         # Publish state and particles
         self.publish_state(msg.header.stamp)
@@ -149,7 +164,14 @@ class ParticleFilterNode(BaseLocalizationNode):
     def publish_state(self, stamp):
         """Publishes the estimated pose and the particle cloud for RViz"""
         cov_3x3: ndarray = cov(self.particles, rowvar=False)
-        self.publish_pose_and_tf(stamp, cov_3x3)
+
+        # Publish state
+        self.publish_pose_and_tf_runtime(
+            stamp=stamp,
+            cov_3x3=cov_3x3,
+            start_time=0.0,
+            end_time=self.localization_runtime
+        )
 
         # Publish Particle Cloud
         cloud_msg: PoseArray = PoseArray()
@@ -163,6 +185,9 @@ class ParticleFilterNode(BaseLocalizationNode):
             cloud_msg.poses.append(pose)
 
         self.pub_particles.publish(cloud_msg)
+
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
 
     def _predict(self, dt: float) -> ndarray:
         ## Apply the motion model to the samples (Prediction Step)
@@ -264,11 +289,6 @@ class ParticleFilterNode(BaseLocalizationNode):
         # Calculate Effective Sample Size (N_eff)
         n_eff = 1.0 / sum(self.weights**2)
 
-        # Log to file
-        current_time = self.get_clock().now().nanoseconds / 1e9
-        self.tuning_log_file.write(f'{current_time:.3f},{n_eff:.1f},{avg_raw_likelihood:.6f}\n')
-        self.tuning_log_file.flush()
-
         # Estimate the state based on the weighted average of particles
         x_est: ndarray = average(self.particles, axis=0, weights=self.weights)
 
@@ -339,12 +359,6 @@ class ParticleFilterNode(BaseLocalizationNode):
         indexes = searchsorted(cumulative_sum, pointers)
 
         return particles[indexes]
-
-    def destroy_node(self):
-        """Ensure the log file is closed cleanly on shutdown."""
-        if hasattr(self, 'tuning_log_file') and not self.tuning_log_file.closed:
-            self.tuning_log_file.close()
-        super().destroy_node()
 
 
 def main(args=None):

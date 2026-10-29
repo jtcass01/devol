@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from numpy import cos, sin, ndarray, round as np_round, clip, abs, sum as np_sum
 
 

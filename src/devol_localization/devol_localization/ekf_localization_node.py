@@ -1,4 +1,7 @@
-from typing import Optional, Tuple
+#!/usr/bin/env python3
+
+from typing import Tuple
+from time import perf_counter
 from scipy.spatial import KDTree
 from numpy import (
     ndarray,
@@ -38,9 +41,14 @@ __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'
 
 
+# Chi-square threshold for 3 degrees of freedom at 95% confidence
+CHI2_TRESHOLD_3DOF_95CONF: float = 7.815
+
+
 class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('ekf_localization_node', '/devol_drive/ekf_pose')
+        super().__init__('ekf_localization_node', '/devol_drive/ekf_pose',
+                         runtime_topic='/devol_drive/ekf_pose/runtime')
 
         self.map_data = None
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
@@ -50,13 +58,16 @@ class EKFLocalizationNode(BaseLocalizationNode):
             [0.0, 0.0, 0.0, 1.0]
         )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
-        self.q_yaw_scale: nd = 0.02
+        self.q_yaw_scale: float = 0.02
 
         # Time synchronization variables
-        self.odom_buffer = []
-        self.last_time = None
-        self.current_v = 0.0
-        self.current_omega = 0.0
+        self.odom_buffer: list = []
+        self.last_time: float = None
+        self.current_v: float = 0.0
+        self.current_omega: float = 0.0
+
+        # Total runtime accumulator
+        self.localization_runtime: float = 0.0
 
         # Subscribers / Publishers
         map_qos: QoSProfile = QoSProfile(
@@ -84,7 +95,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
     def map_callback(self, msg: OccupancyGrid):
         """Extracts obstacle coordinates and builds KDTree."""
+        start_time: float = perf_counter()
+
         if not self.is_map_new(msg):
+            self.localization_runtime += perf_counter() - start_time
             return
 
         grid: ndarray = array(msg.data, dtype=np_int8).reshape((msg.info.height, msg.info.width))
@@ -106,6 +120,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.get_logger().info(
             f'Map received. Built KDTree with {len(map_points)} obstacle points.'
         )
+
+        self.localization_runtime += perf_counter() - start_time
 
     def scan_match(self, msg: LaserScan, max_iter: int = 50, tolerance: float = 1e-4):
         """2D Iterative Closest Point using SVD."""
@@ -221,7 +237,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
     def scan_callback(self, msg: LaserScan):
         """The main loop of the EKF."""
+        start_time: float = perf_counter()
+
         if self.map_data is None:
+            self.localization_runtime += perf_counter() - start_time
             return  # Wait for map to load
 
         # Get exact timestamp of the laser scan
@@ -231,6 +250,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Initialize time tracker on the very first scan
         if self.last_time is None:
             self.last_time = t_scan
+            self.localization_runtime += perf_counter() - start_time
             return
 
         # Process all buffered odom messages stamped AT or BEFORE the scan time
@@ -264,7 +284,13 @@ class EKFLocalizationNode(BaseLocalizationNode):
                 self.get_logger().debug('ICP match rejected by Mahalanobis check.')
 
         # Publish state
-        self.publish_pose_and_tf(msg.header.stamp, self.covariance)
+        self.publish_pose_and_tf(stamp=msg.header.stamp, 
+                                 cov_3x3=self.covariance,
+                                 start_time=0.0,
+                                 end_time=self.localization_runtime)
+
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
 
     def _predict(self, v: float, omega: float, dt: float) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
@@ -277,7 +303,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Calculate the Jacobian using the previous step.
         A: ndarray = eye(4)
-        A[:3, :3]: ndarray = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
+        A[:3, :3] = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
         A[2, 3] = omega * dt
 
         # Proportional Control Noise Covariance (M)
@@ -296,7 +322,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         R[3, 3] += self.q_yaw_scale**2 * dt
 
         # Predict: Apply model forward kinematics
-        new_x_est[:3]: ndarray = UnicycleMotionModel.forward(
+        new_x_est[:3] = UnicycleMotionModel.forward(
             state=new_x_est[:3], u=u, noise=zeros(3), dt=dt
         )
 
@@ -325,10 +351,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Statistical Acceptance Test
         mahalanobis_sq = y_tilde.T @ inv(S) @ y_tilde
 
-        # Chi-square threshold for 3 degrees of freedom at 95% confidence
-        chi2_threshold = 7.815
-
-        if mahalanobis_sq > chi2_threshold:
+        if mahalanobis_sq > CHI2_TRESHOLD_3DOF_95CONF:
             # The observation is statistically absurd given current belief.
             # Reject the update and keep prior estimate.
             return new_x_est, new_cov, False

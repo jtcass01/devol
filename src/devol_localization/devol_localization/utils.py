@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from typing import Union
 from numpy import ndarray, pi, sin, cos, atan2, array
 

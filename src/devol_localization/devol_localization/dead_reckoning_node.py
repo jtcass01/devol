@@ -1,11 +1,16 @@
+#!/usr/bin/env python3
+
 from typing import Tuple, Optional
+from time import perf_counter
+from numpy import diag, array, ndarray, sin, cos, zeros, deg2rad, eye
+
 import rclpy
 from nav_msgs.msg import Odometry
-from numpy import diag, array, ndarray, sin, cos, zeros, deg2rad, eye
 
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.motion_models import UnicycleMotionModel
 from devol_localization.utils import wrap_angle
+
 
 __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'
@@ -13,14 +18,15 @@ __email__ = 'jcassad1@jh.edu'
 
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose')
+        super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose',
+                         runtime_topic='/devol_drive/dr_pose/runtime')
 
         # State variables.
         self.x_est: ndarray = array(
             [0.0, 0.0, 0.0, 1.0]
         )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
-        self.q_yaw_scale: nd = 0.02
+        self.q_yaw_scale: float = 0.02
 
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
@@ -28,6 +34,8 @@ class DeadReckoningNode(BaseLocalizationNode):
 
     def odom_callback(self, msg: Odometry):
         """Overrides base class implementation"""
+        start_time: float = perf_counter()
+
         self.v: float = msg.twist.twist.linear.x
         self.omega: float = msg.twist.twist.angular.z / self.x_est[3]
 
@@ -36,10 +44,19 @@ class DeadReckoningNode(BaseLocalizationNode):
             return
 
         self.x_est, self.covariance = self._predict(dt=dt)
+        self.localization_runtime += perf_counter() - start_time
 
-        # Use Base class to publish Pose and TF
-        self.publish_pose_and_tf(msg.header.stamp, self.covariance)
-
+        # Publish Pose, TF, and Runtime using the base class
+        self.publish_pose_and_tf_runtime(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime
+        )
+        
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
+    
     def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
         new_x_est: ndarray = self.x_est
@@ -51,7 +68,7 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         # Calculate the Jacobian using the previous step.
         A: ndarray = eye(4)
-        A[:3, :3]: ndarray = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
+        A[:3, :3] = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
         A[2, 3] = self.omega * dt
 
         # Proportional Control Noise Covariance (M)
@@ -74,13 +91,13 @@ class DeadReckoningNode(BaseLocalizationNode):
         R[3, 3] += self.q_yaw_scale**2 * dt
 
         # Predict: Apply model forward kinematics
-        new_x_est[:3]: ndarray = UnicycleMotionModel.forward(
+        new_x_est[:3] = UnicycleMotionModel.forward(
             state=new_x_est[:3], u=u, noise=zeros(3), dt=dt
         )
+        new_x_est: ndarray = wrap_angle(new_x_est)
 
         # Update the covariance
         new_cov: ndarray = A @ new_cov @ A.T + R
-        new_x_est: ndarray = wrap_angle(new_x_est)
 
         return new_x_est, new_cov
 
