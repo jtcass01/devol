@@ -18,8 +18,12 @@ __email__ = 'jcassad1@jh.edu'
 
 
 class BaseLocalizationNode(Node):
-    def __init__(self, node_name, pose_topic: str = '/devol_drive/pose',
-                 runtime_topic: str = '/devol_drive/pose/runtime'):
+    def __init__(
+        self,
+        node_name,
+        pose_topic: str = '/devol_drive/pose',
+        runtime_topic: str = '/devol_drive/pose/runtime',
+    ):
         super().__init__(node_name)
 
         # Declare Parameters

@@ -75,7 +75,7 @@ def launch_setup(context):
             name='localization_vis_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            condition=IfCondition(LaunchConfiguration('show_vis'))
+            condition=IfCondition(LaunchConfiguration('show_vis')),
         )
     )
 
@@ -87,7 +87,7 @@ def launch_setup(context):
             name='metrics_vis_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            condition=IfCondition(LaunchConfiguration('log_metrics'))
+            condition=IfCondition(LaunchConfiguration('log_metrics')),
         )
     )
 
@@ -98,11 +98,12 @@ def launch_setup(context):
             name='kidnapper_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            condition=IfCondition(LaunchConfiguration('kidnap'))
+            condition=IfCondition(LaunchConfiguration('kidnap')),
         )
     )
 
     return actions
+
 
 def generate_launch_description():
     args = [

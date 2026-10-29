@@ -78,8 +78,11 @@ __email__ = 'jcassad1@jh.edu'
 
 class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('particle_filter_node', '/devol_drive/pf_pose',
-                         runtime_topic='/devol_drive/pf_pose/runtime')
+        super().__init__(
+            'particle_filter_node',
+            '/devol_drive/pf_pose',
+            runtime_topic='/devol_drive/pf_pose/runtime',
+        )
 
         self.declare_parameter('num_particles', '500')
 
@@ -95,7 +98,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         # Adaptive injection moving averages
         self.slow_avg_lik = 0.0
         self.fast_avg_lik = 0.0
-        
+
         # Total runtime accumulator
         self.localization_runtime = 0.0
 
@@ -216,10 +219,7 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         # Publish state
         self.publish_pose_and_tf_runtime(
-            stamp=stamp,
-            cov_3x3=cov_3x3,
-            start_time=0.0,
-            end_time=self.localization_runtime
+            stamp=stamp, cov_3x3=cov_3x3, start_time=0.0, end_time=self.localization_runtime
         )
 
         # Publish Particle Cloud

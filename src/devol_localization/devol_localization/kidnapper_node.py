@@ -22,6 +22,7 @@ __email__ = 'jcassad1@jh.edu'
 @dataclass
 class BodyBox:
     """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
+
     x_min: float
     x_max: float
     y_min: float
@@ -29,12 +30,14 @@ class BodyBox:
     z_min: float
     z_max: float
 
+
 # Clearpath A200 + stowed UR5e + Robotiq gripper
 DEFAULT_BODY = [
     BodyBox(-0.495, 0.495, -0.335, 0.335, 0.05, 0.45),  # chassis, wheels, top plate
-    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),      # 300 mm sensor arch + VLP-16
-    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),       # stowed UR5e + Robotiq, offset to +y
+    BodyBox(-0.10, 0.10, -0.30, 0.30, 0.45, 0.82),  # 300 mm sensor arch + VLP-16
+    BodyBox(0.08, 0.35, -0.10, 0.42, 0.45, 1.55),  # stowed UR5e + Robotiq, offset to +y
 ]
+
 
 def set_pose_command(
     world: str, entity: str, x: float, y: float, z: float, yaw: float, timeout_ms: int = 3000
@@ -58,6 +61,7 @@ def set_pose_command(
         req,
     ]
 
+
 def calculate_safe_radius(boxes: list[BodyBox]) -> float:
     """Calculates the maximum horizontal distance from the origin to any corner of the body boxes."""
     max_r_sq = 0.0
@@ -66,7 +70,7 @@ def calculate_safe_radius(boxes: list[BodyBox]) -> float:
             (box.x_min, box.y_min),
             (box.x_min, box.y_max),
             (box.x_max, box.y_min),
-            (box.x_max, box.y_max)
+            (box.x_max, box.y_max),
         ]
         for cx, cy in corners:
             r_sq = cx**2 + cy**2
@@ -74,10 +78,11 @@ def calculate_safe_radius(boxes: list[BodyBox]) -> float:
                 max_r_sq = r_sq
     return sqrt(max_r_sq)
 
+
 class KidnapperNode(Node):
     def __init__(self):
         super().__init__('kidnapper_node')
-        
+
         # Declare Parameters
         self.declare_parameter('odom_topic', '/devol_drive/odom')
         self.declare_parameter('map_topic', '/devol_drive/projected_map')
@@ -109,17 +114,17 @@ class KidnapperNode(Node):
         # Automatic safe radius calculation with an extra 0.1m buffer
         self.safe_radius = calculate_safe_radius(DEFAULT_BODY) + 0.1
         self.get_logger().info(f'Calculated safe spawn radius: {self.safe_radius:.2f}m')
-        
+
         # State variables
         self.last_map_crc = None
         self.map_dict = None
         self.state = 'WAITING_FOR_MAP'
         self.countdown_start_time = None
-        
+
         # TF tracking
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        
+
         # Subscriptions and timers
         self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 1)
         self.timer = self.create_timer(0.5, self.control_loop)
@@ -143,9 +148,7 @@ class KidnapperNode(Node):
             return
 
         # Convert 1D array to 2D numpy array
-        grid: ndarray = array(msg.data, dtype=float32).reshape(
-            (msg.info.height, msg.info.width)
-        )
+        grid: ndarray = array(msg.data, dtype=float32).reshape((msg.info.height, msg.info.width))
 
         # Create binary map where obstacle = 0, free space = 1
         binary_map: ndarray = ones_like(grid)
@@ -179,35 +182,40 @@ class KidnapperNode(Node):
     def control_loop(self):
         if self.state in ['WAITING_FOR_MAP', 'DONE']:
             return
-            
+
         map_frame = self.get_parameter('map_frame').value
         base_frame = self.get_parameter('base_frame').value
-        
+
         try:
             trans = self.tf_buffer.lookup_transform(map_frame, base_frame, Time())
             robot_x = trans.transform.translation.x
             robot_y = trans.transform.translation.y
         except Exception as e:
-            self.get_logger().warn(f'Waiting for TF ({map_frame} to {base_frame}): {str(e)}', throttle_duration_sec=5.0)
+            self.get_logger().warn(
+                f'Waiting for TF ({map_frame} to {base_frame}): {str(e)}',
+                throttle_duration_sec=5.0,
+            )
             return
 
         if self.state == 'WAITING_FOR_ROBOT':
             target_x = self.get_parameter('target_x').value
             target_y = self.get_parameter('target_y').value
             tolerance = self.get_parameter('tolerance').value
-            
+
             dist = hypot(robot_x - target_x, robot_y - target_y)
             if dist <= tolerance:
                 self.get_logger().info(f'Target reached (dist: {dist:.2f}m). Starting countdown.')
                 self.state = 'COUNTDOWN'
                 self.countdown_start_time = self.get_clock().now()
-                
+
         elif self.state == 'COUNTDOWN':
             wait_time = self.get_parameter('wait_time').value
             elapsed = (self.get_clock().now() - self.countdown_start_time).nanoseconds / 1e9
-            
-            self.get_logger().info(f'Kidnapping in {wait_time - elapsed:.1f}s...', throttle_duration_sec=2.0)
-            
+
+            self.get_logger().info(
+                f'Kidnapping in {wait_time - elapsed:.1f}s...', throttle_duration_sec=2.0
+            )
+
             if elapsed >= wait_time:
                 self.get_logger().info('Executing kidnap sequence!')
                 self.teleport_robot()
@@ -221,31 +229,34 @@ class KidnapperNode(Node):
         edt_map = self.map_dict['grid']
         px_x = self.map_dict['free_pixel_x']
         px_y = self.map_dict['free_pixel_y']
-        
+
         # Check clearance for all free pixels at once
         clearances = edt_map[px_y, px_x]
         safe_indices = where(clearances > self.safe_radius)[0]
-        
+
         if len(safe_indices) == 0:
             self.get_logger().error('No spaces found with sufficient clearance for the robot!')
             return
-            
+
         chosen_idx = choice(safe_indices)
         target_x = self.map_dict['free_x'][chosen_idx]
         target_y = self.map_dict['free_y'][chosen_idx]
         target_yaw = uniform(-pi, pi)
-        
+
         world = self.get_parameter('world_name').value
         entity = self.get_parameter('entity_name').value
-        
+
         cmd = set_pose_command(world, entity, target_x, target_y, target_z, target_yaw)
-        self.get_logger().info(f'Teleporting to free space: x={target_x:.2f}, y={target_y:.2f}, yaw={target_yaw:.2f}')
-        
+        self.get_logger().info(
+            f'Teleporting to free space: x={target_x:.2f}, y={target_y:.2f}, yaw={target_yaw:.2f}'
+        )
+
         result = run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             self.get_logger().error(f'Teleport command failed: {result.stderr}')
         else:
             self.get_logger().info('Teleport successful.')
+
 
 def main(args=None):
     init(args=args)
@@ -257,6 +268,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         try_shutdown()
+
 
 if __name__ == '__main__':
     main()

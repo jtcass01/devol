@@ -10,8 +10,9 @@ __email__ = 'jcassad1@jh.edu'
 
 class UnicycleMotionModel:
     @staticmethod
-    def forward(state: Union[float, ndarray], 
-                u: ndarray, noise: float, dt: float) -> Union[float, ndarray]:
+    def forward(
+        state: Union[float, ndarray], u: ndarray, noise: float, dt: float
+    ) -> Union[float, ndarray]:
         v = u[0] + noise[0]
         omega = u[1] + noise[1]
 

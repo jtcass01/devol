@@ -51,8 +51,11 @@ CHI2_TRESHOLD_3DOF_95CONF: float = 7.815
 
 class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('ekf_localization_node', '/devol_drive/ekf_pose',
-                         runtime_topic='/devol_drive/ekf_pose/runtime')
+        super().__init__(
+            'ekf_localization_node',
+            '/devol_drive/ekf_pose',
+            runtime_topic='/devol_drive/ekf_pose/runtime',
+        )
 
         self.map_data = None
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
@@ -360,10 +363,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
                 self.get_logger().debug('ICP match rejected by Mahalanobis check.')
 
         # Publish state
-        self.publish_pose_and_tf(stamp=msg.header.stamp, 
-                                 cov_3x3=self.covariance,
-                                 start_time=0.0,
-                                 end_time=self.localization_runtime)
+        self.publish_pose_and_tf(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime,
+        )
 
         # Reset runtime for the next cycle
         self.localization_runtime = 0.0
