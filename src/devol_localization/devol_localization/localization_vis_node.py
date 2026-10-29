@@ -46,7 +46,6 @@ DEFAULT_BODY = [
 ]
 
 
-
 class LocalizationVisNode(Node):
     def __init__(self):
         super().__init__('localization_combined_vis_node')
@@ -74,11 +73,7 @@ class LocalizationVisNode(Node):
         self.dr = ErrorTracker('DR', 'red')
         self.trackers = [self.ekf, self.pf, self.dr]
 
-        self.runtimes = {
-            'EKF': ([], []),
-            'PF': ([], []),
-            'DR': ([], [])
-        }
+        self.runtimes = {'EKF': ([], []), 'PF': ([], []), 'DR': ([], [])}
 
         # Subscribers
         map_qos = QoSProfile(
@@ -107,10 +102,14 @@ class LocalizationVisNode(Node):
         # Syncronize Subs
         self.ts = ApproximateTimeSynchronizer(
             [
-                self.gt_sub, 
-                self.ekf_sub, self.ekf_rt_sub, 
-                self.pf_sub, self.pf_cloud_sub, self.pf_rt_sub, 
-                self.dr_sub, self.dr_rt_sub
+                self.gt_sub,
+                self.ekf_sub,
+                self.ekf_rt_sub,
+                self.pf_sub,
+                self.pf_cloud_sub,
+                self.pf_rt_sub,
+                self.dr_sub,
+                self.dr_rt_sub,
             ],
             queue_size=20,
             slop=0.5,
@@ -171,14 +170,14 @@ class LocalizationVisNode(Node):
             self.ekf.update(sim_time, self.ekf_pose, self.gt_pose)
             self.pf.update(sim_time, self.pf_pose, self.gt_pose)
             self.dr.update(sim_time, self.dr_pose, self.gt_pose)
-            
+
             # Store runtimes locally
             self.runtimes['EKF'][0].append(sim_time)
             self.runtimes['EKF'][1].append(ekf_rt_msg.point.x)
-            
+
             self.runtimes['PF'][0].append(sim_time)
             self.runtimes['PF'][1].append(pf_rt_msg.point.x)
-            
+
             self.runtimes['DR'][0].append(sim_time)
             self.runtimes['DR'][1].append(dr_rt_msg.point.x)
 
@@ -290,7 +289,7 @@ class LocalizationVisNode(Node):
             # Yaw Data
             l_err_y.set_data(tracker.times, tracker.err_yaw)
             l_rm_y.set_data(tracker.times, tracker.rmse_yaw)
-            
+
             # Runtime Data
             t_rt, y_rt = self.runtimes[tracker.name]
             l_rt.set_data(t_rt, y_rt)
@@ -331,7 +330,7 @@ def main(args=None):
     plt.ion()
     fig = plt.figure(figsize=(22, 10))
     fig.canvas.manager.set_window_title('Devol Localization Overview')
-    
+
     # Give the map slightly more width ratio than the individual plots
     gs = GridSpec(3, 4, width_ratios=[1.3, 1, 1, 1], figure=fig)
 
@@ -342,19 +341,23 @@ def main(args=None):
     axs_plots = [
         [fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]), fig.add_subplot(gs[0, 3])],
         [fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[1, 2]), fig.add_subplot(gs[1, 3])],
-        [fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2]), fig.add_subplot(gs[2, 3])]
+        [fig.add_subplot(gs[2, 1]), fig.add_subplot(gs[2, 2]), fig.add_subplot(gs[2, 3])],
     ]
 
     for i, tracker in enumerate(node.trackers):
         # Position Error Subplot (Column 1 of Grid)
-        (l_err_p,) = axs_plots[i][0].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
+        (l_err_p,) = axs_plots[i][0].plot(
+            [], [], color=tracker.color, alpha=0.3, label='Inst Error'
+        )
         (l_rm_p,) = axs_plots[i][0].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
         axs_plots[i][0].set_title(f'{tracker.name} Position Error (m)')
         axs_plots[i][0].grid(True, linestyle='--', alpha=0.6)
         axs_plots[i][0].legend(loc='upper left')
 
         # Heading Error Subplot (Column 2 of Grid)
-        (l_err_y,) = axs_plots[i][1].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
+        (l_err_y,) = axs_plots[i][1].plot(
+            [], [], color=tracker.color, alpha=0.3, label='Inst Error'
+        )
         (l_rm_y,) = axs_plots[i][1].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
         axs_plots[i][1].set_title(f'{tracker.name} Heading Error (rad)')
         axs_plots[i][1].grid(True, linestyle='--', alpha=0.6)
@@ -384,9 +387,7 @@ def main(args=None):
 
     try:
         while rclpy.ok() and plt.fignum_exists(fig.number):
-            timeout = (
-                0.05 if next_draw is None else max(0.0, min(0.05, next_draw - monotonic()))
-            )
+            timeout = 0.05 if next_draw is None else max(0.0, min(0.05, next_draw - monotonic()))
             executor.spin_once(timeout_sec=timeout)
 
             now = monotonic()
