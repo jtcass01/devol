@@ -27,11 +27,36 @@ from numpy import (
     mean as np_mean,
 )
 from numpy.random import multivariate_normal, uniform, normal, choice
+from numpy import (
+    ndarray,
+    array,
+    cov,
+    float32 as np_float32,
+    ones_like,
+    ones,
+    searchsorted,
+    cumsum,
+    average,
+    arctan2,
+    cos,
+    sin,
+    copy as np_copy,
+    arange,
+    exp as np_exp,
+    max as np_max,
+    zeros,
+    vstack,
+    where,
+    pi,
+    mean as np_mean,
+)
+from numpy.random import multivariate_normal, uniform, normal, choice
 
 import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
+from nav_msgs.msg import OccupancyGrid, Odometry
 from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseArray, Pose
@@ -41,6 +66,10 @@ from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.laser_model import LaserModel
 from devol_localization.utils import euler_to_quaternion
 from devol_localization.motion_models import UnicycleMotionModel
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 __author__ = 'Jacob Taylor Cassady'
@@ -79,9 +108,13 @@ class ParticleFilterNode(BaseLocalizationNode):
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
 
+        # Open a CSV file for logging tuning metrics
+        self.tuning_log_file = open('pf_tuning_metrics.csv', 'w')
+        self.tuning_log_file.write('time,n_eff,avg_raw_likelihood\n')
         self.get_logger().info('Particle Filter Node Started!')
 
     def odom_callback(self, msg: Odometry):
@@ -129,7 +162,23 @@ class ParticleFilterNode(BaseLocalizationNode):
         free_world_x: ndarray = free_x * res + ox + (res / 2.0)
         free_world_y: ndarray = free_y * res + oy + (res / 2.0)
 
+        # Pre-compute free space coordinates for the escape hatch
+        free_y, free_x = where(binary_map == 1)
+        res: float = msg.info.resolution
+        ox: float = msg.info.origin.position.x
+        oy: float = msg.info.origin.position.y
+
+        # Convert pixel indices to real-world coordinates
+        free_world_x: ndarray = free_x * res + ox + (res / 2.0)
+        free_world_y: ndarray = free_y * res + oy + (res / 2.0)
+
         # Store in dict to pass to LaserModel easily
+        self.map_dict: dict = {
+            'grid': edt_map,
+            'info': msg.info,
+            'free_x': free_world_x,
+            'free_y': free_world_y,
+        }
         self.map_dict: dict = {
             'grid': edt_map,
             'info': msg.info,

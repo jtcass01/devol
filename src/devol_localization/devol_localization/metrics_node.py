@@ -6,7 +6,6 @@ import csv
 from datetime import datetime
 import matplotlib.pyplot as plt
 from message_filters import ApproximateTimeSynchronizer, Subscriber
-from numpy import array
 
 import rclpy
 from rclpy.node import Node

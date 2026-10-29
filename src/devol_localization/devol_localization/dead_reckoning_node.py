@@ -29,6 +29,7 @@ class DeadReckoningNode(BaseLocalizationNode):
         self.q_yaw_scale: float = 0.02
 
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.get_logger().info('Dead Reckoning Node Started!')
 
@@ -99,6 +100,7 @@ class DeadReckoningNode(BaseLocalizationNode):
         # Update the covariance
         new_cov: ndarray = A @ new_cov @ A.T + R
 
+        return new_x_est, new_cov
         return new_x_est, new_cov
 
 

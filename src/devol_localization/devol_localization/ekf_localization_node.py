@@ -21,6 +21,9 @@ from numpy import (
     trace,
     sqrt,
     clip,
+    trace,
+    sqrt,
+    clip,
 )
 from numpy.linalg import svd, det, inv
 
@@ -28,6 +31,7 @@ import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
+from nav_msgs.msg import OccupancyGrid, Odometry
 from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 
@@ -78,8 +82,21 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 10)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.get_logger().info('EKF Localization Node Started!')
+
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        # Convert ROS timestamp to a float in seconds
+        stamp = msg.header.stamp
+        t_odom = stamp.sec + stamp.nanosec * 1e-9
+
+        v = msg.twist.twist.linear.x
+        omega = msg.twist.twist.angular.z / self.x_est[3]
+
+        # Add to the buffer
+        self.odom_buffer.append((t_odom, v, omega))
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
@@ -111,6 +128,10 @@ class EKFLocalizationNode(BaseLocalizationNode):
         map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
         map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
         map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
+        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
+        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
+        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
+        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
 
         # Stack into an Nx2 array of obstacle points
         map_points: ndarray = vstack((map_pts_x, map_pts_y)).T
@@ -130,6 +151,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         if len(ranges) < 10:
             return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
+            return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
 
         # Nx2 array of local laser points
         laser_pts: ndarray = vstack((ranges * cos(angles), ranges * sin(angles))).T
@@ -144,8 +166,13 @@ class EKFLocalizationNode(BaseLocalizationNode):
         local_pts: ndarray = (R_offset @ laser_pts.T).T + laser_offset[:2]
 
         current_pose: ndarray = self.x_est[:3].copy()
+        current_pose: ndarray = self.x_est[:3].copy()
         prev_error: float = float('inf')
 
+        # Calculate adaptive correspondence gate based on positional covariance
+        pos_variance = trace(self.covariance[:2, :2])
+        #  3-sigma radius, clamped between 0.5m and 2.0m
+        search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
         # Calculate adaptive correspondence gate based on positional covariance
         pos_variance = trace(self.covariance[:2, :2])
         #  3-sigma radius, clamped between 0.5m and 2.0m
@@ -160,6 +187,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
             # Find the closest Map points (Q) for every Global Scan point (P)
             distances, indices = self.map_data['kdtree'].query(global_pts)
 
+            # Reject outlier points using the adaptive search radius
+            good_matches: ndarray = distances < search_radius
             # Reject outlier points using the adaptive search radius
             good_matches: ndarray = distances < search_radius
             if sum(good_matches) < 10:
@@ -194,6 +223,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             t_delta: ndarray = centroid_Q - R_delta @ centroid_P
 
             # Apply the delta transformation to current pose guess
+            # Apply the delta transformation to current pose guess
             current_pose[:2] = R_delta @ current_pose[:2] + t_delta
             current_pose[2] += arctan2(R_delta[1, 0], R_delta[0, 0])
 
@@ -205,11 +235,37 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Format final pose
         current_pose = wrap_angle(current_pose)
+        current_pose = wrap_angle(current_pose)
 
         # Consider the match "valid" if the final average distance to walls is less than 20cm
         is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
+        is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
 
         return current_pose, is_valid, prev_error
+
+    def inlier_fraction_check(
+        self,
+        current_pose: ndarray,
+        local_pts: ndarray,
+        distance_threshold: float = 0.15,
+        valid_threshold: float = 0.8,
+    ) -> bool:
+        # Project scan points to the global map frame using the pose
+        final_theta: float = current_pose[2]
+        R_final: ndarray = array(
+            [[cos(final_theta), -sin(final_theta)], [sin(final_theta), cos(final_theta)]]
+        )
+        final_global_pts: ndarray = (R_final @ local_pts.T).T + current_pose[:2]
+
+        # Query distances to the nearest map points.
+        final_distances, _ = self.map_data['kdtree'].query(final_global_pts)
+
+        # Calculate the fraction of points within distance_threshold
+        inliers = sum(final_distances <= distance_threshold)
+        inlier_fraction = float(inliers) / len(final_global_pts)
+
+        # Consider the match "valid" if within valid_threshold
+        return inlier_fraction >= valid_threshold
 
     def inlier_fraction_check(
         self,
@@ -253,6 +309,26 @@ class EKFLocalizationNode(BaseLocalizationNode):
             self.localization_runtime += perf_counter() - start_time
             return
 
+        # Process all buffered odom messages stamped AT or BEFORE the scan time
+        while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
+            t_odom, v, omega = self.odom_buffer.pop(0)
+
+            dt = t_odom - self.last_time
+            if dt > 0:
+                self.x_est, self.covariance = self._predict(v, omega, dt)
+                self.last_time = t_odom
+
+            # Keep track of the latest velocities for the partial step
+            self.current_v = v
+            self.current_omega = omega
+
+        # Add one final partial step exactly up to the scan timestamp
+        dt_partial = t_scan - self.last_time
+        if dt_partial > 0:
+            self.x_est, self.covariance = self._predict(
+                self.current_v, self.current_omega, dt_partial
+            )
+            self.last_time = t_scan
         # Process all buffered odom messages stamped AT or BEFORE the scan time
         while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
             t_odom, v, omega = self.odom_buffer.pop(0)
@@ -341,6 +417,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
         H: ndarray = eye(3, 4)
+        # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
+        H: ndarray = eye(3, 4)
 
         # Innovation covariance (S)
         S: ndarray = H @ new_cov @ H.T + W_dynamic
@@ -358,7 +436,13 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Kalman Gain (K)
         K: ndarray = new_cov @ H.T @ inv(S)
+        # Kalman Gain (K)
+        K: ndarray = new_cov @ H.T @ inv(S)
 
+        # Update the state estimate and shrink the covariance
+        new_x_est: ndarray = new_x_est + K @ y_tilde
+        new_x_est[3] = clip(new_x_est[3], 0.5, 1.2)
+        new_cov: ndarray = (eye(4) - K @ H) @ new_cov
         # Update the state estimate and shrink the covariance
         new_x_est: ndarray = new_x_est + K @ y_tilde
         new_x_est[3] = clip(new_x_est[3], 0.5, 1.2)
@@ -366,7 +450,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Wrap heading to [-pi, pi] to prevent runaway angle values over time
         new_x_est = wrap_angle(new_x_est)
+        new_x_est = wrap_angle(new_x_est)
 
+        return new_x_est, new_cov, True
         return new_x_est, new_cov, True
 
 
