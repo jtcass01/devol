@@ -11,7 +11,7 @@ from rclpy.executors import ExternalShutdownException
 
 # ROS 2 Messages
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, PointStamped
 
 from devol_localization.utils import odom_to_planar, pose_to_planar
 
@@ -89,18 +89,15 @@ class LocalizationLoggingNode(Node):
         # Initialize Trackers
         self.gt_pose = None
         self.ekf_pose = None
+        self.ekf_runtime = 0.0
         self.ekf = ErrorTracker('EKF')
         self.pf_pose = None
+        self.pf_runtime = 0.0
         self.pf_num_particles = 0
         self.pf = ErrorTracker('PF')
         self.dr_pose = None
+        self.dr_runtime = 0.0
         self.dr = ErrorTracker('DR')
-
-        # Setup CSV Logging
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.csv_filename = f'localization_metrics_{timestamp}.csv'
-        self.csv_file = open(self.csv_filename, mode='w', newline='')
-        self.csv_writer = writer(self.csv_file)
 
         # Write CSV Header
         self.csv_writer.writerow(
@@ -115,6 +112,7 @@ class LocalizationLoggingNode(Node):
                 'EKF_Yaw_Err',
                 'EKF_Yaw_RMSE',
                 'EKF_Yaw_Integral',
+                'EKF_Runtime',
                 'PF_Pos_Err',
                 'PF_Pos_RMSE',
                 'PF_Pos_Integral',
@@ -122,31 +120,37 @@ class LocalizationLoggingNode(Node):
                 'PF_Yaw_RMSE',
                 'PF_Yaw_Integral',
                 'PF_Num_Particles',
+                'PF_Runtime',
                 'DR_Pos_Err',
                 'DR_Pos_RMSE',
                 'DR_Pos_Integral',
                 'DR_Yaw_Err',
                 'DR_Yaw_RMSE',
                 'DR_Yaw_Integral',
-            ]
+                'DR_Runtime',            ]
         )
 
         # Subscribers
-        self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        self.ekf_sub: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose'
-        )
-        self.pf_sub: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/pf_pose'
-        )
-        self.pf_cloud_sub: Subscriber = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
-        self.dr_sub: Subscriber = Subscriber(
-            self, PoseWithCovarianceStamped, '/devol_drive/dr_pose'
-        )
+        self.gt_sub = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
+        
+        self.ekf_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose')
+        self.ekf_rt_sub = Subscriber(self, PointStamped, '/devol_drive/ekf_pose/runtime')
+        
+        self.pf_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/pf_pose')
+        self.pf_cloud_sub = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
+        self.pf_rt_sub = Subscriber(self, PointStamped, '/devol_drive/pf_pose/runtime')
+        
+        self.dr_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/dr_pose')
+        self.dr_rt_sub = Subscriber(self, PointStamped, '/devol_drive/dr_pose/runtime')
 
         # Syncronize Subs
         self.ts = ApproximateTimeSynchronizer(
-            [self.gt_sub, self.ekf_sub, self.pf_sub, self.pf_cloud_sub, self.dr_sub],
+            [
+                self.gt_sub, 
+                self.ekf_sub, self.ekf_rt_sub, 
+                self.pf_sub, self.pf_cloud_sub, self.pf_rt_sub, 
+                self.dr_sub, self.dr_rt_sub
+            ],
             queue_size=20,
             slop=0.5,
         )
@@ -173,16 +177,25 @@ class LocalizationLoggingNode(Node):
         self,
         gt_msg: Odometry,
         ekf_msg: PoseWithCovarianceStamped,
+        ekf_rt_msg: PointStamped,
         pf_msg: PoseWithCovarianceStamped,
         pf_cloud_msg: PoseArray,
+        pf_rt_msg: PointStamped,
         dr_msg: PoseWithCovarianceStamped,
+        dr_rt_msg: PointStamped,
     ):
         """This callback ONLY triggers when a matched set of timestamps arrives."""
         self.gt_pose = odom_to_planar(gt_msg)
+
         self.ekf_pose = pose_to_planar(ekf_msg)
+        self.ekf_runtime = ekf_rt_msg.point.x
+
         self.pf_num_particles = len(pf_cloud_msg.poses)
         self.pf_pose = pose_to_planar(pf_msg)
+        self.pf_runtime = pf_rt_msg.point.x
+
         self.dr_pose = pose_to_planar(dr_msg)
+        self.dr_runtime = dr_rt_msg.point.x
 
         self.start_recording_if_ready()
 
@@ -217,6 +230,7 @@ class LocalizationLoggingNode(Node):
             f'{self.ekf.curr_err_yaw:.4f}',
             f'{self.ekf.curr_rmse_yaw:.4f}',
             f'{self.ekf.integral_yaw:.4f}',
+            f'{self.ekf_runtime:.6f}',
             f'{self.pf.curr_err_pos:.4f}',
             f'{self.pf.curr_rmse_pos:.4f}',
             f'{self.pf.integral_pos:.4f}',
@@ -224,12 +238,14 @@ class LocalizationLoggingNode(Node):
             f'{self.pf.curr_rmse_yaw:.4f}',
             f'{self.pf.integral_yaw:.4f}',
             f'{self.pf_num_particles}',
+            f'{self.pf_runtime:.6f}',
             f'{self.dr.curr_err_pos:.4f}',
             f'{self.dr.curr_rmse_pos:.4f}',
             f'{self.dr.integral_pos:.4f}',
             f'{self.dr.curr_err_yaw:.4f}',
             f'{self.dr.curr_rmse_yaw:.4f}',
             f'{self.dr.integral_yaw:.4f}',
+            f'{self.dr_runtime:.6f}',
         ]
         self.csv_writer.writerow(row)
         self.csv_file.flush()  # Ensure data is saved immediately in case of crash

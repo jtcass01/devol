@@ -7,9 +7,8 @@ from rclpy.node import Node
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
 from nav_msgs.msg import Odometry, OccupancyGrid
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PointStamped
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Float64
 
 from devol_localization.utils import euler_to_quaternion
 
@@ -66,7 +65,7 @@ class BaseLocalizationNode(Node):
 
         # Shared Publishers
         self.pub_pose = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
-        self.runtime_pub = self.create_publisher(Float64, self.runtime_topic, 10)
+        self.runtime_pub = self.create_publisher(PointStamped, self.runtime_topic, 10)
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
@@ -148,7 +147,9 @@ class BaseLocalizationNode(Node):
         pose_msg.pose.covariance = tuple(cov_6x6.flatten())
         self.pub_pose.publish(pose_msg)
 
-        # Publish the runtime in seconds
-        runtime_msg = Float64()
-        runtime_msg.data = end_time - start_time
+        # Publish the runtime as a PointStamped message
+        runtime_msg = PointStamped()
+        runtime_msg.header.stamp = stamp
+        runtime_msg.frame_id = self.map_frame
+        runtime_msg.point.x = end_time - start_time
         self.runtime_pub.publish(runtime_msg)
