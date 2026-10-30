@@ -117,7 +117,7 @@ class LocalizationVisNode(Node):
                 self.dr_rt_sub,
             ],
             queue_size=50,
-            slop=1.0,
+            slop=0.5,
         )
         self.ts.registerCallback(self.sync_callback)
 
