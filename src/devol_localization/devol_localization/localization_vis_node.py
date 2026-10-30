@@ -55,7 +55,7 @@ class LocalizationVisNode(Node):
         self.rate_hz = self.get_parameter('rate_hz').value
 
         # State Variables
-        self.data_lock = Lock() # Protects data arrays across threads
+        self.data_lock = Lock()  # Protects data arrays across threads
         self.map_grid = None
         self.map_extent = None  # [xmin, xmax, ymin, ymax] in meters
         self.map_updated = False
@@ -116,7 +116,7 @@ class LocalizationVisNode(Node):
                 self.dr_rt_sub,
             ],
             queue_size=50,
-            slop=1.0,
+            slop=0.5,
         )
         self.ts.registerCallback(self.sync_callback)
 
@@ -133,7 +133,7 @@ class LocalizationVisNode(Node):
         self.ekf_artists = None
         self.pf_artists = None
         self.dr_artists = None
-        
+
         self.get_logger().info(f'Combined Visualization Node Started at {self.rate_hz} Hz')
 
     def get_sim_time(self):
@@ -163,7 +163,7 @@ class LocalizationVisNode(Node):
 
         self.last_map_crc = current_crc
         return True
-    
+
     def sync_callback(
         self,
         gt_msg: Odometry,
@@ -237,19 +237,28 @@ class LocalizationVisNode(Node):
         self.map_img = self.ax_map.imshow([[0]], cmap='gray', origin='lower', vmin=0, vmax=255)
 
         # Scatter for PF Particles
-        self.pf_scatter, = self.ax_map.plot([], [], '.', color='gray', markersize=2, alpha=0.5, label='PF Particles')
+        (self.pf_scatter,) = self.ax_map.plot(
+            [], [], '.', color='gray', markersize=2, alpha=0.5, label='PF Particles'
+        )
 
         # Helper to setup a robot tracker
         def _setup_robot(color, label):
             patches = []
             for _ in DEFAULT_BODY:
                 # Provide a dummy 4-point polygon
-                poly = Polygon([[0,0], [0,1], [1,1], [1,0]], closed=True, facecolor=color, edgecolor='black', alpha=0.6, zorder=5)
+                poly = Polygon(
+                    [[0, 0], [0, 1], [1, 1], [1, 0]],
+                    closed=True,
+                    facecolor=color,
+                    edgecolor='black',
+                    alpha=0.6,
+                    zorder=5,
+                )
                 poly.set_visible(False)
                 self.ax_map.add_patch(poly)
                 patches.append(poly)
             # Heading line
-            line, = self.ax_map.plot([], [], color='black', linewidth=1.5, zorder=6)
+            (line,) = self.ax_map.plot([], [], color='black', linewidth=1.5, zorder=6)
             # Dummy line just for the legend
             self.ax_map.plot([], [], color=color, linewidth=4, alpha=0.6, label=label)
             return (patches, line)
@@ -265,7 +274,8 @@ class LocalizationVisNode(Node):
         """Update artist coordinates in place."""
         patches, line = artists
         if pose is None:
-            for p in patches: p.set_visible(False)
+            for p in patches:
+                p.set_visible(False)
             line.set_visible(False)
             return
 
@@ -381,12 +391,16 @@ def main(args=None):
     ]
 
     for i, tracker in enumerate(node.trackers):
-        (l_err_p,) = axs_plots[i][0].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
+        (l_err_p,) = axs_plots[i][0].plot(
+            [], [], color=tracker.color, alpha=0.3, label='Inst Error'
+        )
         (l_rm_p,) = axs_plots[i][0].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
         axs_plots[i][0].grid(True, linestyle='--', alpha=0.6)
         axs_plots[i][0].legend(loc='upper left')
 
-        (l_err_y,) = axs_plots[i][1].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
+        (l_err_y,) = axs_plots[i][1].plot(
+            [], [], color=tracker.color, alpha=0.3, label='Inst Error'
+        )
         (l_rm_y,) = axs_plots[i][1].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
         axs_plots[i][1].grid(True, linestyle='--', alpha=0.6)
         axs_plots[i][1].legend(loc='upper left')
@@ -405,11 +419,7 @@ def main(args=None):
 
     update_interval_ms = int(1000.0 / max(node.rate_hz, 0.1))
     ani = FuncAnimation(
-        fig, 
-        node.render, 
-        interval=update_interval_ms, 
-        blit=False, 
-        cache_frame_data=False
+        fig, node.render, interval=update_interval_ms, blit=False, cache_frame_data=False
     )
 
     try:

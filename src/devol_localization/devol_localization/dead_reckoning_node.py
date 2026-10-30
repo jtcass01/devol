@@ -25,10 +25,8 @@ class DeadReckoningNode(BaseLocalizationNode):
         )
 
         # State variables.
-        self.x_est: ndarray = array(
-            [0.0, 0.0, 0.0, 1.0]
-        )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
-        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
+        self.x_est: ndarray = array([0.0, 0.0, 0.0])  # [x, y, theta]
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
         self.q_yaw_scale: float = 0.02
         self.localization_runtime = 0.0
 
@@ -41,7 +39,7 @@ class DeadReckoningNode(BaseLocalizationNode):
         start_time: float = perf_counter()
 
         self.v: float = msg.twist.twist.linear.x
-        self.omega: float = msg.twist.twist.angular.z / self.x_est[3]
+        self.omega: float = msg.twist.twist.angular.z
 
         dt: Optional[float] = self.get_dt_from_header(msg.header)
         if dt is None:
@@ -67,13 +65,10 @@ class DeadReckoningNode(BaseLocalizationNode):
         new_cov: ndarray = self.covariance
 
         # Package the inputs for the motion model
-        s: float = new_x_est[3]
-        u: ndarray = array([self.v, s * self.omega])
+        u: ndarray = array([self.v, self.omega])
 
         # Calculate the Jacobian using the previous step.
-        A: ndarray = eye(4)
-        A[:3, :3] = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
-        A[2, 3] = self.omega * dt
+        A = UnicycleMotionModel.linearize(state=new_x_est, u=u, dt=dt)
 
         # Proportional Control Noise Covariance (M)
         sigma_v: float = (
@@ -90,9 +85,8 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         # Mapped Process Noise (R)
         theta: float = new_x_est[2]
-        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0]])
         R: ndarray = G @ M @ G.T * dt
-        R[3, 3] += self.q_yaw_scale**2 * dt
 
         # Predict: Apply model forward kinematics
         new_x_est[:3] = UnicycleMotionModel.forward(

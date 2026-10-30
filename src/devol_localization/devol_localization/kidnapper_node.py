@@ -94,7 +94,7 @@ class KidnapperNode(Node):
         self.declare_parameter('target_x', -4.7)
         self.declare_parameter('target_y', 9.2)
         self.declare_parameter('tolerance', 0.3)
-        self.declare_parameter('wait_time', 20.0)
+        self.declare_parameter('wait_time', 10.0)
         self.declare_parameter('world_name', 'maze_world')
         self.declare_parameter('entity_name', 'devol_drive')
 
@@ -126,7 +126,9 @@ class KidnapperNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Subscriptions and timers
-        self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 1)
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, self.map_topic, self.map_callback, 1
+        )
         self.timer = self.create_timer(0.5, self.control_loop)
 
     def is_map_new(self, msg: OccupancyGrid) -> bool:
@@ -143,7 +145,6 @@ class KidnapperNode(Node):
 
     def map_callback(self, msg: OccupancyGrid):
         """Converts ROS OccupancyGrid into a distance transform map for finding safe spawns."""
-        """Converts ROS OccupancyGrid into a distance transform map for the Likelihood field"""
         if not self.is_map_new(msg):
             return
 
@@ -174,6 +175,8 @@ class KidnapperNode(Node):
             'info': msg.info,
             'free_x': free_world_x,
             'free_y': free_world_y,
+            'free_pixel_x': free_x,
+            'free_pixel_y': free_y,
         }
         self.get_logger().info('Map received and Euclidean Distance Transform computed.')
         if self.state == 'WAITING_FOR_MAP':
@@ -221,7 +224,7 @@ class KidnapperNode(Node):
                 self.teleport_robot()
                 self.state = 'DONE'
 
-    def teleport_robot(self, target_z: float = 0.1):
+    def teleport_robot(self, target_z: float = 0.2):
         if not self.map_dict:
             self.get_logger().error('Map data is missing. Cannot teleport.')
             return
