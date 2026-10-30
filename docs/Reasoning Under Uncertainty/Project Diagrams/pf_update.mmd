@@ -1,4 +1,4 @@
-graph TD
+graph LR
     %% External Inputs & Handoffs
     LiDAR["2D LiDAR Plugin"]
     Octomap["2D Map Projection"]
@@ -17,29 +17,26 @@ graph TD
     end
 
     %% Final Outputs
-    PoseOut["Output (Pose & TF)"]
+    PoseOut["Output (Pose)"]
     CloudOut["Output (Particle Cloud)"]
 
     %% External & Map Flows
-    Octomap -->|"OccupancyGrid"| MapCB
+    Octomap ==>|"OccupancyGrid"| MapCB
     LiDAR ==>|"LaserScan"| Likelihood
     
     MapCB -.->|"EDT Map"| Likelihood
-    MapCB -.->|"Freespace Coords"| Resample
+    MapCB -.->|"Freespace"| Resample
 
-    %% Main State Pipeline (Thick lines)
-    PredictedParticles ==>|"Predicted Particles"| Likelihood
-    PredictedParticles ==>|"Predicted Particles"| StateEst
-    PredictedParticles ==>|"Predicted Particles"| Resample
+    PredictedParticles -->|"particles (pred)"| Likelihood
+    PredictedParticles -->|"particles (pred)"| StateEst
+    PredictedParticles -->|"particles (pred)"| Resample
 
-    %% Internal Math and Weights (Thin lines)
     Likelihood -->|"Log Probabilities"| Weights
     Weights -->|"Normalized Weights"| StateEst
     Weights -->|"N_eff & Avg Likelihoods"| Resample
 
-    %% Output Flows
-    StateEst ==>|"Estimated Pose & Cov"| PoseOut
-    Resample ==>|"Updated Particles"| CloudOut
+    StateEst ==>|"x_t & cov (update)"| PoseOut
+    Resample ==>|"particles (update)"| CloudOut
 
     %% Node Styling
     classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;

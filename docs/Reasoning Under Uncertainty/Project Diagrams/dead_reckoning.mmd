@@ -1,4 +1,4 @@
-graph TD
+graph LR
     %% External Nodes
     Octomap["2D Map Projection<br>(Not Used)"]
     
@@ -11,7 +11,6 @@ graph TD
         
         subgraph Odom_Callback ["Odom Callback (Predict Step)"]
             direction TB
-            Calib["Apply Online Odometry Calibration"]
             A["Unicycle Jacobian (A)"]
             M["Control Noise Covariance (M)"]
             R["Mapped Process Noise (R)"]
@@ -20,27 +19,23 @@ graph TD
         end
     end
 
-    Output["Output (Pose & TF)"]
+    Output["Output Pose"]
 
-    %% Main Pipeline (Thick lines)
-    Odometry_Plugin ==>|"Raw Odometry"| Calib
-    Calib ==>|"Calibrated Control (u)"| Kinematics
-    Kinematics ==>|"Estimated Pose"| Output
-    Cov ==>|"Estimated Covariance"| Output
+    Odometry_Plugin ==>|"u"| Kinematics
+    Odometry_Plugin ==>|"u"| A
+    Kinematics ==>|"x_t"| Output
+    Cov ==>|"cov_t"| Output
 
-    %% Explicit Data & Math Flows (Restored from original)
-    Odometry_Plugin -->|"Raw Odometry"| M
-    Calib -->|"Calibrated Control (u)"| A
+    Odometry_Plugin ==>|"u"| M
     
-    M -->|"Control Noise (M)"| R
-    A -->|"Jacobian (A)"| Cov
-    R -->|"Process Noise (R)"| Cov
+    M --> R
+    A --> Cov
+    R --> Cov
 
-    %% Feedback loops from previous timestep (dotted lines)
-    Kinematics -.->|"(t-1) State"| Calib
-    Kinematics -.->|"(t-1) State"| R
-    Kinematics -.->|"(t-1) State"| A
-    Cov -.->|"(t-1) Covariance"| Cov
+    Kinematics -.->|"x_{t-1}"| Kinematics
+    Kinematics -.->|"x_{t-1}"| R
+    Kinematics -.->|"x_{t-1}"| A
+    Cov -.->|"cov_{t-1}"| Cov
 
     %% Node Styling
     classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
@@ -49,7 +44,7 @@ graph TD
     classDef unused fill:#F9F9F9,stroke:#D3D3D3,stroke-width:1px,color:#A9A9A9,stroke-dasharray: 5 5;
 
     %% Apply Node Classes
-    class Calib,A,M,R,Kinematics,Cov jhuPrimary;
+    class A,M,R,Kinematics,Cov jhuPrimary;
     class Odometry_Plugin,Output outOfScope;
     class LiDAR,Octomap unused;
 

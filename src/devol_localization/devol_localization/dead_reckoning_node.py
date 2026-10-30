@@ -89,8 +89,8 @@ class DeadReckoningNode(BaseLocalizationNode):
         R: ndarray = G @ M @ G.T * dt
 
         # Predict: Apply model forward kinematics
-        new_x_est[:3] = UnicycleMotionModel.forward(
-            state=new_x_est[:3], u=u, noise=zeros(3), dt=dt
+        new_x_est = UnicycleMotionModel.forward(
+            state=new_x_est, u=u, noise=zeros(3), dt=dt
         )
         new_x_est: ndarray = wrap_angle(new_x_est)
 

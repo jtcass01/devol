@@ -1,4 +1,4 @@
-graph TD
+graph LR
     %% External Inputs
     Odometry_Plugin["Odometry Plugin"]
     PrevParticles[/"(t-1) Particles & Weights"/]
@@ -15,17 +15,17 @@ graph TD
     PredictedParticles[/"Predicted Particles<br>(Passed to Update Step)"/]
 
     %% Input Flows
-    Odometry_Plugin ==>|"Raw Odometry"| CalcNoise
-    Odometry_Plugin -->|"Raw v, ω"| NoisyCmd
-    PrevParticles -.->|"Prior State"| FwdKinematics
+    Odometry_Plugin ==>|"u"| CalcNoise
+    Odometry_Plugin ==>|"u"| NoisyCmd
+    PrevParticles -.->|"particles (t-1)"| FwdKinematics
 
     %% Internal Predict Flows
-    CalcNoise -->|"Std Devs"| NoisyCmd
-    NoisyCmd ==>|"Noisy Velocities"| FwdKinematics
-    FwdKinematics ==>|"Propagated Particles"| SlipNoise
+    CalcNoise -->|"sigmas"| NoisyCmd
+    NoisyCmd -->|"Noisy u"| FwdKinematics
+    FwdKinematics -->|"Propagated Particles"| SlipNoise
     
     %% Output Flow
-    SlipNoise ==>|"Predicted State"| PredictedParticles
+    SlipNoise -->|"particles (pred)"| PredictedParticles
 
     %% Node Styling
     classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
