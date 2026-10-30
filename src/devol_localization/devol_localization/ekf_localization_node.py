@@ -32,7 +32,6 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
 from nav_msgs.msg import OccupancyGrid, Odometry
-from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 
 # Import devol localization classes
@@ -85,7 +84,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 10)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
-        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.get_logger().info('EKF Localization Node Started!')
 
@@ -129,12 +127,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Convert indices to real-world metric coordinates
         map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
         map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
-        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
-        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
-        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
-        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
-        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
-        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
 
         # Stack into an Nx2 array of obstacle points
         map_points: ndarray = vstack((map_pts_x, map_pts_y)).T
@@ -169,13 +161,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
         local_pts: ndarray = (R_offset @ laser_pts.T).T + laser_offset[:2]
 
         current_pose: ndarray = self.x_est[:3].copy()
-        current_pose: ndarray = self.x_est[:3].copy()
         prev_error: float = float('inf')
 
-        # Calculate adaptive correspondence gate based on positional covariance
-        pos_variance = trace(self.covariance[:2, :2])
-        #  3-sigma radius, clamped between 0.5m and 2.0m
-        search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
         # Calculate adaptive correspondence gate based on positional covariance
         pos_variance = trace(self.covariance[:2, :2])
         #  3-sigma radius, clamped between 0.5m and 2.0m
@@ -190,8 +177,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
             # Find the closest Map points (Q) for every Global Scan point (P)
             distances, indices = self.map_data['kdtree'].query(global_pts)
 
-            # Reject outlier points using the adaptive search radius
-            good_matches: ndarray = distances < search_radius
             # Reject outlier points using the adaptive search radius
             good_matches: ndarray = distances < search_radius
             if sum(good_matches) < 10:
@@ -238,10 +223,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Format final pose
         current_pose = wrap_angle(current_pose)
-        current_pose = wrap_angle(current_pose)
 
         # Consider the match "valid" if the final average distance to walls is less than 20cm
-        is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
         is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
 
         return current_pose, is_valid, prev_error
@@ -363,7 +346,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
                 self.get_logger().debug('ICP match rejected by Mahalanobis check.')
 
         # Publish state
-        self.publish_pose_and_tf(
+        self.publish_pose_and_tf_runtime(
             stamp=msg.header.stamp,
             cov_3x3=self.covariance,
             start_time=0.0,
@@ -422,8 +405,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
         H: ndarray = eye(3, 4)
-        # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
-        H: ndarray = eye(3, 4)
 
         # Innovation covariance (S)
         S: ndarray = H @ new_cov @ H.T + W_dynamic
@@ -441,13 +422,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Kalman Gain (K)
         K: ndarray = new_cov @ H.T @ inv(S)
-        # Kalman Gain (K)
-        K: ndarray = new_cov @ H.T @ inv(S)
 
-        # Update the state estimate and shrink the covariance
-        new_x_est: ndarray = new_x_est + K @ y_tilde
-        new_x_est[3] = clip(new_x_est[3], 0.5, 1.2)
-        new_cov: ndarray = (eye(4) - K @ H) @ new_cov
         # Update the state estimate and shrink the covariance
         new_x_est: ndarray = new_x_est + K @ y_tilde
         new_x_est[3] = clip(new_x_est[3], 0.5, 1.2)
@@ -455,9 +430,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Wrap heading to [-pi, pi] to prevent runaway angle values over time
         new_x_est = wrap_angle(new_x_est)
-        new_x_est = wrap_angle(new_x_est)
 
-        return new_x_est, new_cov, True
         return new_x_est, new_cov, True
 
 

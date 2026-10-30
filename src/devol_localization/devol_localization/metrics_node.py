@@ -23,8 +23,9 @@ __email__ = 'jcassad1@jh.edu'
 class ErrorTracker:
     """Tracks and calculates instantaneous error and RMSE for a specific estimator."""
 
-    def __init__(self, name):
+    def __init__(self, name, color):
         self.name = name
+        self.color = color
 
         # Cumulative stats for RMSE
         self.sum_sq_pos = 0.0
@@ -35,6 +36,13 @@ class ErrorTracker:
         self.integral_pos = 0.0
         self.integral_yaw = 0.0
         self.last_time = None
+
+        # History arrays for plotting
+        self.times = []
+        self.err_pos = []
+        self.err_yaw = []
+        self.rmse_pos = []
+        self.rmse_yaw = []
 
         # Current values for CSV logging
         self.curr_err_pos = 0.0
@@ -90,14 +98,20 @@ class LocalizationLoggingNode(Node):
         self.gt_pose = None
         self.ekf_pose = None
         self.ekf_runtime = 0.0
-        self.ekf = ErrorTracker('EKF')
+        self.ekf = ErrorTracker('EKF', None)
         self.pf_pose = None
         self.pf_runtime = 0.0
         self.pf_num_particles = 0
-        self.pf = ErrorTracker('PF')
+        self.pf = ErrorTracker('PF', None)
         self.dr_pose = None
         self.dr_runtime = 0.0
-        self.dr = ErrorTracker('DR')
+        self.dr = ErrorTracker('DR', None)
+
+        # Setup CSV Logging
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.csv_filename = f'localization_metrics_{timestamp}.csv'
+        self.csv_file = open(self.csv_filename, mode='w', newline='')
+        self.csv_writer = writer(self.csv_file)
 
         # Write CSV Header
         self.csv_writer.writerow(

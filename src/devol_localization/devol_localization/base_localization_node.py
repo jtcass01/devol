@@ -157,6 +157,5 @@ class BaseLocalizationNode(Node):
         # Publish the runtime as a PointStamped message
         runtime_msg = PointStamped()
         runtime_msg.header.stamp = stamp
-        runtime_msg.frame_id = self.map_frame
         runtime_msg.point.x = end_time - start_time
         self.runtime_pub.publish(runtime_msg)

@@ -27,30 +27,6 @@ from numpy import (
     mean as np_mean,
 )
 from numpy.random import multivariate_normal, uniform, normal, choice
-from numpy import (
-    ndarray,
-    array,
-    cov,
-    float32 as np_float32,
-    ones_like,
-    ones,
-    searchsorted,
-    cumsum,
-    average,
-    arctan2,
-    cos,
-    sin,
-    copy as np_copy,
-    arange,
-    exp as np_exp,
-    max as np_max,
-    zeros,
-    vstack,
-    where,
-    pi,
-    mean as np_mean,
-)
-from numpy.random import multivariate_normal, uniform, normal, choice
 
 import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
@@ -64,12 +40,8 @@ from geometry_msgs.msg import PoseArray, Pose
 # Import devol localization classes
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.laser_model import LaserModel
-from devol_localization.utils import euler_to_quaternion
 from devol_localization.motion_models import UnicycleMotionModel
-
-
-__author__ = 'Jacob Taylor Cassady'
-__email__ = 'jcassad1@jh.edu'
+from devol_localization.utils import euler_to_quaternion
 
 
 __author__ = 'Jacob Taylor Cassady'
@@ -110,7 +82,6 @@ class ParticleFilterNode(BaseLocalizationNode):
         )
         self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
         self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
-        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
         self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
