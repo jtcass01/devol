@@ -1,0 +1,74 @@
+graph TD
+    %% External Nodes
+    Octomap["2D Map Projection"]
+
+    subgraph Gazebo ["Gazebo Simulation"]
+        Odometry_Plugin["Odometry Plugin"]
+        LiDAR["2D LiDAR Plugin"]
+    end
+
+    subgraph EKF ["Extended Kalman Filter Node"]
+        MapCB["Map Callback<br>(Build KD-Tree)"]
+        OdomCB["Odom Callback<br>(Buffer t, v, ω)"]
+        
+        subgraph LiDAR_Callback ["LiDAR Callback (Main EKF Loop)"]
+            Predict["Predict Step<br>(Process Odom Buffer)"]
+            ScanMatch["2D ICP (SVD)<br>Scan Matcher"]
+            
+            subgraph Update ["EKF Update Step"]
+                direction TB
+                W["Noise Covariance (W)"]
+                y_tilde["Innovation (y_tilde)"]
+                S["Innovation Covariance (S)"]
+                K["Kalman Gain (K)"]
+                Update_State["Apply State Update"]
+            end
+        end
+    end
+
+    Output["Output (Pose)"]
+
+    %% External Inputs
+    Octomap ==>|"OccupancyGrid"| MapCB
+    Odometry_Plugin ==>|"u"| OdomCB
+    LiDAR ==>|"LaserScan"| ScanMatch
+
+    %% Background Data
+    MapCB -.->|"KD-Tree"| ScanMatch
+    OdomCB -.->|"(t,v,omega) buffer"| Predict
+
+    %% Main State Pipeline
+    Predict -->|"x_t (pred) & cov_t (pred)"| ScanMatch
+    Predict -->|"x_t (pred)"| y_tilde
+    ScanMatch -->|"y_t (obs)"| y_tilde
+    y_tilde -->|"y_tilde"| Update_State
+    Predict -->|"x_t (pred) & cov_t (pred)"| Update_State
+    Update_State ==>|"x_t (upd) & cov_t (upd)"| Output
+
+    %% Covariance / Kalman Math
+    ScanMatch -->|"Match Error"| W
+    Predict -->|"cov_t (pred)"| S
+    W --> S
+    S --> K
+    Predict -->|"cov_t (pred)"| K
+    K --> Update_State
+
+    %% Feedback loops from previous timestep
+    Update_State -.->|"x_{t-1} & cov_{t-1}"| Predict
+
+    %% Node Styling
+    classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
+    classDef jhuGold fill:#CFB53B,stroke:#9E8721,stroke-width:2px,color:black;
+    classDef outOfScope fill:#E5E2E0,stroke:#9A9A9A,stroke-width:2px,color:black;
+    classDef callback fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;
+
+    %% Apply Classes
+    class W,y_tilde,S,K,Update_State jhuPrimary;
+    class Predict,ScanMatch jhuGold;
+    class Odometry_Plugin,LiDAR,Octomap,Output outOfScope;
+    class MapCB,OdomCB callback;
+
+    %% Subgraph Styling
+    style EKF fill:#EBF3FA,stroke:#002D72,stroke-width:2px,color:black;
+    style Update fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;
+    style LiDAR_Callback fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;

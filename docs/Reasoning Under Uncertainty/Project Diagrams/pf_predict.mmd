@@ -1,0 +1,38 @@
+graph LR
+    %% External Inputs
+    Odometry_Plugin["Odometry Plugin"]
+    PrevParticles[/"(t-1) Particles & Weights"/]
+
+    subgraph Predict ["Odom Callback (Predict Step)"]
+        direction TB
+        CalcNoise["Dynamic Noise Model<br>(Calculate σ_v, σ_w)"]
+        NoisyCmd["Sample Noisy Commands<br>(Noisy v, ω per particle)"]
+        FwdKinematics["Unicycle Forward Kinematics"]
+        SlipNoise["Lateral Slip Injection<br>(X, Y Noise)"]
+    end
+
+    %% Handoff Node
+    PredictedParticles[/"Predicted Particles<br>(Passed to Update Step)"/]
+
+    %% Input Flows
+    Odometry_Plugin ==>|"u"| CalcNoise
+    Odometry_Plugin ==>|"u"| NoisyCmd
+    PrevParticles -.->|"particles (t-1)"| FwdKinematics
+
+    %% Internal Predict Flows
+    CalcNoise -->|"sigmas"| NoisyCmd
+    NoisyCmd -->|"Noisy u"| FwdKinematics
+    FwdKinematics -->|"Propagated Particles"| SlipNoise
+    
+    %% Output Flow
+    SlipNoise -->|"particles (pred)"| PredictedParticles
+
+    %% Node Styling
+    classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
+    classDef outOfScope fill:#E5E2E0,stroke:#9A9A9A,stroke-width:2px,color:black;
+    classDef handoff fill:#CFB53B,stroke:#9E8721,stroke-width:2px,color:black;
+
+    class CalcNoise,NoisyCmd,FwdKinematics,SlipNoise jhuPrimary;
+    class Odometry_Plugin,PrevParticles outOfScope;
+    class PredictedParticles handoff;
+    style Predict fill:#D6E6F5,stroke:#002D72,stroke-width:2px,color:black;

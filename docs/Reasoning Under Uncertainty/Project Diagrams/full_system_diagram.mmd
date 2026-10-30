@@ -1,0 +1,34 @@
+graph LR
+    subgraph Agent_Level_Nodes ["Agent Level Nodes"]
+        Sensors["Sensors"]
+        Octo["octomap_server"]
+        AL["AgentLocalizer"]
+        LMP["Local Motion Planner"]
+        PC["Position Controller"]
+        DDM["DiffDrive Model"]
+        Actuators["Actuators"]
+    end
+    
+    Octo -->|"Map"| LMP
+    Octo ==>|"Map"| AL
+    
+    AL ==>|"x_t"| LMP
+    LMP -->|"Target"| PC
+    
+    Sensors ==>|"Sensor\nData"| AL
+    AL ==>|"x_t"| PC
+    PC -->|"(v, ω)"| DDM
+    DDM -->|"Joint\nVelocities"| Actuators
+
+    %% JHU Theme Node Styling
+    classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
+    classDef jhuGold fill:#CFB53B,stroke:#9E8721,stroke-width:2px,color:black;
+    classDef outOfScope fill:#E5E2E0,stroke:#9A9A9A,stroke-width:2px,color:black;
+
+    %% Apply Classes
+    class AL jhuGold;
+    class Sensors jhuPrimary;
+    class Actuators,Octo,LMP,PC,DDM outOfScope;
+
+    %% Subgraph Styling
+    style Agent_Level_Nodes fill:#EBF3FA,stroke:#002D72,stroke-width:2px,color:black;

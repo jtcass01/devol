@@ -1,0 +1,53 @@
+graph LR
+    %% External Inputs & Handoffs
+    LiDAR["2D LiDAR Plugin"]
+    Octomap["2D Map Projection"]
+    PredictedParticles[/"Predicted Particles<br>(From Predict Step)"/]
+
+    subgraph MapCB_Sub ["Map Callback"]
+        MapCB["Build EDT Map & Freespace"]
+    end
+
+    subgraph Update ["LiDAR Callback (Update Step)"]
+        direction TB
+        Likelihood["Laser Model<br>(Likelihood Field)"]
+        Weights["Weight Update & N_eff<br>(Adaptive Averages)"]
+        StateEst["State Estimation<br>(Weighted Average)"]
+        Resample["Adaptive Resampling<br>(Low Variance + Random)"]
+    end
+
+    %% Final Outputs
+    PoseOut["Output (Pose)"]
+    CloudOut["Output (Particle Cloud)"]
+
+    %% External & Map Flows
+    Octomap ==>|"OccupancyGrid"| MapCB
+    LiDAR ==>|"LaserScan"| Likelihood
+    
+    MapCB -.->|"EDT Map"| Likelihood
+    MapCB -.->|"Freespace"| Resample
+
+    PredictedParticles -->|"particles (pred)"| Likelihood
+    PredictedParticles -->|"particles (pred)"| StateEst
+    PredictedParticles -->|"particles (pred)"| Resample
+
+    Likelihood -->|"Log Probabilities"| Weights
+    Weights -->|"Normalized Weights"| StateEst
+    Weights -->|"N_eff & Avg Likelihoods"| Resample
+
+    StateEst ==>|"x_t & cov (update)"| PoseOut
+    Resample ==>|"particles (update)"| CloudOut
+
+    %% Node Styling
+    classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
+    classDef outOfScope fill:#E5E2E0,stroke:#9A9A9A,stroke-width:2px,color:black;
+    classDef handoff fill:#CFB53B,stroke:#9E8721,stroke-width:2px,color:black;
+    classDef callback fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;
+
+    class Likelihood,Weights,StateEst,Resample jhuPrimary;
+    class LiDAR,Octomap,PoseOut,CloudOut outOfScope;
+    class PredictedParticles handoff;
+    class MapCB callback;
+    
+    style MapCB_Sub fill:#EBF3FA,stroke:#002D72,stroke-width:2px,color:black;
+    style Update fill:#D6E6F5,stroke:#002D72,stroke-width:2px,color:black;

@@ -1,0 +1,54 @@
+graph LR
+    %% External Nodes
+    Octomap["2D Map Projection<br>(Not Used)"]
+    
+    subgraph Gazebo ["Gazebo Simulation"]
+        Odometry_Plugin["Odometry Plugin"]
+        LiDAR["2D LiDAR Plugin<br>(Not Used)"]
+    end
+
+    subgraph Dead_Reckoning ["Dead Reckoning Node"]
+        
+        subgraph Odom_Callback ["Odom Callback (Predict Step)"]
+            direction TB
+            A["Unicycle Jacobian (A)"]
+            M["Control Noise Covariance (M)"]
+            R["Mapped Process Noise (R)"]
+            Kinematics["Unicycle Forward Kinematics"]
+            Cov["Covariance Update"]
+        end
+    end
+
+    Output["Output Pose"]
+
+    Odometry_Plugin ==>|"u"| Kinematics
+    Odometry_Plugin ==>|"u"| A
+    Kinematics ==>|"x_t"| Output
+    Cov ==>|"cov_t"| Output
+
+    Odometry_Plugin ==>|"u"| M
+    
+    M --> R
+    A --> Cov
+    R --> Cov
+
+    Kinematics -.->|"x_{t-1}"| Kinematics
+    Kinematics -.->|"x_{t-1}"| R
+    Kinematics -.->|"x_{t-1}"| A
+    Cov -.->|"cov_{t-1}"| Cov
+
+    %% Node Styling
+    classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
+    classDef jhuGold fill:#CFB53B,stroke:#9E8721,stroke-width:2px,color:black;
+    classDef outOfScope fill:#E5E2E0,stroke:#9A9A9A,stroke-width:2px,color:black;
+    classDef unused fill:#F9F9F9,stroke:#D3D3D3,stroke-width:1px,color:#A9A9A9,stroke-dasharray: 5 5;
+
+    %% Apply Node Classes
+    class A,M,R,Kinematics,Cov jhuPrimary;
+    class Odometry_Plugin,Output outOfScope;
+    class LiDAR,Octomap unused;
+
+    %% Subgraph Styling
+    style Gazebo fill:#F5F5F5,stroke:#9A9A9A,stroke-width:2px,color:black;
+    style Dead_Reckoning fill:#EBF3FA,stroke:#002D72,stroke-width:2px,color:black;
+    style Odom_Callback fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;
