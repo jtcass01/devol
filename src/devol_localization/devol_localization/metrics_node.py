@@ -89,6 +89,7 @@ class ErrorTracker:
         self.rmse_pos.append(self.curr_rmse_pos)
         self.rmse_yaw.append(self.curr_rmse_yaw)
 
+
 class LocalizationLoggingNode(Node):
     def __init__(self):
         super().__init__('localization_logging_node')
