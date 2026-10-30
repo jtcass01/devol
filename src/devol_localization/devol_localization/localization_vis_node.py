@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 from typing import List
-from time import monotonic
+from threading import Lock, Thread
 from numpy import array, ndarray, int8 as np_int8, full, cos, sin, uint8 as np_uint8
+from zlib import crc32
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Polygon
 from dataclasses import dataclass
@@ -29,7 +31,6 @@ __email__ = 'jcassad1@jh.edu'
 @dataclass
 class BodyBox:
     """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
-
     x_min: float
     x_max: float
     y_min: float
@@ -46,17 +47,19 @@ DEFAULT_BODY = [
 ]
 
 
-
 class LocalizationVisNode(Node):
     def __init__(self):
         super().__init__('localization_combined_vis_node')
 
-        self.declare_parameter('rate_hz', 10.0)
+        self.declare_parameter('rate_hz', 5.0)
         self.rate_hz = self.get_parameter('rate_hz').value
 
         # State Variables
+        self.data_lock = Lock() # Protects data arrays across threads
         self.map_grid = None
         self.map_extent = None  # [xmin, xmax, ymin, ymax] in meters
+        self.map_updated = False
+        self.last_map_crc = None
 
         self.recording_started = False
         self.t0 = None  # Start time for x-axis zeroing
@@ -123,6 +126,14 @@ class LocalizationVisNode(Node):
         self.axs = None
         self.lines = {}
 
+        # Artist References for Map
+        self.map_img = None
+        self.pf_scatter = None
+        self.gt_artists = None
+        self.ekf_artists = None
+        self.pf_artists = None
+        self.dr_artists = None
+        
         self.get_logger().info(f'Combined Visualization Node Started at {self.rate_hz} Hz')
 
     def get_sim_time(self):
@@ -141,6 +152,18 @@ class LocalizationVisNode(Node):
             and self.dr_pose is not None
         )
 
+    def is_map_new(self, msg: OccupancyGrid) -> bool:
+        """Computes a CRC32 hash of the map data.
+        Returns True if the map is new/changed, False if it is identical."""
+        # Convert the map data array to continuous bytes and hash it
+        current_crc = crc32(bytes(msg.data))
+
+        if self.last_map_crc == current_crc:
+            return False
+
+        self.last_map_crc = current_crc
+        return True
+    
     def sync_callback(
         self,
         gt_msg: Odometry,
@@ -153,172 +176,185 @@ class LocalizationVisNode(Node):
         dr_rt_msg: PointStamped,
     ):
         """This callback ONLY triggers when a matched set of timestamps arrives."""
-        self.gt_pose = odom_to_planar(gt_msg)
-        self.ekf_pose = pose_to_planar(ekf_msg)
-        self.pf_particles = array([pose_to_planar(p) for p in pf_cloud_msg.poses])
-        self.pf_num_particles = len(pf_cloud_msg.poses)
-        self.pf_pose = pose_to_planar(pf_msg)
-        self.dr_pose = pose_to_planar(dr_msg)
+        with self.data_lock:
+            self.gt_pose = odom_to_planar(gt_msg)
+            self.ekf_pose = pose_to_planar(ekf_msg)
+            self.pf_particles = array([pose_to_planar(p) for p in pf_cloud_msg.poses])
+            self.pf_num_particles = len(pf_cloud_msg.poses)
+            self.pf_pose = pose_to_planar(pf_msg)
+            self.dr_pose = pose_to_planar(dr_msg)
 
-        if not self.recording_started and self.all_algorithms_ready:
-            self.t0 = self.get_clock().now().nanoseconds / 1e9
-            self.recording_started = True
+            if not self.recording_started and self.all_algorithms_ready:
+                self.t0 = self.get_clock().now().nanoseconds / 1e9
+                self.recording_started = True
 
-        if self.recording_started:
-            sim_time = self.get_sim_time()
+            if self.recording_started:
+                sim_time = self.get_sim_time()
 
-            # Update trackers
-            self.ekf.update(sim_time, self.ekf_pose, self.gt_pose)
-            self.pf.update(sim_time, self.pf_pose, self.gt_pose)
-            self.dr.update(sim_time, self.dr_pose, self.gt_pose)
+                # Update trackers
+                self.ekf.update(sim_time, self.ekf_pose, self.gt_pose)
+                self.pf.update(sim_time, self.pf_pose, self.gt_pose)
+                self.dr.update(sim_time, self.dr_pose, self.gt_pose)
 
-            # Store runtimes locally
-            self.runtimes['EKF'][0].append(sim_time)
-            self.runtimes['EKF'][1].append(ekf_rt_msg.point.x)
+                # Store runtimes locally
+                self.runtimes['EKF'][0].append(sim_time)
+                self.runtimes['EKF'][1].append(ekf_rt_msg.point.x)
 
-            self.runtimes['PF'][0].append(sim_time)
-            self.runtimes['PF'][1].append(pf_rt_msg.point.x)
+                self.runtimes['PF'][0].append(sim_time)
+                self.runtimes['PF'][1].append(pf_rt_msg.point.x)
 
-            self.runtimes['DR'][0].append(sim_time)
-            self.runtimes['DR'][1].append(dr_rt_msg.point.x)
+                self.runtimes['DR'][0].append(sim_time)
+                self.runtimes['DR'][1].append(dr_rt_msg.point.x)
 
     def map_callback(self, msg: OccupancyGrid):
+        if not self.is_map_new(msg):
+            return
+
         # Convert to visual grayscale
         grid: ndarray = array(msg.data, dtype=np_int8).reshape((msg.info.height, msg.info.width))
         vis_map: ndarray = full(grid.shape, 200, dtype=np_uint8)  # Unknown = Gray
         vis_map[grid == 0] = 255  # Free = White
         vis_map[grid > 50] = 0  # Obstacle = Black
-        self.map_grid: ndarray = vis_map
 
         # Calculate physical boundaries of the map in meters
         xmin: float = msg.info.origin.position.x
         ymin: float = msg.info.origin.position.y
         xmax: float = xmin + (msg.info.width * msg.info.resolution)
         ymax: float = ymin + (msg.info.height * msg.info.resolution)
-        self.map_extent: List[float] = [xmin, xmax, ymin, ymax]
 
-    def draw_robot(self, pose, color, alpha=0.6):
-        """Draws the 2D bounding boxes of the robot for a given (x, y, yaw)."""
+        with self.data_lock:
+            self.map_grid = vis_map
+            self.map_extent: List[float] = [xmin, xmax, ymin, ymax]
+            self.map_updated = True
+
+    def init_map_artists(self, ax_map):
+        self.ax_map = ax_map
+        self.ax_map.set_title('Live Localization')
+        self.ax_map.set_xlabel('Meters (X)')
+        self.ax_map.set_ylabel('Meters (Y)')
+
+        # Image for the map (start with empty grid)
+        self.map_img = self.ax_map.imshow([[0]], cmap='gray', origin='lower', vmin=0, vmax=255)
+
+        # Scatter for PF Particles
+        self.pf_scatter, = self.ax_map.plot([], [], '.', color='gray', markersize=2, alpha=0.5, label='PF Particles')
+
+        # Helper to setup a robot tracker
+        def _setup_robot(color, label):
+            patches = []
+            for _ in DEFAULT_BODY:
+                # Provide a dummy 4-point polygon
+                poly = Polygon([[0,0], [0,1], [1,1], [1,0]], closed=True, facecolor=color, edgecolor='black', alpha=0.6, zorder=5)
+                poly.set_visible(False)
+                self.ax_map.add_patch(poly)
+                patches.append(poly)
+            # Heading line
+            line, = self.ax_map.plot([], [], color='black', linewidth=1.5, zorder=6)
+            # Dummy line just for the legend
+            self.ax_map.plot([], [], color=color, linewidth=4, alpha=0.6, label=label)
+            return (patches, line)
+
+        self.gt_artists = _setup_robot('green', 'Ground Truth')
+        self.ekf_artists = _setup_robot('blue', 'EKF')
+        self.pf_artists = _setup_robot('orange', 'PF')
+        self.dr_artists = _setup_robot('red', 'Dead Reckoning')
+
+        self.ax_map.legend(loc='upper right')
+
+    def update_robot(self, pose, artists):
+        """Update artist coordinates in place."""
+        patches, line = artists
         if pose is None:
+            for p in patches: p.set_visible(False)
+            line.set_visible(False)
             return
 
         x, y, yaw = pose
-        cos_yaw = cos(yaw)
-        sin_yaw = sin(yaw)
+        cos_yaw, sin_yaw = cos(yaw), sin(yaw)
 
-        # Plot each box footprint
-        for box in DEFAULT_BODY:
+        # Update Polygon vertices
+        for i, box in enumerate(DEFAULT_BODY):
             corners_local = [
                 (box.x_min, box.y_min),
                 (box.x_max, box.y_min),
                 (box.x_max, box.y_max),
                 (box.x_min, box.y_max),
             ]
-
             corners_global = []
             for lx, ly in corners_local:
                 gx = x + lx * cos_yaw - ly * sin_yaw
                 gy = y + lx * sin_yaw + ly * cos_yaw
                 corners_global.append((gx, gy))
 
-            poly = Polygon(
-                corners_global,
-                closed=True,
-                facecolor=color,
-                edgecolor='black',
-                alpha=alpha,
-                linewidth=1,
-                zorder=5,
-            )
-            self.ax_map.add_patch(poly)
+            patches[i].set_xy(corners_global)
+            patches[i].set_visible(True)
 
-        # Draw a small heading line indicating the forward X axis
+        # Update Heading Line
         front_x = x + 0.6 * cos_yaw
         front_y = y + 0.6 * sin_yaw
-        self.ax_map.plot([x, front_x], [y, front_y], color='black', linewidth=1.5, zorder=6)
+        line.set_data([x, front_x], [y, front_y])
+        line.set_visible(True)
 
-    def render(self):
-        if self.map_grid is None or self.ax_map is None or not self.recording_started:
+    def render(self, frame):
+        if not self.recording_started:
             return
 
-        self.ax_map.clear()
-        self.ax_map.imshow(self.map_grid, cmap='gray', origin='lower', extent=self.map_extent)
+        with self.data_lock:
+            if self.map_grid is not None and self.map_updated:
+                self.map_img.set_data(self.map_grid)
+                self.map_img.set_extent(self.map_extent)
+                self.ax_map.set_xlim(self.map_extent[0], self.map_extent[1])
+                self.ax_map.set_ylim(self.map_extent[2], self.map_extent[3])
+                self.map_updated = False
 
-        if self.pf_particles is not None and len(self.pf_particles) > 0:
-            self.ax_map.plot(
-                self.pf_particles[:, 0],
-                self.pf_particles[:, 1],
-                '.',
-                color='gray',
-                markersize=2,
-                alpha=0.5,
-                label='PF Particles',
-            )
+            if self.pf_particles is not None and len(self.pf_particles) > 0:
+                self.pf_scatter.set_data(self.pf_particles[:, 0], self.pf_particles[:, 1])
 
-        if self.gt_pose is not None:
-            self.draw_robot(self.gt_pose, color='green', alpha=0.7)
-            self.ax_map.plot([], [], color='green', linewidth=4, alpha=0.7, label='Ground Truth')
+            self.update_robot(self.gt_pose, self.gt_artists)
+            self.update_robot(self.ekf_pose, self.ekf_artists)
+            self.update_robot(self.pf_pose, self.pf_artists)
+            self.update_robot(self.dr_pose, self.dr_artists)
 
-        if self.ekf_pose is not None:
-            self.draw_robot(self.ekf_pose, color='blue', alpha=0.6)
-            self.ax_map.plot([], [], color='blue', linewidth=4, alpha=0.6, label='EKF')
+            if frame % 5 == 0:
+                for i, tracker in enumerate(self.trackers):
+                    if tracker.count == 0:
+                        continue
 
-        if self.pf_pose is not None:
-            self.draw_robot(self.pf_pose, color='orange', alpha=0.6)
-            self.ax_map.plot([], [], color='orange', linewidth=4, alpha=0.6, label='PF')
+                    l_err_p, l_rm_p, l_err_y, l_rm_y, l_rt = self.lines[tracker.name]
 
-        if self.dr_pose is not None:
-            self.draw_robot(self.dr_pose, color='red', alpha=0.6)
-            self.ax_map.plot([], [], color='red', linewidth=4, alpha=0.6, label='Dead Reckoning')
+                    # Position Data
+                    l_err_p.set_data(tracker.times, tracker.err_pos)
+                    l_rm_p.set_data(tracker.times, tracker.rmse_pos)
 
-        self.ax_map.set_title('Live Localization')
-        self.ax_map.set_xlabel('Meters (X)')
-        self.ax_map.set_ylabel('Meters (Y)')
-        self.ax_map.legend(loc='upper right')
+                    # Yaw Data
+                    l_err_y.set_data(tracker.times, tracker.err_yaw)
+                    l_rm_y.set_data(tracker.times, tracker.rmse_yaw)
 
-        # ---- Render Metrics ----
-        for i, tracker in enumerate(self.trackers):
-            if tracker.count == 0:
-                continue
+                    # Runtime Data
+                    t_rt, y_rt = self.runtimes[tracker.name]
+                    l_rt.set_data(t_rt, y_rt)
 
-            l_err_p, l_rm_p, l_err_y, l_rm_y, l_rt = self.lines[tracker.name]
+                    # Rescale axes bounds around new data bounds
+                    self.axs[i][0].relim()
+                    self.axs[i][0].autoscale_view(True, True, True)
+                    self.axs[i][1].relim()
+                    self.axs[i][1].autoscale_view(True, True, True)
+                    self.axs[i][2].relim()
+                    self.axs[i][2].autoscale_view(True, True, True)
 
-            # Position Data
-            l_err_p.set_data(tracker.times, tracker.err_pos)
-            l_rm_p.set_data(tracker.times, tracker.rmse_pos)
+                    # Dynamic titles
+                    if tracker.name == 'PF':
+                        self.axs[i][0].set_title(
+                            f'{tracker.name} Pos Err (m) | Int: {tracker.integral_pos:.2f} | Parts: {self.pf_num_particles}'
+                        )
+                    else:
+                        self.axs[i][0].set_title(
+                            f'{tracker.name} Pos Err (m) | Int: {tracker.integral_pos:.2f}'
+                        )
 
-            # Yaw Data
-            l_err_y.set_data(tracker.times, tracker.err_yaw)
-            l_rm_y.set_data(tracker.times, tracker.rmse_yaw)
-
-            # Runtime Data
-            t_rt, y_rt = self.runtimes[tracker.name]
-            l_rt.set_data(t_rt, y_rt)
-
-            # Rescale axes
-            self.axs[i][0].relim()
-            self.axs[i][0].autoscale_view(True, True, True)
-            self.axs[i][1].relim()
-            self.axs[i][1].autoscale_view(True, True, True)
-            self.axs[i][2].relim()
-            self.axs[i][2].autoscale_view(True, True, True)
-
-            # Dynamic titles
-            if tracker.name == 'PF':
-                self.axs[i][0].set_title(
-                    f'{tracker.name} Pos Error (m) | Integral: {tracker.integral_pos:.2f} | Particles: {self.pf_num_particles}'
-                )
-            else:
-                self.axs[i][0].set_title(
-                    f'{tracker.name} Pos Error (m) | Integral: {tracker.integral_pos:.2f}'
-                )
-
-            self.axs[i][1].set_title(
-                f'{tracker.name} Heading Error (rad) | Integral: {tracker.integral_yaw:.2f}'
-            )
-
-        self.fig.canvas.draw_idle()
-        self.fig.canvas.flush_events()
+                    self.axs[i][1].set_title(
+                        f'{tracker.name} Head Err (rad) | Int: {tracker.integral_yaw:.2f}'
+                    )
 
 
 def main(args=None):
@@ -327,16 +363,15 @@ def main(args=None):
     executor = SingleThreadedExecutor()
     executor.add_node(node)
 
-    # Setup Matplotlib Structure
-    plt.ion()
-    fig = plt.figure(figsize=(22, 10))
+    executor_thread = Thread(target=executor.spin, daemon=True)
+    executor_thread.start()
+
+    fig = plt.figure(figsize=(16, 8), dpi=100)
     fig.canvas.manager.set_window_title('Devol Localization Overview')
 
-    # Give the map slightly more width ratio than the individual plots
     gs = GridSpec(3, 4, width_ratios=[1.3, 1, 1, 1], figure=fig)
-
-    # Left Side: Single large Map
     ax_map = fig.add_subplot(gs[:, 0])
+    node.init_map_artists(ax_map)
 
     # Right Side: 3x2 Grid for Metrics
     axs_plots = [
@@ -346,71 +381,42 @@ def main(args=None):
     ]
 
     for i, tracker in enumerate(node.trackers):
-        # Position Error Subplot (Column 1 of Grid)
-        (l_err_p,) = axs_plots[i][0].plot(
-            [], [], color=tracker.color, alpha=0.3, label='Inst Error'
-        )
+        (l_err_p,) = axs_plots[i][0].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
         (l_rm_p,) = axs_plots[i][0].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
-        axs_plots[i][0].set_title(f'{tracker.name} Position Error (m)')
         axs_plots[i][0].grid(True, linestyle='--', alpha=0.6)
         axs_plots[i][0].legend(loc='upper left')
 
-        # Heading Error Subplot (Column 2 of Grid)
-        (l_err_y,) = axs_plots[i][1].plot(
-            [], [], color=tracker.color, alpha=0.3, label='Inst Error'
-        )
+        (l_err_y,) = axs_plots[i][1].plot([], [], color=tracker.color, alpha=0.3, label='Inst Error')
         (l_rm_y,) = axs_plots[i][1].plot([], [], color=tracker.color, linewidth=2, label='RMSE')
-        axs_plots[i][1].set_title(f'{tracker.name} Heading Error (rad)')
         axs_plots[i][1].grid(True, linestyle='--', alpha=0.6)
         axs_plots[i][1].legend(loc='upper left')
 
-        # Runtime Subplot (Column 3 of Grid)
         (l_rt,) = axs_plots[i][2].plot([], [], color=tracker.color, linewidth=2, label='Runtime')
-        axs_plots[i][2].set_title(f'{tracker.name} Loop Runtime (s)')
         axs_plots[i][2].grid(True, linestyle='--', alpha=0.6)
         axs_plots[i][2].legend(loc='upper left')
 
         node.lines[tracker.name] = (l_err_p, l_rm_p, l_err_y, l_rm_y, l_rt)
 
-    # X-axis labels for the bottom row plots
     axs_plots[2][0].set_xlabel('Time (s)')
     axs_plots[2][1].set_xlabel('Time (s)')
     axs_plots[2][2].set_xlabel('Time (s)')
-
     plt.tight_layout(rect=[0, 0, 1, 0.98])
-
-    node.fig = fig
-    node.ax_map = ax_map
     node.axs = axs_plots
 
-    period = 1.0 / max(node.rate_hz, 0.1)
-    next_draw = None
+    update_interval_ms = int(1000.0 / max(node.rate_hz, 0.1))
+    ani = FuncAnimation(
+        fig, 
+        node.render, 
+        interval=update_interval_ms, 
+        blit=False, 
+        cache_frame_data=False
+    )
 
     try:
-        while rclpy.ok() and plt.fignum_exists(fig.number):
-            timeout = 0.05 if next_draw is None else max(0.0, min(0.05, next_draw - monotonic()))
-            executor.spin_once(timeout_sec=timeout)
-
-            now = monotonic()
-
-            if not node.all_algorithms_ready or node.map_grid is None:
-                next_draw = None
-                continue
-
-            if next_draw is None:
-                next_draw = now
-
-            if now >= next_draw:
-                node.render()
-                next_draw += period
-
-                if next_draw < now:
-                    next_draw = now + period
-
+        plt.show()
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        plt.close(fig)
         node.destroy_node()
         rclpy.try_shutdown()
 

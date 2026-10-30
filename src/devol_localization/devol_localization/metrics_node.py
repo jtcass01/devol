@@ -23,8 +23,9 @@ __email__ = 'jcassad1@jh.edu'
 class ErrorTracker:
     """Tracks and calculates instantaneous error and RMSE for a specific estimator."""
 
-    def __init__(self, name):
+    def __init__(self, name, color):
         self.name = name
+        self.color = color
 
         # Cumulative stats for RMSE
         self.sum_sq_pos = 0.0
@@ -35,6 +36,13 @@ class ErrorTracker:
         self.integral_pos = 0.0
         self.integral_yaw = 0.0
         self.last_time = None
+
+        # History arrays for plotting
+        self.times = []
+        self.err_pos = []
+        self.err_yaw = []
+        self.rmse_pos = []
+        self.rmse_yaw = []
 
         # Current values for CSV logging
         self.curr_err_pos = 0.0
@@ -74,6 +82,12 @@ class ErrorTracker:
         self.curr_rmse_pos = sqrt(self.sum_sq_pos / self.count)
         self.curr_rmse_yaw = sqrt(self.sum_sq_yaw / self.count)
 
+        # Append to history for plotting
+        self.times.append(t)
+        self.err_pos.append(self.curr_err_pos)
+        self.err_yaw.append(self.curr_err_yaw)
+        self.rmse_pos.append(self.curr_rmse_pos)
+        self.rmse_yaw.append(self.curr_rmse_yaw)
 
 class LocalizationLoggingNode(Node):
     def __init__(self):
