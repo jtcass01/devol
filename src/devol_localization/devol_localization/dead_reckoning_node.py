@@ -25,9 +25,7 @@ class DeadReckoningNode(BaseLocalizationNode):
         )
 
         # State variables.
-        self.x_est: ndarray = array(
-            [0.0, 0.0, 0.0]
-        )  # [x, y, theta]
+        self.x_est: ndarray = array([0.0, 0.0, 0.0])  # [x, y, theta]
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
         self.q_yaw_scale: float = 0.02
         self.localization_runtime = 0.0
