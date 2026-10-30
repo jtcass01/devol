@@ -95,7 +95,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         t_odom = stamp.sec + stamp.nanosec * 1e-9
 
         v = msg.twist.twist.linear.x
-        omega = msg.twist.twist.angular.z / self.x_est[3]
+        omega = msg.twist.twist.angular.z
 
         # Add to the buffer
         self.odom_buffer.append((t_odom, v, omega))

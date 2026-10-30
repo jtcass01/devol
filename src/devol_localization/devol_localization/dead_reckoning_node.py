@@ -41,7 +41,7 @@ class DeadReckoningNode(BaseLocalizationNode):
         start_time: float = perf_counter()
 
         self.v: float = msg.twist.twist.linear.x
-        self.omega: float = msg.twist.twist.angular.z / self.x_est[3]
+        self.omega: float = msg.twist.twist.angular.z
 
         dt: Optional[float] = self.get_dt_from_header(msg.header)
         if dt is None:
