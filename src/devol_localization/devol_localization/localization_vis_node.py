@@ -46,7 +46,6 @@ DEFAULT_BODY = [
 ]
 
 
-
 class LocalizationVisNode(Node):
     def __init__(self):
         super().__init__('localization_combined_vis_node')
