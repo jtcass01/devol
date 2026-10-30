@@ -126,7 +126,9 @@ class KidnapperNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Subscriptions and timers
-        self.map_sub = self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, 1)
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, self.map_topic, self.map_callback, 1
+        )
         self.timer = self.create_timer(0.5, self.control_loop)
 
     def is_map_new(self, msg: OccupancyGrid) -> bool:
@@ -175,7 +177,7 @@ class KidnapperNode(Node):
             'free_x': free_world_x,
             'free_y': free_world_y,
             'free_pixel_x': free_x,
-            'free_pixel_y': free_y
+            'free_pixel_y': free_y,
         }
         self.get_logger().info('Map received and Euclidean Distance Transform computed.')
         if self.state == 'WAITING_FOR_MAP':
