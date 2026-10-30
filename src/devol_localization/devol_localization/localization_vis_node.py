@@ -31,6 +31,7 @@ __email__ = 'jcassad1@jh.edu'
 @dataclass
 class BodyBox:
     """Axis-aligned box of the robot body in base_footprint (z = 0 on the ground)."""
+
     x_min: float
     x_max: float
     y_min: float
