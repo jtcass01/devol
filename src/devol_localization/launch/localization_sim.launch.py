@@ -111,7 +111,7 @@ def generate_launch_description():
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
         ('max_linear_velocity', '1.0', 'Path follower top speed in m/s'),
         ('pf_num_particles', '400', 'Number of Particles for Particle Filter'),
-        ('gz_gui', 'true', 'Show the Gazebo GUI'),
+        ('gz_gui', 'false', 'Show the Gazebo GUI'),
         ('kidnap', 'true', 'kidnap?'),
         ('log_metrics', 'true', 'log metrics?'),
         ('show_vis', 'true', 'Visualize?'),

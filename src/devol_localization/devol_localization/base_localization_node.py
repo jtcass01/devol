@@ -62,11 +62,6 @@ class BaseLocalizationNode(Node):
         self.last_map_crc = None
         self.last_scan_time = None
 
-        # TF Handling
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.tf_broadcaster = TransformBroadcaster(self)
-
         # Shared Publishers
         self.pub_pose = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
         self.runtime_pub = self.create_publisher(PointStamped, self.runtime_topic, 10)

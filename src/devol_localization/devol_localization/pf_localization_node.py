@@ -133,23 +133,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         free_world_x: ndarray = free_x * res + ox + (res / 2.0)
         free_world_y: ndarray = free_y * res + oy + (res / 2.0)
 
-        # Pre-compute free space coordinates for the escape hatch
-        free_y, free_x = where(binary_map == 1)
-        res: float = msg.info.resolution
-        ox: float = msg.info.origin.position.x
-        oy: float = msg.info.origin.position.y
-
-        # Convert pixel indices to real-world coordinates
-        free_world_x: ndarray = free_x * res + ox + (res / 2.0)
-        free_world_y: ndarray = free_y * res + oy + (res / 2.0)
-
         # Store in dict to pass to LaserModel easily
-        self.map_dict: dict = {
-            'grid': edt_map,
-            'info': msg.info,
-            'free_x': free_world_x,
-            'free_y': free_world_y,
-        }
         self.map_dict: dict = {
             'grid': edt_map,
             'info': msg.info,
