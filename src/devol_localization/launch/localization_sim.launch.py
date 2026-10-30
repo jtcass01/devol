@@ -104,6 +104,7 @@ def launch_setup(context):
 
     return actions
 
+
 def generate_launch_description():
     args = [
         ('maze', 'factory', 'World to load'),
