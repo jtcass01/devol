@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from numpy import array, cos, sin, pi, ndarray, eye, atleast_2d
+from typing import Union
+from numpy import cos, sin, eye, atleast_2d, ndarray
 
 
 __author__ = 'Jacob Taylor Cassady'
@@ -9,7 +10,9 @@ __email__ = 'jcassad1@jh.edu'
 
 class UnicycleMotionModel:
     @staticmethod
-    def forward(state, u, noise, dt):
+    def forward(
+        state: Union[float, ndarray], u: ndarray, noise: float, dt: float
+    ) -> Union[float, ndarray]:
         v = u[0] + noise[0]
         omega = u[1] + noise[1]
 
@@ -25,7 +28,7 @@ class UnicycleMotionModel:
         return state_arr[0] if is_1d else state_arr
 
     @staticmethod
-    def linearize(state, u, dt):
+    def linearize(state: ndarray, u: ndarray, dt: float) -> ndarray:
         v = u[0]
         theta = state[2]
 

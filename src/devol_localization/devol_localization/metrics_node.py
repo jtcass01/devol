@@ -90,14 +90,20 @@ class LocalizationLoggingNode(Node):
         self.gt_pose = None
         self.ekf_pose = None
         self.ekf_runtime = 0.0
-        self.ekf = ErrorTracker('EKF')
+        self.ekf = ErrorTracker('EKF', None)
         self.pf_pose = None
         self.pf_runtime = 0.0
         self.pf_num_particles = 0
-        self.pf = ErrorTracker('PF')
+        self.pf = ErrorTracker('PF', None)
         self.dr_pose = None
         self.dr_runtime = 0.0
-        self.dr = ErrorTracker('DR')
+        self.dr = ErrorTracker('DR', None)
+
+        # Setup CSV Logging
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.csv_filename = f'localization_metrics_{timestamp}.csv'
+        self.csv_file = open(self.csv_filename, mode='w', newline='')
+        self.csv_writer = writer(self.csv_file)
 
         # Write CSV Header
         self.csv_writer.writerow(
@@ -127,29 +133,34 @@ class LocalizationLoggingNode(Node):
                 'DR_Yaw_Err',
                 'DR_Yaw_RMSE',
                 'DR_Yaw_Integral',
-                'DR_Runtime',            ]
+                'DR_Runtime',
+            ]
         )
 
         # Subscribers
         self.gt_sub = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
-        
+
         self.ekf_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/ekf_pose')
         self.ekf_rt_sub = Subscriber(self, PointStamped, '/devol_drive/ekf_pose/runtime')
-        
+
         self.pf_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/pf_pose')
         self.pf_cloud_sub = Subscriber(self, PoseArray, '/devol_drive/pf_pose_cloud')
         self.pf_rt_sub = Subscriber(self, PointStamped, '/devol_drive/pf_pose/runtime')
-        
+
         self.dr_sub = Subscriber(self, PoseWithCovarianceStamped, '/devol_drive/dr_pose')
         self.dr_rt_sub = Subscriber(self, PointStamped, '/devol_drive/dr_pose/runtime')
 
         # Syncronize Subs
         self.ts = ApproximateTimeSynchronizer(
             [
-                self.gt_sub, 
-                self.ekf_sub, self.ekf_rt_sub, 
-                self.pf_sub, self.pf_cloud_sub, self.pf_rt_sub, 
-                self.dr_sub, self.dr_rt_sub
+                self.gt_sub,
+                self.ekf_sub,
+                self.ekf_rt_sub,
+                self.pf_sub,
+                self.pf_cloud_sub,
+                self.pf_rt_sub,
+                self.dr_sub,
+                self.dr_rt_sub,
             ],
             queue_size=20,
             slop=0.5,
@@ -160,7 +171,9 @@ class LocalizationLoggingNode(Node):
         timer_period = 1.0 / self.rate_hz
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
-        self.get_logger().info(f'Logging Node Started. Writing to {self.csv_filename} at {self.rate_hz} Hz')
+        self.get_logger().info(
+            f'Logging Node Started. Writing to {self.csv_filename} at {self.rate_hz} Hz'
+        )
 
     def get_sim_time(self):
         """Returns time in seconds. Initializes t0 on first call."""

@@ -21,6 +21,9 @@ from numpy import (
     trace,
     sqrt,
     clip,
+    trace,
+    sqrt,
+    clip,
 )
 from numpy.linalg import svd, det, inv
 
@@ -47,8 +50,11 @@ CHI2_TRESHOLD_3DOF_95CONF: float = 7.815
 
 class EKFLocalizationNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('ekf_localization_node', '/devol_drive/ekf_pose',
-                         runtime_topic='/devol_drive/ekf_pose/runtime')
+        super().__init__(
+            'ekf_localization_node',
+            '/devol_drive/ekf_pose',
+            runtime_topic='/devol_drive/ekf_pose/runtime',
+        )
 
         self.map_data = None
         self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
@@ -93,6 +99,18 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Add to the buffer
         self.odom_buffer.append((t_odom, v, omega))
 
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        # Convert ROS timestamp to a float in seconds
+        stamp = msg.header.stamp
+        t_odom = stamp.sec + stamp.nanosec * 1e-9
+
+        v = msg.twist.twist.linear.x
+        omega = msg.twist.twist.angular.z / self.x_est[3]
+
+        # Add to the buffer
+        self.odom_buffer.append((t_odom, v, omega))
+
     def map_callback(self, msg: OccupancyGrid):
         """Extracts obstacle coordinates and builds KDTree."""
         start_time: float = perf_counter()
@@ -107,8 +125,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
         obstacle_y, obstacle_x = where(grid > 50)
 
         # Convert indices to real-world metric coordinates
-        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
-        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
         map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
         map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
 
@@ -129,6 +145,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         ranges, angles = self.preprocess_scan(msg=msg)
 
         if len(ranges) < 10:
+            return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
             return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
 
         # Nx2 array of local laser points
@@ -194,6 +211,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
             t_delta: ndarray = centroid_Q - R_delta @ centroid_P
 
             # Apply the delta transformation to current pose guess
+            # Apply the delta transformation to current pose guess
             current_pose[:2] = R_delta @ current_pose[:2] + t_delta
             current_pose[2] += arctan2(R_delta[1, 0], R_delta[0, 0])
 
@@ -210,6 +228,30 @@ class EKFLocalizationNode(BaseLocalizationNode):
         is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
 
         return current_pose, is_valid, prev_error
+
+    def inlier_fraction_check(
+        self,
+        current_pose: ndarray,
+        local_pts: ndarray,
+        distance_threshold: float = 0.15,
+        valid_threshold: float = 0.8,
+    ) -> bool:
+        # Project scan points to the global map frame using the pose
+        final_theta: float = current_pose[2]
+        R_final: ndarray = array(
+            [[cos(final_theta), -sin(final_theta)], [sin(final_theta), cos(final_theta)]]
+        )
+        final_global_pts: ndarray = (R_final @ local_pts.T).T + current_pose[:2]
+
+        # Query distances to the nearest map points.
+        final_distances, _ = self.map_data['kdtree'].query(final_global_pts)
+
+        # Calculate the fraction of points within distance_threshold
+        inliers = sum(final_distances <= distance_threshold)
+        inlier_fraction = float(inliers) / len(final_global_pts)
+
+        # Consider the match "valid" if within valid_threshold
+        return inlier_fraction >= valid_threshold
 
     def inlier_fraction_check(
         self,
@@ -273,6 +315,26 @@ class EKFLocalizationNode(BaseLocalizationNode):
                 self.current_v, self.current_omega, dt_partial
             )
             self.last_time = t_scan
+        # Process all buffered odom messages stamped AT or BEFORE the scan time
+        while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
+            t_odom, v, omega = self.odom_buffer.pop(0)
+
+            dt = t_odom - self.last_time
+            if dt > 0:
+                self.x_est, self.covariance = self._predict(v, omega, dt)
+                self.last_time = t_odom
+
+            # Keep track of the latest velocities for the partial step
+            self.current_v = v
+            self.current_omega = omega
+
+        # Add one final partial step exactly up to the scan timestamp
+        dt_partial = t_scan - self.last_time
+        if dt_partial > 0:
+            self.x_est, self.covariance = self._predict(
+                self.current_v, self.current_omega, dt_partial
+            )
+            self.last_time = t_scan
 
         # update step (Using LaserScan ICP)
         y_pose, is_valid, match_error = self.scan_match(msg)
@@ -284,10 +346,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
                 self.get_logger().debug('ICP match rejected by Mahalanobis check.')
 
         # Publish state
-        self.publish_pose_and_tf(stamp=msg.header.stamp, 
-                                 cov_3x3=self.covariance,
-                                 start_time=0.0,
-                                 end_time=self.localization_runtime)
+        self.publish_pose_and_tf_runtime(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime,
+        )
 
         # Reset runtime for the next cycle
         self.localization_runtime = 0.0

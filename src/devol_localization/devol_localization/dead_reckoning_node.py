@@ -18,8 +18,11 @@ __email__ = 'jcassad1@jh.edu'
 
 class DeadReckoningNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('dead_reckoning_node', pose_topic='/devol_drive/dr_pose',
-                         runtime_topic='/devol_drive/dr_pose/runtime')
+        super().__init__(
+            'dead_reckoning_node',
+            pose_topic='/devol_drive/dr_pose',
+            runtime_topic='/devol_drive/dr_pose/runtime',
+        )
 
         # State variables.
         self.x_est: ndarray = array(
@@ -27,6 +30,7 @@ class DeadReckoningNode(BaseLocalizationNode):
         )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
         self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
         self.q_yaw_scale: float = 0.02
+        self.localization_runtime = 0.0
 
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
@@ -51,12 +55,12 @@ class DeadReckoningNode(BaseLocalizationNode):
             stamp=msg.header.stamp,
             cov_3x3=self.covariance,
             start_time=0.0,
-            end_time=self.localization_runtime
+            end_time=self.localization_runtime,
         )
-        
+
         # Reset runtime for the next cycle
         self.localization_runtime = 0.0
-    
+
     def _predict(self, dt: float) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
         new_x_est: ndarray = self.x_est

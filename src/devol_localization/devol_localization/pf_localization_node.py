@@ -33,14 +33,15 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
 from nav_msgs.msg import OccupancyGrid, Odometry
+from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseArray, Pose
 
 # Import devol localization classes
 from devol_localization.base_localization_node import BaseLocalizationNode
 from devol_localization.laser_model import LaserModel
-from devol_localization.utils import euler_to_quaternion
 from devol_localization.motion_models import UnicycleMotionModel
+from devol_localization.utils import euler_to_quaternion
 
 
 __author__ = 'Jacob Taylor Cassady'
@@ -49,8 +50,11 @@ __email__ = 'jcassad1@jh.edu'
 
 class ParticleFilterNode(BaseLocalizationNode):
     def __init__(self):
-        super().__init__('particle_filter_node', '/devol_drive/pf_pose',
-                         runtime_topic='/devol_drive/pf_pose/runtime')
+        super().__init__(
+            'particle_filter_node',
+            '/devol_drive/pf_pose',
+            runtime_topic='/devol_drive/pf_pose/runtime',
+        )
 
         self.declare_parameter('num_particles', '500')
 
@@ -66,7 +70,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         # Adaptive injection moving averages
         self.slow_avg_lik = 0.0
         self.fast_avg_lik = 0.0
-        
+
         # Total runtime accumulator
         self.localization_runtime = 0.0
 
@@ -129,7 +133,23 @@ class ParticleFilterNode(BaseLocalizationNode):
         free_world_x: ndarray = free_x * res + ox + (res / 2.0)
         free_world_y: ndarray = free_y * res + oy + (res / 2.0)
 
+        # Pre-compute free space coordinates for the escape hatch
+        free_y, free_x = where(binary_map == 1)
+        res: float = msg.info.resolution
+        ox: float = msg.info.origin.position.x
+        oy: float = msg.info.origin.position.y
+
+        # Convert pixel indices to real-world coordinates
+        free_world_x: ndarray = free_x * res + ox + (res / 2.0)
+        free_world_y: ndarray = free_y * res + oy + (res / 2.0)
+
         # Store in dict to pass to LaserModel easily
+        self.map_dict: dict = {
+            'grid': edt_map,
+            'info': msg.info,
+            'free_x': free_world_x,
+            'free_y': free_world_y,
+        }
         self.map_dict: dict = {
             'grid': edt_map,
             'info': msg.info,
@@ -167,10 +187,7 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         # Publish state
         self.publish_pose_and_tf_runtime(
-            stamp=stamp,
-            cov_3x3=cov_3x3,
-            start_time=0.0,
-            end_time=self.localization_runtime
+            stamp=stamp, cov_3x3=cov_3x3, start_time=0.0, end_time=self.localization_runtime
         )
 
         # Publish Particle Cloud

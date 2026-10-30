@@ -18,8 +18,12 @@ __email__ = 'jcassad1@jh.edu'
 
 
 class BaseLocalizationNode(Node):
-    def __init__(self, node_name, pose_topic: str = '/devol_drive/pose',
-                 runtime_topic: str = '/devol_drive/pose/runtime'):
+    def __init__(
+        self,
+        node_name,
+        pose_topic: str = '/devol_drive/pose',
+        runtime_topic: str = '/devol_drive/pose/runtime',
+    ):
         super().__init__(node_name)
 
         # Declare Parameters
@@ -69,6 +73,9 @@ class BaseLocalizationNode(Node):
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
         self.v: float = msg.twist.twist.linear.x
         self.omega: float = msg.twist.twist.angular.z
         self.u: ndarray = array([self.v, self.omega])
@@ -150,6 +157,5 @@ class BaseLocalizationNode(Node):
         # Publish the runtime as a PointStamped message
         runtime_msg = PointStamped()
         runtime_msg.header.stamp = stamp
-        runtime_msg.frame_id = self.map_frame
         runtime_msg.point.x = end_time - start_time
         self.runtime_pub.publish(runtime_msg)

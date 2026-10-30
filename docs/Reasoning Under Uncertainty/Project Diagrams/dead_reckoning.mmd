@@ -1,0 +1,59 @@
+graph TD
+    %% External Nodes
+    Octomap["2D Map Projection<br>(Not Used)"]
+    
+    subgraph Gazebo ["Gazebo Simulation"]
+        Odometry_Plugin["Odometry Plugin"]
+        LiDAR["2D LiDAR Plugin<br>(Not Used)"]
+    end
+
+    subgraph Dead_Reckoning ["Dead Reckoning Node"]
+        
+        subgraph Odom_Callback ["Odom Callback (Predict Step)"]
+            direction TB
+            Calib["Apply Online Odometry Calibration"]
+            A["Unicycle Jacobian (A)"]
+            M["Control Noise Covariance (M)"]
+            R["Mapped Process Noise (R)"]
+            Kinematics["Unicycle Forward Kinematics"]
+            Cov["Covariance Update"]
+        end
+    end
+
+    Output["Output (Pose & TF)"]
+
+    %% Main Pipeline (Thick lines)
+    Odometry_Plugin ==>|"Raw Odometry"| Calib
+    Calib ==>|"Calibrated Control (u)"| Kinematics
+    Kinematics ==>|"Estimated Pose"| Output
+    Cov ==>|"Estimated Covariance"| Output
+
+    %% Explicit Data & Math Flows (Restored from original)
+    Odometry_Plugin -->|"Raw Odometry"| M
+    Calib -->|"Calibrated Control (u)"| A
+    
+    M -->|"Control Noise (M)"| R
+    A -->|"Jacobian (A)"| Cov
+    R -->|"Process Noise (R)"| Cov
+
+    %% Feedback loops from previous timestep (dotted lines)
+    Kinematics -.->|"(t-1) State"| Calib
+    Kinematics -.->|"(t-1) State"| R
+    Kinematics -.->|"(t-1) State"| A
+    Cov -.->|"(t-1) Covariance"| Cov
+
+    %% Node Styling
+    classDef jhuPrimary fill:#002D72,stroke:#001A40,stroke-width:2px,color:white;
+    classDef jhuGold fill:#CFB53B,stroke:#9E8721,stroke-width:2px,color:black;
+    classDef outOfScope fill:#E5E2E0,stroke:#9A9A9A,stroke-width:2px,color:black;
+    classDef unused fill:#F9F9F9,stroke:#D3D3D3,stroke-width:1px,color:#A9A9A9,stroke-dasharray: 5 5;
+
+    %% Apply Node Classes
+    class Calib,A,M,R,Kinematics,Cov jhuPrimary;
+    class Odometry_Plugin,Output outOfScope;
+    class LiDAR,Octomap unused;
+
+    %% Subgraph Styling
+    style Gazebo fill:#F5F5F5,stroke:#9A9A9A,stroke-width:2px,color:black;
+    style Dead_Reckoning fill:#EBF3FA,stroke:#002D72,stroke-width:2px,color:black;
+    style Odom_Callback fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;
