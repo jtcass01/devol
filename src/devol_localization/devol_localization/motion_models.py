@@ -29,7 +29,7 @@ class UnicycleMotionModel:
     def control_jacobian(x: ndarray, dt: float) -> ndarray:
         """G"""
         theta = x[2]
-        return array([[dt*cos(theta), 0.0], [dt*sin(theta), 0.0], [0.0, dt]])
+        return array([[dt * cos(theta), 0.0], [dt * sin(theta), 0.0], [0.0, dt]])
 
     @staticmethod
     def state_jacobian(x: ndarray, u: ndarray, dt: float) -> ndarray:

@@ -46,11 +46,12 @@ class DeadReckoningNode(BaseLocalizationNode):
             prev_cov=self.covariance,
             v=msg.twist.twist.linear.x,
             omega=msg.twist.twist.angular.z,
-            dt=dt, 
+            dt=dt,
             alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
             alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
             alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
-            alpha_rv_causedby_rv=self.alpha_rv_causedby_rv)
+            alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
+        )
         self.localization_runtime += perf_counter() - start_time
 
         # Publish Pose, TF, and Runtime using the base class
@@ -71,10 +72,17 @@ class DeadReckoningNode(BaseLocalizationNode):
         return G @ M @ G.T * dt
 
     @staticmethod
-    def _predict(prev_x: ndarray, prev_cov: ndarray, v: float, 
-                 omega: float, dt: float, alpha_tv_causedby_tv: float, 
-                 alpha_tv_causedby_rv: float, alpha_rv_causedby_tv: float, 
-                 alpha_rv_causedby_rv: float) -> Tuple[ndarray, ndarray]:
+    def _predict(
+        prev_x: ndarray,
+        prev_cov: ndarray,
+        v: float,
+        omega: float,
+        dt: float,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
         u: ndarray = array([v, omega])
 
@@ -84,10 +92,12 @@ class DeadReckoningNode(BaseLocalizationNode):
 
         # Proportional Control Noise Covariance (M)
         M: ndarray = DeadReckoningNode.control_noise_covariance(
-            u=u, alpha_tv_causedby_tv=alpha_tv_causedby_tv,
+            u=u,
+            alpha_tv_causedby_tv=alpha_tv_causedby_tv,
             alpha_tv_causedby_rv=alpha_tv_causedby_rv,
             alpha_rv_causedby_tv=alpha_rv_causedby_tv,
-            alpha_rv_causedby_rv=alpha_rv_causedby_rv)
+            alpha_rv_causedby_rv=alpha_rv_causedby_rv,
+        )
 
         # Mapped Process Noise (R)
         R: ndarray = DeadReckoningNode.mapped_process_noise(x=x, M=M, dt=dt)
