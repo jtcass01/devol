@@ -32,6 +32,7 @@ setup(
             'viz_node = devol_localization.localization_vis_node:main',
             'metrics_node = devol_localization.metrics_node:main',
             'kidnapper_node = devol_localization.kidnapper_node:main',
+            'goal_monitor_node = devol_localization.goal_monitor_node:main',
         ],
     },
 )
