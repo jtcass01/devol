@@ -124,24 +124,21 @@ class BaseLocalizationNode(Node):
     def get_laser_offset(self):
         """Looks up the physical LiDAR mount offset."""
         return array([0.32825, 0.0, 0.0])
-    
+
     @staticmethod
-    def control_noise_covariance(u: ndarray, alpha_tv_causedby_tv: float, alpha_tv_causedby_rv: float,
-                                 alpha_rv_causedby_tv: float, alpha_rv_causedby_rv: float) -> ndarray:
+    def control_noise_covariance(
+        u: ndarray,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> ndarray:
         """M"""
         v: float = u[0]
         omega: float = u[1]
 
-        sigma_v: float = (
-            alpha_tv_causedby_tv * abs(v)
-            + alpha_tv_causedby_rv * abs(omega)
-            + 0.001
-        )
-        sigma_w: float = (
-            alpha_rv_causedby_tv * abs(v)
-            + alpha_rv_causedby_rv * abs(omega)
-            + 0.001
-        )
+        sigma_v: float = alpha_tv_causedby_tv * abs(v) + alpha_tv_causedby_rv * abs(omega) + 0.001
+        sigma_w: float = alpha_rv_causedby_tv * abs(v) + alpha_rv_causedby_rv * abs(omega) + 0.001
 
         return diag([sigma_v**2, sigma_w**2])
 
