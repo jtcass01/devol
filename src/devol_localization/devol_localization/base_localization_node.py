@@ -36,7 +36,7 @@ class BaseLocalizationNode(Node):
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'a200_base_link')
-        self.declare_parameter('seed', "31")
+        self.declare_parameter('seed', '31')
 
         # Retrieve Parameters
         self.odom_topic: str = self.get_parameter('odom_topic').value

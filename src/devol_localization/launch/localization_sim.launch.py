@@ -52,7 +52,13 @@ def launch_setup(context):
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
-            parameters=[{'use_sim_time': True, 'num_particles': arg('pf_num_particles'), 'seed': arg('seed')}],
+            parameters=[
+                {
+                    'use_sim_time': True,
+                    'num_particles': arg('pf_num_particles'),
+                    'seed': arg('seed'),
+                }
+            ],
         )
     )
 
@@ -86,8 +92,7 @@ def launch_setup(context):
             executable='metrics_node',
             name='metrics_vis_node',
             output='screen',
-            parameters=[{'use_sim_time': True,
-                         'results_dir': arg('results_dir')}],
+            parameters=[{'use_sim_time': True, 'results_dir': arg('results_dir')}],
             condition=IfCondition(LaunchConfiguration('log_metrics')),
         )
     )

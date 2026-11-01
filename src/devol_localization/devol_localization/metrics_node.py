@@ -97,7 +97,7 @@ class LocalizationLoggingNode(Node):
         super().__init__('localization_logging_node')
 
         self.declare_parameter('rate_hz', 10.0)
-        self.declare_parameter('results_dir', "results")
+        self.declare_parameter('results_dir', 'results')
 
         self.rate_hz = self.get_parameter('rate_hz').value
         results_dir: str = self.get_parameter('results_dir').value
@@ -124,7 +124,9 @@ class LocalizationLoggingNode(Node):
         if isabs(results_dir):
             self.csv_filename = join(results_dir, f'localization_metrics_{timestamp}.csv')
         else:
-            self.csv_filename = join(getcwd(), results_dir, f'localization_metrics_{timestamp}.csv')
+            self.csv_filename = join(
+                getcwd(), results_dir, f'localization_metrics_{timestamp}.csv'
+            )
         self.csv_file = open(self.csv_filename, mode='w', newline='')
         self.csv_writer = writer(self.csv_file)
 
