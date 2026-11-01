@@ -52,7 +52,7 @@ def launch_setup(context):
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
-            parameters=[{'use_sim_time': True, 'num_particles': arg('pf_num_particles')}],
+            parameters=[{'use_sim_time': True, 'num_particles': arg('pf_num_particles'), 'seed': arg('seed')}],
         )
     )
 
@@ -86,7 +86,8 @@ def launch_setup(context):
             executable='metrics_node',
             name='metrics_vis_node',
             output='screen',
-            parameters=[{'use_sim_time': True}],
+            parameters=[{'use_sim_time': True,
+                         'results_dir': arg('results_dir')}],
             condition=IfCondition(LaunchConfiguration('log_metrics')),
         )
     )
@@ -115,6 +116,8 @@ def generate_launch_description():
         ('kidnap', 'false', 'kidnap?'),
         ('log_metrics', 'true', 'log metrics?'),
         ('show_vis', 'true', 'Visualize?'),
+        ('seed', '31', 'Seed for RNG'),
+        ('results_dir', 'results', 'relative directory for results'),
     ]
 
     return LaunchDescription(

@@ -2,6 +2,8 @@
 
 from math import hypot, atan2, sin, cos, sqrt
 from csv import writer
+from os.path import join, isabs
+from os import getcwd
 from datetime import datetime
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 
@@ -95,7 +97,10 @@ class LocalizationLoggingNode(Node):
         super().__init__('localization_logging_node')
 
         self.declare_parameter('rate_hz', 10.0)
+        self.declare_parameter('results_dir', "results")
+
         self.rate_hz = self.get_parameter('rate_hz').value
+        results_dir: str = self.get_parameter('results_dir').value
 
         # State Variables
         self.recording_started = False
@@ -116,7 +121,10 @@ class LocalizationLoggingNode(Node):
 
         # Setup CSV Logging
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.csv_filename = f'localization_metrics_{timestamp}.csv'
+        if isabs(results_dir):
+            self.csv_filename = join(results_dir, f'localization_metrics_{timestamp}.csv')
+        else:
+            self.csv_filename = join(getcwd(), results_dir, f'localization_metrics_{timestamp}.csv')
         self.csv_file = open(self.csv_filename, mode='w', newline='')
         self.csv_writer = writer(self.csv_file)
 

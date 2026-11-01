@@ -59,9 +59,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # State variables.
         self.x_est: ndarray = array(
-            [0.0, 0.0, 0.0]
+            [0.0, 0.0, 0.0, 1.0]
         )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
-        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
         self.q_yaw_scale: float = 0.02
 
         # Time synchronization variables
@@ -341,10 +341,13 @@ class EKFLocalizationNode(BaseLocalizationNode):
         return inlier_fraction >= valid_threshold
 
     @staticmethod
-    def mapped_process_noise(x: ndarray, M: ndarray, dt: float) -> ndarray:
+    def mapped_process_noise(x: ndarray, M: ndarray, dt: float, q_yaw_scale: float) -> ndarray:
         """R"""
-        G: ndarray = UnicycleMotionModel.control_jacobian(x=x, dt=dt)
-        return G @ M @ G.T * dt
+        theta: float = x[2]
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
+        R: ndarray = G @ M @ G.T * dt
+        R[3, 3] += q_yaw_scale**2 * dt
+        return R
 
     @staticmethod
     def _predict(
@@ -361,10 +364,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
     ) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
         # Package the inputs for the motion model
-        u: ndarray = array([v, omega])
+        s: float = prev_x[3]
+        u: ndarray = array([v, s * omega])
 
         # Apply model forward kinematics
-        x = UnicycleMotionModel.forward(x=prev_x, u=u, noise=zeros(3), dt=dt)
+        x: ndarray = prev_x.copy()
+        x[:3] = UnicycleMotionModel.forward(x=prev_x[:3], u=u, noise=zeros(3), dt=dt)
         x: ndarray = wrap_angle(x)
 
         # Proportional Control Noise Covariance (M)
@@ -382,7 +387,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
         )
 
         # Calculate the Jacobian using the previous step.
-        A: ndarray = UnicycleMotionModel.state_jacobian(x=prev_x, u=u, dt=dt)
+        A: ndarray = eye(4)
+        A[:3, :3] = UnicycleMotionModel.state_jacobian(x=prev_x[:3], u=u, dt=dt)
+        A[2, 3] = omega * dt
 
         # Update the covariance
         cov: ndarray = EKFLocalizationNode.update_covariance(A=A, cov=prev_cov, R=R)
@@ -397,7 +404,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         W_dynamic: ndarray = W_pose * error_scale
 
         # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
-        H: ndarray = eye(3, 3)
+        H: ndarray = eye(3, 4)
 
         # Innovation covariance (S)
         S: ndarray = H @ cov_pred @ H.T + W_dynamic

@@ -26,7 +26,6 @@ from numpy import (
     pi,
     mean as np_mean,
 )
-from numpy.random import multivariate_normal, uniform, normal, choice
 
 import rclpy
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
@@ -61,7 +60,7 @@ class ParticleFilterNode(BaseLocalizationNode):
         self.num_particles: int = int(self.get_parameter('num_particles').value)
 
         # Initialize particles clustered around starting origin
-        self.particles: ndarray = multivariate_normal(
+        self.particles: ndarray = self.rng.multivariate_normal(
             self.x_est, self.covariance, self.num_particles
         )
         self.weights: ndarray = ones(self.num_particles) / self.num_particles
@@ -210,8 +209,8 @@ class ParticleFilterNode(BaseLocalizationNode):
         heading_moved = self.omega * dt
 
         # Vectorized generation of noisy movements (std_dev = sigma * sqrt(dt))
-        noisy_dists = normal(dist_moved, sigma_v * sqrt_dt, self.num_particles)
-        noisy_headings = normal(heading_moved, sigma_w * sqrt_dt, self.num_particles)
+        noisy_dists = self.rng.normal(dist_moved, sigma_v * sqrt_dt, self.num_particles)
+        noisy_headings = self.rng.normal(heading_moved, sigma_w * sqrt_dt, self.num_particles)
 
         # Convert back to effective velocities since UnicycleMotionModel expects velocity inputs
         noisy_vs = noisy_dists / dt
@@ -231,8 +230,8 @@ class ParticleFilterNode(BaseLocalizationNode):
         )
 
         # Inject independent X and Y lateral slip noise directly to the array
-        new_particles[:, 0] += normal(0.0, 0.005, self.num_particles)
-        new_particles[:, 1] += normal(0.0, 0.005, self.num_particles)
+        new_particles[:, 0] += self.rng.normal(0.0, 0.005, self.num_particles)
+        new_particles[:, 1] += self.rng.normal(0.0, 0.005, self.num_particles)
 
         return new_particles
 
@@ -311,7 +310,7 @@ class ParticleFilterNode(BaseLocalizationNode):
 
             num_random = int(self.num_particles * escape_fraction)
             num_normal = self.num_particles - num_random
-            normal_particles: ndarray = ParticleFilterNode.low_variance_resample(
+            normal_particles: ndarray = self.low_variance_resample(
                 self.particles, self.weights, num_samples=num_normal
             )
 
@@ -321,14 +320,14 @@ class ParticleFilterNode(BaseLocalizationNode):
 
             if num_random > 0:
                 if len(free_x) > 0:
-                    rand_indices = choice(len(free_x), size=num_random, replace=True)
+                    rand_indices = self.rng.choice(len(free_x), size=num_random, replace=True)
                     random_particles = zeros((num_random, 3))
                     random_particles[:, 0] = free_x[rand_indices]
                     random_particles[:, 1] = free_y[rand_indices]
-                    random_particles[:, 2] = uniform(-pi, pi, num_random)
+                    random_particles[:, 2] = self.rng.uniform(-pi, pi, num_random)
                 else:
                     # Safe fallback if map processing missed freespace coordinates
-                    random_particles = multivariate_normal(
+                    random_particles = self.rng.multivariate_normal(
                         x_est, cov(self.particles, rowvar=False), num_random
                     )
 
@@ -344,15 +343,14 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         return new_particles, x_est
 
-    @staticmethod
     def low_variance_resample(
-        particles: ndarray, weights: ndarray, num_samples: Optional[int] = None
+        self, particles: ndarray, weights: ndarray, num_samples: Optional[int] = None
     ) -> ndarray:
         N = len(particles) if num_samples is None else num_samples
 
         # Generate a single random start point between 0 and 1/N
         step = 1.0 / N
-        pointers = uniform(0, step) + arange(N) * step
+        pointers = self.rng.uniform(0, step) + arange(N) * step
 
         # Find where those evenly spaced pointers land in the cumulative weight array
         cumulative_sum = cumsum(weights)

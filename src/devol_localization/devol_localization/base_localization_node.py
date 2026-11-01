@@ -2,6 +2,7 @@
 
 from zlib import crc32
 from numpy import ndarray, array, linspace, isinf, isnan, diag, deg2rad, zeros
+from numpy.random import default_rng
 
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
@@ -35,6 +36,7 @@ class BaseLocalizationNode(Node):
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'a200_base_link')
+        self.declare_parameter('seed', "31")
 
         # Retrieve Parameters
         self.odom_topic: str = self.get_parameter('odom_topic').value
@@ -45,6 +47,7 @@ class BaseLocalizationNode(Node):
         self.map_frame: str = self.get_parameter('map_frame').value
         self.odom_frame: str = self.get_parameter('odom_frame').value
         self.base_frame: str = self.get_parameter('base_frame').value
+        self.seed: int = int(self.get_parameter('seed').value)
 
         # Shared State and Models
         self.v: float = 0.0
@@ -57,6 +60,9 @@ class BaseLocalizationNode(Node):
         self.alpha_tv_causedby_rv: float = 0.01
         self.alpha_rv_causedby_tv: float = 0.01
         self.alpha_rv_causedby_rv: float = 0.20
+
+        # Initialize random number generator
+        self.rng = default_rng(self.seed)
 
         self.latest_odom_pose = array([0.0, 0.0, 0.0])
         self.last_map_crc = None
