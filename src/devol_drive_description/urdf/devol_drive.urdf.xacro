@@ -101,8 +101,6 @@
                 <left_joint>rear_left_wheel_joint</left_joint>
                 <right_joint>front_right_wheel_joint</right_joint>
                 <right_joint>rear_right_wheel_joint</right_joint>
-                <!-- Effective skid-steer track width (geometric is 0.555 m). Calibrated in Gazebo so that
-                     odometry yaw matches ground truth for in-place turns; 0.555 over-reported yaw ~2.2x. -->
                 <wheel_separation>1.224</wheel_separation>
                 <wheel_radius>0.1651</wheel_radius>
                 <odom_publish_frequency>30</odom_publish_frequency>

@@ -71,9 +71,6 @@ class BaseLocalizationNode(Node):
         self.v: float = msg.twist.twist.linear.x
         self.omega: float = msg.twist.twist.angular.z
         self.u: ndarray = array([self.v, self.omega])
-        self.v: float = msg.twist.twist.linear.x
-        self.omega: float = msg.twist.twist.angular.z
-        self.u: ndarray = array([self.v, self.omega])
 
     def is_map_new(self, msg: OccupancyGrid) -> bool:
         """Computes a CRC32 hash of the map data.
@@ -108,7 +105,8 @@ class BaseLocalizationNode(Node):
         self.last_scan_time = msg_time
         return dt
 
-    def preprocess_scan(self, msg: LaserScan):
+    @staticmethod
+    def preprocess_scan(msg: LaserScan):
         """Standardizes LiDAR extraction for all algorithms."""
         angles: ndarray = linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
         ranges: ndarray = array(msg.ranges)
@@ -126,6 +124,31 @@ class BaseLocalizationNode(Node):
     def get_laser_offset(self):
         """Looks up the physical LiDAR mount offset."""
         return array([0.32825, 0.0, 0.0])
+    
+    @staticmethod
+    def control_noise_covariance(u: ndarray, alpha_tv_causedby_tv: float, alpha_tv_causedby_rv: float,
+                                 alpha_rv_causedby_tv: float, alpha_rv_causedby_rv: float) -> ndarray:
+        """M"""
+        v: float = u[0]
+        omega: float = u[1]
+
+        sigma_v: float = (
+            alpha_tv_causedby_tv * abs(v)
+            + alpha_tv_causedby_rv * abs(omega)
+            + 0.001
+        )
+        sigma_w: float = (
+            alpha_rv_causedby_tv * abs(v)
+            + alpha_rv_causedby_rv * abs(omega)
+            + 0.001
+        )
+
+        return diag([sigma_v**2, sigma_w**2])
+
+    @staticmethod
+    def update_covariance(A: ndarray, cov: ndarray, R: ndarray) -> ndarray:
+        """Sigma"""
+        return A @ cov @ A.T + R
 
     def publish_pose_and_tf_runtime(self, stamp, cov_3x3, start_time: float, end_time: float):
         """Standardized publishing of Pose + Covariance and REP-105 TF."""

@@ -33,7 +33,6 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 # ROS 2 Messages
 from nav_msgs.msg import OccupancyGrid, Odometry
-from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseArray, Pose
 
