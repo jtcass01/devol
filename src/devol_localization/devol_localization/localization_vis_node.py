@@ -87,7 +87,7 @@ class LocalizationVisNode(Node):
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self.create_subscription(
-            OccupancyGrid, '/devol_drive/projected_map', self.map_callback, map_qos
+            OccupancyGrid, '/devol_drive/localization/projected_map', self.map_callback, map_qos
         )
         self.gt_sub: Subscriber = Subscriber(self, Odometry, '/devol_drive/ground_truth/odom')
         self.ekf_sub: Subscriber = Subscriber(

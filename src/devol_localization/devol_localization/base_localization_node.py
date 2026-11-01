@@ -28,7 +28,7 @@ class BaseLocalizationNode(Node):
 
         # Declare Parameters
         self.declare_parameter('odom_topic', '/devol_drive/odom')
-        self.declare_parameter('map_topic', '/devol_drive/projected_map')
+        self.declare_parameter('map_topic', '/devol_drive/localization/projected_map')
         self.declare_parameter('scan_topic', '/devol_drive/sensors/lidar2d_0/scan')
         self.declare_parameter('pose_topic', pose_topic)
         self.declare_parameter('runtime_topic', runtime_topic)

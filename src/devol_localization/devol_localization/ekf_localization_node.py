@@ -21,7 +21,7 @@ from numpy import (
     arctan2,
     trace,
     sqrt,
-    clip
+    clip,
 )
 from numpy.linalg import svd, det, inv
 
@@ -152,13 +152,16 @@ class EKFLocalizationNode(BaseLocalizationNode):
             dt = t_odom - self.last_time
             if dt > 0:
                 x_pred, cov_pred = EKFLocalizationNode._predict(
-                    prev_x=x_pred, prev_cov=cov_pred,
-                    v=v, omega=omega, dt=dt,
-                    q_yaw_scale=self.q_yaw_scale, 
+                    prev_x=x_pred,
+                    prev_cov=cov_pred,
+                    v=v,
+                    omega=omega,
+                    dt=dt,
+                    q_yaw_scale=self.q_yaw_scale,
                     alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
                     alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
                     alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
-                    alpha_rv_causedby_rv=self.alpha_rv_causedby_rv
+                    alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
                 )
                 self.last_time = t_odom
 
@@ -170,28 +173,32 @@ class EKFLocalizationNode(BaseLocalizationNode):
         dt_partial = t_scan - self.last_time
         if dt_partial > 0:
             x_pred, cov_pred = EKFLocalizationNode._predict(
-                prev_x=x_pred, prev_cov=cov_pred,
-                v=current_v, omega=current_omega, dt=dt_partial,
-                q_yaw_scale=self.q_yaw_scale, 
+                prev_x=x_pred,
+                prev_cov=cov_pred,
+                v=current_v,
+                omega=current_omega,
+                dt=dt_partial,
+                q_yaw_scale=self.q_yaw_scale,
                 alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
                 alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
                 alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
-                alpha_rv_causedby_rv=self.alpha_rv_causedby_rv
+                alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
             )
             self.last_time = t_scan
 
         # update step (Using LaserScan ICP)
         z, is_valid, match_error = EKFLocalizationNode.scan_match(
-            msg=msg, x_pred=x_pred, 
-            cov_pred=cov_pred, 
+            msg=msg,
+            x_pred=x_pred,
+            cov_pred=cov_pred,
             map_data=self.map_data,
-            laser_offset=self.get_laser_offset())
+            laser_offset=self.get_laser_offset(),
+        )
 
         if is_valid:
-            self.x_est, self.covariance, accepted = EKFLocalizationNode._update(x_pred=x_pred,
-                                                                                cov_pred=cov_pred,
-                                                                                W_pose=self.W_pose,
-                                                                                z=z, match_error=match_error) 
+            self.x_est, self.covariance, accepted = EKFLocalizationNode._update(
+                x_pred=x_pred, cov_pred=cov_pred, W_pose=self.W_pose, z=z, match_error=match_error
+            )
 
             if not accepted:
                 self.get_logger().debug('ICP match rejected by Mahalanobis check.')
@@ -210,11 +217,17 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         # Reset runtime for the next cycle
         self.localization_runtime = 0.0
-    
+
     @staticmethod
-    def scan_match(msg: LaserScan, x_pred: ndarray, cov_pred: ndarray, 
-                   map_data: dict, laser_offset: ndarray, max_iter: int = 200, 
-                   tolerance: float = 1e-4):
+    def scan_match(
+        msg: LaserScan,
+        x_pred: ndarray,
+        cov_pred: ndarray,
+        map_data: dict,
+        laser_offset: ndarray,
+        max_iter: int = 200,
+        tolerance: float = 1e-4,
+    ):
         """2D Iterative Closest Point using SVD."""
         # Filter out invalid rays
         ranges, angles = EKFLocalizationNode.preprocess_scan(msg=msg)
@@ -296,9 +309,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Format final pose
         z = wrap_angle(z)
 
-        is_valid: bool = EKFLocalizationNode.inlier_fraction_check(current_pose=z, 
-                                                                   local_pts=local_pts,
-                                                                   map_data=map_data)
+        is_valid: bool = EKFLocalizationNode.inlier_fraction_check(
+            current_pose=z, local_pts=local_pts, map_data=map_data
+        )
 
         return z, is_valid, prev_error
 
@@ -334,34 +347,44 @@ class EKFLocalizationNode(BaseLocalizationNode):
         G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
         R: ndarray = G @ M @ G.T * dt
         R[3, 3] += q_yaw_scale**2 * dt
-        return R        
+        return R
 
     @staticmethod
-    def _predict(prev_x: ndarray, prev_cov: ndarray, v: float, 
-                 omega: float, dt: float, q_yaw_scale: float,
-                 alpha_tv_causedby_tv: float, alpha_tv_causedby_rv: float,
-                 alpha_rv_causedby_tv: float, alpha_rv_causedby_rv: float) -> Tuple[ndarray, ndarray]:
+    def _predict(
+        prev_x: ndarray,
+        prev_cov: ndarray,
+        v: float,
+        omega: float,
+        dt: float,
+        q_yaw_scale: float,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> Tuple[ndarray, ndarray]:
         """Prediction step. Apply Kinematic model"""
         # Package the inputs for the motion model
         s: float = prev_x[3]
-        u: ndarray = array([v, s*omega])
+        u: ndarray = array([v, s * omega])
 
         # Apply model forward kinematics
         x: ndarray = prev_x.copy()
-        x[:3] = UnicycleMotionModel.forward(
-            x=prev_x[:3], u=u, noise=zeros(3), dt=dt
-        )
+        x[:3] = UnicycleMotionModel.forward(x=prev_x[:3], u=u, noise=zeros(3), dt=dt)
         x: ndarray = wrap_angle(x)
 
         # Proportional Control Noise Covariance (M)
         M: ndarray = EKFLocalizationNode.control_noise_covariance(
-            u=u, alpha_tv_causedby_tv=alpha_tv_causedby_tv,
+            u=u,
+            alpha_tv_causedby_tv=alpha_tv_causedby_tv,
             alpha_tv_causedby_rv=alpha_tv_causedby_rv,
             alpha_rv_causedby_tv=alpha_rv_causedby_tv,
-            alpha_rv_causedby_rv=alpha_rv_causedby_rv)
+            alpha_rv_causedby_rv=alpha_rv_causedby_rv,
+        )
 
         # Mapped Process Noise (R)
-        R: ndarray = EKFLocalizationNode.mapped_process_noise(x=prev_x, M=M, dt=dt, q_yaw_scale=q_yaw_scale)
+        R: ndarray = EKFLocalizationNode.mapped_process_noise(
+            x=prev_x, M=M, dt=dt, q_yaw_scale=q_yaw_scale
+        )
 
         # Calculate the Jacobian using the previous step.
         A: ndarray = eye(4)
@@ -374,8 +397,9 @@ class EKFLocalizationNode(BaseLocalizationNode):
         return x, cov
 
     @staticmethod
-    def _update(x_pred: ndarray, cov_pred: ndarray, W_pose: ndarray,
-                z: ndarray, match_error: float) -> Tuple[ndarray, ndarray, bool]:
+    def _update(
+        x_pred: ndarray, cov_pred: ndarray, W_pose: ndarray, z: ndarray, match_error: float
+    ) -> Tuple[ndarray, ndarray, bool]:
         error_scale: float = max(1.0, (match_error / 0.05) ** 2)
         W_dynamic: ndarray = W_pose * error_scale
 

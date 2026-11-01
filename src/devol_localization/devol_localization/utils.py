@@ -25,6 +25,11 @@ def wrap_angle(x: ndarray) -> ndarray:
     return x
 
 
+def rot(theta: float) -> ndarray:
+    c, s = cos(theta), sin(theta)
+    return array([[c, -s], [s, c]])
+    
+
 def compose(a: ndarray, b: ndarray) -> ndarray:
     """2D Pose composition: a ⊕ b"""
     sin_a: float = sin(a[2])
