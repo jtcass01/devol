@@ -218,7 +218,7 @@ def launch_setup(context):
             package='octomap_server',
             executable='octomap_server_node',
             name='octomap_server_node',
-            namespace=f"{ns}/localization",
+            namespace=f'{ns}/localization',
             parameters=[
                 {
                     'resolution': 0.05,
@@ -255,7 +255,7 @@ def launch_setup(context):
                     'frame_id': 'map',
                     'publish_rate': 0.1,
                     'topic_name': 'static_map_pointcloud',
-                    'namespace': f"{ns}/localization",
+                    'namespace': f'{ns}/localization',
                 }
             ],
         ),
