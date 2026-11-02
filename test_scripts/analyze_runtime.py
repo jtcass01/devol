@@ -58,14 +58,7 @@ def main():
 
     colors = ['blue', 'gray'] + ['orange'] * len(particle_counts)
 
-    ax.bar(
-        labels,
-        means,
-        yerr=cis,
-        color=colors,
-        capsize=5,
-        error_kw={'alpha': 0.7}
-    )
+    ax.bar(labels, means, yerr=cis, color=colors, capsize=5, error_kw={'alpha': 0.7})
 
     ax.set_ylabel('Average Runtime (ms)')
     ax.set_title('Algorithm Runtime Comparison with 95% CI')
