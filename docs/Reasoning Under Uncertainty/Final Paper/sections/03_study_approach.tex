@@ -1,0 +1,36 @@
+% This section will focus on the algorithm implementations, ROS2 data flow, metrics, and experiment design.
+% It will detail the localization algorithms for dead reckoning \cite{ros2_control_mobile_robot_kinematics}, extended kalman filter (EKF) \cite{leonard1991mobile}, and particle filter (PF) \cite{doucet2000sequential}.
+% It will describe scan matching, including the iterative closest point (ICP) algorithm \cite{besl1992method}, as well as, details on the SVD-based rigid transformation \cite{arun1987least}.
+% Furthermore, this section will detail the design of Monte Carlo Localization (MCL) algorithm for the PF \cite{fox1999monte}.
+% If time permits, this section will describe a hybrid algorithm in which the PF detects potential kidnapping events and supports EKF recovery by providing a pose estimate and an uncertainty estimate derived from the particle distribution.
+
+% The study approach section will continue with ROS2 node graph and data flow focusing on the inputs and outputs for the localization algorithms.
+% It will detail where data is being produced, where noise is being injected, and the plans for storing the data for analysis.
+% Next, this section will detail the metrics that will be collected at each time step including position error, heading error, and compute cost.
+% Finally, this section will detail the experimental design for test cases including a uniform prior, mid-run kidnapping, the sensitivity analyses on varying particle count, injected odometry noise, and injected LiDAR noise.
+
+\section{Study Approach}\label{Study-Approach}
+This section begins by outlining the model that the three algorithms share including the mobile platform and its sensors, the kinematic model and its Jacobians, the odometry noise model, and the map representations.
+Then it describes the algorithms and their implementation specifics.
+At the end, this section describes the mechanisms for kidnapping in the Gazebo environment and the metrics to be collected in the experiments presented in section \ref{sec:Results}.
+
+\input{sections/03_01_system_model.tex}
+
+\input{sections/03_02_dead_reckoning.tex}
+
+\input{sections/03_03_ekf.tex}
+
+\input{sections/03_04_pf.tex}
+
+\subsection{Kidnapping}
+Kidnapping is performed by a seperate \texttt{Kidnap} node.
+The Kidnap node monitors the ground truth state of the robot.
+When the robot is within $0.3m$ of goal 1 pose, the Kidnap node starts a 15 second timer.
+When the 15 second timer elaspes, the Kidnap node chooses a random valid position in free space and teleports the robot using a service call to Gazebo.
+The local motion planner is robust to this and replans from its current pose to the existing goal (i.e. goal 2).
+
+\subsection{Metric Collection}
+Metric collection is performed by the \texttt{Metric} node.
+The Metric node monitors the poses published by the localization nodes and compares them to the ground truth transform.
+The Metric node compares the localization node poses with the ground truth pose to find the RMSE position and orientation values.
+The Metric node also subscribes to the runtime topics for each localization nodes which includes runtime since their last estimation.

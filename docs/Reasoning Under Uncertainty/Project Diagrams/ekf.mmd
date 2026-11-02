@@ -3,8 +3,8 @@ graph TD
     Octomap["2D Map Projection"]
 
     subgraph Gazebo ["Gazebo Simulation"]
-        Odometry_Plugin["Odometry Plugin"]
-        LiDAR["2D LiDAR Plugin"]
+        Odometry_Plugin["DiffDrive Plugin"]
+        LiDAR["Lidar Plugin"]
     end
 
     subgraph EKF ["Extended Kalman Filter Node"]
@@ -43,7 +43,7 @@ graph TD
     ScanMatch -->|"y_t (obs)"| y_tilde
     y_tilde -->|"y_tilde"| Update_State
     Predict -->|"x_t (pred) & cov_t (pred)"| Update_State
-    Update_State ==>|"x_t (upd) & cov_t (upd)"| Output
+    Update_State ==>|"PoseS"| Output
 
     %% Covariance / Kalman Math
     ScanMatch -->|"Match Error"| W
@@ -69,6 +69,7 @@ graph TD
     class MapCB,OdomCB callback;
 
     %% Subgraph Styling
+    style Gazebo fill:#F5F5F5,stroke:#9A9A9A,stroke-width:2px,color:black;
     style EKF fill:#EBF3FA,stroke:#002D72,stroke-width:2px,color:black;
     style Update fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;
     style LiDAR_Callback fill:#D6E6F5,stroke:#002D72,stroke-width:1px,color:black;

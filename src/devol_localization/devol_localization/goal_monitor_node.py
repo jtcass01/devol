@@ -7,6 +7,7 @@ from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener
 from math import hypot
 
+
 class GoalMonitorNode(Node):
     def __init__(self):
         super().__init__('goal_monitor_node')
@@ -14,8 +15,8 @@ class GoalMonitorNode(Node):
         # Declare parameters
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('base_frame', 'a200_base_link')
-        self.declare_parameter('goal_x', 1.87) 
-        self.declare_parameter('goal_y', -8.06) 
+        self.declare_parameter('goal_x', 1.87)
+        self.declare_parameter('goal_y', -8.06)
         self.declare_parameter('tolerance', 0.5)
 
         # TF tracking
@@ -50,6 +51,7 @@ class GoalMonitorNode(Node):
             # Exit the node cleanly, triggering the OnProcessExit handler in the launch file
             try_shutdown()
 
+
 def main(args=None):
     init(args=args)
     node = GoalMonitorNode()
@@ -62,6 +64,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         try_shutdown()
+
 
 if __name__ == '__main__':
     main()
