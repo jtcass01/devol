@@ -1,4 +1,26 @@
 \section{Conclusion}\label{Conclusion}
-% The final section will restate the problem statement.
-% It will briefly overview the study approach and remark on the results and their implications.
-% This section will include notes on limitations of the study and the conclusion will end with a discussion on future work with a focus on what would need to change to apply these algorithms to a sloped map.
+Reliable state estimation is a fundamental requirement for safe and effective autonomous mobile manipulation. 
+This study investigated the comparative performance of three localization algorithms: Dead Reckoning (DR), the Extended Kalman Filter (EKF), and the Particle Filter (PF). 
+By leveraging ROS2 and Gazebo, the algorithms were deployed and evaluated on a simulated differential drive mobile manipulator within a realistic factory environment. 
+The algorithms utilized a unicycle kinematic model with injected odometry noise, incorporating 2-D LiDAR measurements through Iterative Closest Point (ICP) scan matching for the EKF and a Likelihood Field model for the PF. 
+The primary objective was to evaluate the trade-offs between local tracking accuracy, computational efficiency, and global recovery capabilities.
+
+The results supported the initial hypotheses regarding the strengths and weaknesses of Gaussian and non-parametric filters. 
+Under baseline navigation conditions, the EKF demonstrated high tracking accuracy while maintaining a low computational footprint. 
+This makes the EKF highly suitable for resource-constrained systems provided the initial pose is well defined and tracking remains continuous. 
+However, both the EKF and DR approaches completely failed to recover from catastrophic tracking failures during the kidnapped robot scenarios. 
+Conversely, the PF successfully resolved global displacements by maintaining multiple pose hypotheses until it reconverged on the true state. 
+Increasing the number of particles in the PF predictably improved both baseline accuracy and kidnap recovery times, but this came at the cost of a significantly higher computational overhead.
+
+While these findings provide valuable insights into 2-D planar localization, the study possesses several limitations. 
+The experiments were conducted in a simulated environment, which may not perfectly capture the complex, non-Gaussian sensor anomalies present in physical LiDAR and wheel encoders. 
+Additionally, the factory environment was entirely static. 
+The presence of dynamic obstacles, such as human workers or other robots, would introduce unmodeled occlusions that could degrade the performance of the ICP and Likelihood Field measurement updates. 
+
+Future work should be focused on comparing how these algorithms perform as an input into local motion planning algorithms.
+For instance, although the PF has a higher accuracy it can be known to jitter.
+Does this jitter cause issues with the position controller and local motion planner that are downstream?
+Additionally, applying these algorithms to a sloped map will require fundamental changes to the underlying system model. 
+The state vector must be expanded from three degrees of freedom (planar coordinates and yaw) to a full six degrees of freedom to account for pitch, roll, and elevation changes. 
+Consequently, the 2-D unicycle kinematic models must be replaced with 3-D motion models that account for gravitational slip and complex terrain geometry. 
+Finally, the sensor model must transition from planar 2-D LiDAR projections and 2-D OccupancyGrids to full 3-D point cloud registration techniques using volumetric maps, heavily increasing the computational requirements for both the EKF and the PF.
