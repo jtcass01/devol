@@ -2,7 +2,13 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler, EmitEvent
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    RegisterEventHandler,
+    EmitEvent,
+)
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.conditions import IfCondition
@@ -125,15 +131,9 @@ def launch_setup(context):
         RegisterEventHandler(
             OnProcessExit(
                 target_action=goal_monitor,
-                on_exit=[
-                    EmitEvent(
-                        event=Shutdown(
-                            reason='Goal reached. Test complete.'
-                        )
-                    )
-                ],
+                on_exit=[EmitEvent(event=Shutdown(reason='Goal reached. Test complete.'))],
             )
-        )    
+        )
     )
 
     return actions
