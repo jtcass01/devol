@@ -52,7 +52,13 @@ def launch_setup(context):
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
-            parameters=[{'use_sim_time': True, 'num_particles': arg('pf_num_particles')}],
+            parameters=[
+                {
+                    'use_sim_time': True,
+                    'num_particles': arg('pf_num_particles'),
+                    'seed': arg('seed'),
+                }
+            ],
         )
     )
 
@@ -86,7 +92,7 @@ def launch_setup(context):
             executable='metrics_node',
             name='metrics_vis_node',
             output='screen',
-            parameters=[{'use_sim_time': True}],
+            parameters=[{'use_sim_time': True, 'results_dir': arg('results_dir')}],
             condition=IfCondition(LaunchConfiguration('log_metrics')),
         )
     )
@@ -102,6 +108,17 @@ def launch_setup(context):
         )
     )
 
+    actions.append(
+        Node(
+            package=loc_share,
+            executable='goal_monitor_node',
+            name='goal_monitor_node',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+            condition=IfCondition(LaunchConfiguration('monitor_goal')),
+        )
+    )
+
     return actions
 
 
@@ -112,9 +129,12 @@ def generate_launch_description():
         ('max_linear_velocity', '1.0', 'Path follower top speed in m/s'),
         ('pf_num_particles', '400', 'Number of Particles for Particle Filter'),
         ('gz_gui', 'false', 'Show the Gazebo GUI'),
-        ('kidnap', 'true', 'kidnap?'),
+        ('kidnap', 'false', 'kidnap?'),
+        ('monitor_goal', 'false', 'Monitor goal?'),
         ('log_metrics', 'true', 'log metrics?'),
         ('show_vis', 'true', 'Visualize?'),
+        ('seed', '31', 'Seed for RNG'),
+        ('results_dir', 'results', 'relative directory for results'),
     ]
 
     return LaunchDescription(

@@ -3,6 +3,7 @@
 from typing import Tuple
 from time import perf_counter
 from scipy.spatial import KDTree
+from scipy.stats import chi2
 from numpy import (
     ndarray,
     array,
@@ -18,9 +19,6 @@ from numpy import (
     int8 as np_int8,
     eye,
     arctan2,
-    trace,
-    sqrt,
-    clip,
     trace,
     sqrt,
     clip,
@@ -57,7 +55,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         )
 
         self.map_data = None
-        self.W_pose: ndarray = diag([0.1**2, 0.1**2, deg2rad(3.0) ** 2])
+        self.W_pose: ndarray = diag([0.05**2, 0.05**2, deg2rad(0.2) ** 2])
 
         # State variables.
         self.x_est: ndarray = array(
@@ -69,8 +67,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Time synchronization variables
         self.odom_buffer: list = []
         self.last_time: float = None
-        self.current_v: float = 0.0
-        self.current_omega: float = 0.0
 
         # Total runtime accumulator
         self.localization_runtime: float = 0.0
@@ -93,7 +89,6 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Convert ROS timestamp to a float in seconds
         stamp = msg.header.stamp
         t_odom = stamp.sec + stamp.nanosec * 1e-9
-
         v = msg.twist.twist.linear.x
         omega = msg.twist.twist.angular.z
 
@@ -129,18 +124,119 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
         self.localization_runtime += perf_counter() - start_time
 
-    def scan_match(self, msg: LaserScan, max_iter: int = 50, tolerance: float = 1e-4):
+    def scan_callback(self, msg: LaserScan):
+        """The main loop of the EKF."""
+        start_time: float = perf_counter()
+
+        if self.map_data is None:
+            self.localization_runtime += perf_counter() - start_time
+            return  # Wait for map to load
+
+        # Get exact timestamp of the laser scan
+        stamp = msg.header.stamp
+        t_scan = stamp.sec + stamp.nanosec * 1e-9
+
+        # Initialize time tracker on the very first scan
+        if self.last_time is None:
+            self.last_time = t_scan
+            self.localization_runtime += perf_counter() - start_time
+            return
+
+        # Process all buffered odom messages stamped AT or BEFORE the scan time
+        x_pred, cov_pred = self.x_est.copy(), self.covariance.copy()
+        current_v = 0.0
+        current_omega = 0.0
+        while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
+            t_odom, v, omega = self.odom_buffer.pop(0)
+
+            dt = t_odom - self.last_time
+            if dt > 0:
+                x_pred, cov_pred = EKFLocalizationNode._predict(
+                    prev_x=x_pred,
+                    prev_cov=cov_pred,
+                    v=v,
+                    omega=omega,
+                    dt=dt,
+                    q_yaw_scale=self.q_yaw_scale,
+                    alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
+                    alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
+                    alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
+                    alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
+                )
+                self.last_time = t_odom
+
+            # Keep track of the latest velocities for the partial step
+            current_v = v
+            current_omega = omega
+
+        # Add one final partial step exactly up to the scan timestamp
+        dt_partial = t_scan - self.last_time
+        if dt_partial > 0:
+            x_pred, cov_pred = EKFLocalizationNode._predict(
+                prev_x=x_pred,
+                prev_cov=cov_pred,
+                v=current_v,
+                omega=current_omega,
+                dt=dt_partial,
+                q_yaw_scale=self.q_yaw_scale,
+                alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
+                alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
+                alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
+                alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
+            )
+            self.last_time = t_scan
+
+        # update step (Using LaserScan ICP)
+        z, is_valid, match_error = EKFLocalizationNode.scan_match(
+            msg=msg,
+            x_pred=x_pred,
+            cov_pred=cov_pred,
+            map_data=self.map_data,
+            laser_offset=self.get_laser_offset(),
+        )
+
+        if is_valid:
+            self.x_est, self.covariance, accepted = EKFLocalizationNode._update(
+                x_pred=x_pred, cov_pred=cov_pred, W_pose=self.W_pose, z=z, match_error=match_error
+            )
+
+            if not accepted:
+                self.get_logger().debug('ICP match rejected by Mahalanobis check.')
+        else:
+            self.x_est = x_pred
+            self.covariance = cov_pred
+
+        # Publish state
+        self.localization_runtime += perf_counter() - start_time
+        self.publish_pose_and_tf_runtime(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime,
+        )
+
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
+
+    @staticmethod
+    def scan_match(
+        msg: LaserScan,
+        x_pred: ndarray,
+        cov_pred: ndarray,
+        map_data: dict,
+        laser_offset: ndarray,
+        max_iter: int = 200,
+        tolerance: float = 1e-4,
+    ):
         """2D Iterative Closest Point using SVD."""
         # Filter out invalid rays
-        ranges, angles = self.preprocess_scan(msg=msg)
+        ranges, angles = EKFLocalizationNode.preprocess_scan(msg=msg)
 
         if len(ranges) < 10:
-            return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
             return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
 
         # Nx2 array of local laser points
         laser_pts: ndarray = vstack((ranges * cos(angles), ranges * sin(angles))).T
-        laser_offset: ndarray = self.get_laser_offset()
 
         R_offset: ndarray = array(
             [
@@ -150,22 +246,22 @@ class EKFLocalizationNode(BaseLocalizationNode):
         )
         local_pts: ndarray = (R_offset @ laser_pts.T).T + laser_offset[:2]
 
-        current_pose: ndarray = self.x_est[:3].copy()
+        z: ndarray = x_pred[:3].copy()
         prev_error: float = float('inf')
 
         # Calculate adaptive correspondence gate based on positional covariance
-        pos_variance = trace(self.covariance[:2, :2])
+        pos_variance = trace(cov_pred[:2, :2])
         #  3-sigma radius, clamped between 0.5m and 2.0m
         search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
 
         for _ in range(max_iter):
             # Transform local scan points into the global map frame
-            theta: float = current_pose[2]
+            theta: float = z[2]
             R_curr: ndarray = array([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])
-            global_pts: ndarray = (R_curr @ local_pts.T).T + current_pose[:2]
+            global_pts: ndarray = (R_curr @ local_pts.T).T + z[:2]
 
             # Find the closest Map points (Q) for every Global Scan point (P)
-            distances, indices = self.map_data['kdtree'].query(global_pts)
+            distances, indices = map_data['kdtree'].query(global_pts)
 
             # Reject outlier points using the adaptive search radius
             good_matches: ndarray = distances < search_radius
@@ -174,7 +270,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
 
             # SVD-Based Alignment (Arun et al., 1987 / Umeyama, 1991)
             P: ndarray = global_pts[good_matches]
-            Q: ndarray = self.map_data['points'][indices[good_matches]]
+            Q: ndarray = map_data['points'][indices[good_matches]]
 
             # Compute Centroids
             centroid_P: ndarray = mean(P, axis=0)
@@ -201,9 +297,8 @@ class EKFLocalizationNode(BaseLocalizationNode):
             t_delta: ndarray = centroid_Q - R_delta @ centroid_P
 
             # Apply the delta transformation to current pose guess
-            # Apply the delta transformation to current pose guess
-            current_pose[:2] = R_delta @ current_pose[:2] + t_delta
-            current_pose[2] += arctan2(R_delta[1, 0], R_delta[0, 0])
+            z[:2] = R_delta @ z[:2] + t_delta
+            z[2] += arctan2(R_delta[1, 0], R_delta[0, 0])
 
             # Check for convergence based on Mean Squared Error
             mean_error: float = mean(distances[good_matches])
@@ -212,17 +307,19 @@ class EKFLocalizationNode(BaseLocalizationNode):
             prev_error = mean_error
 
         # Format final pose
-        current_pose = wrap_angle(current_pose)
+        z = wrap_angle(z)
 
-        # Consider the match "valid" if the final average distance to walls is less than 20cm
-        is_valid: bool = self.inlier_fraction_check(current_pose=current_pose, local_pts=local_pts)
+        is_valid: bool = EKFLocalizationNode.inlier_fraction_check(
+            current_pose=z, local_pts=local_pts, map_data=map_data
+        )
 
-        return current_pose, is_valid, prev_error
+        return z, is_valid, prev_error
 
+    @staticmethod
     def inlier_fraction_check(
-        self,
         current_pose: ndarray,
         local_pts: ndarray,
+        map_data: dict,
         distance_threshold: float = 0.15,
         valid_threshold: float = 0.8,
     ) -> bool:
@@ -234,7 +331,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         final_global_pts: ndarray = (R_final @ local_pts.T).T + current_pose[:2]
 
         # Query distances to the nearest map points.
-        final_distances, _ = self.map_data['kdtree'].query(final_global_pts)
+        final_distances, _ = map_data['kdtree'].query(final_global_pts)
 
         # Calculate the fraction of points within distance_threshold
         inliers = sum(final_distances <= distance_threshold)
@@ -243,142 +340,98 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Consider the match "valid" if within valid_threshold
         return inlier_fraction >= valid_threshold
 
-    def scan_callback(self, msg: LaserScan):
-        """The main loop of the EKF."""
-        start_time: float = perf_counter()
+    @staticmethod
+    def mapped_process_noise(x: ndarray, M: ndarray, dt: float, q_yaw_scale: float) -> ndarray:
+        """R"""
+        theta: float = x[2]
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
+        R: ndarray = G @ M @ G.T * dt
+        R[3, 3] += q_yaw_scale**2 * dt
+        return R
 
-        if self.map_data is None:
-            self.localization_runtime += perf_counter() - start_time
-            return  # Wait for map to load
+    @staticmethod
+    def _predict(
+        prev_x: ndarray,
+        prev_cov: ndarray,
+        v: float,
+        omega: float,
+        dt: float,
+        q_yaw_scale: float,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> Tuple[ndarray, ndarray]:
+        """Prediction step. Apply Kinematic model"""
+        # Package the inputs for the motion model
+        s: float = prev_x[3]
+        u: ndarray = array([v, s * omega])
 
-        # Get exact timestamp of the laser scan
-        stamp = msg.header.stamp
-        t_scan = stamp.sec + stamp.nanosec * 1e-9
+        # Apply model forward kinematics
+        x: ndarray = prev_x.copy()
+        x[:3] = UnicycleMotionModel.forward(x=prev_x[:3], u=u, noise=zeros(3), dt=dt)
+        x: ndarray = wrap_angle(x)
 
-        # Initialize time tracker on the very first scan
-        if self.last_time is None:
-            self.last_time = t_scan
-            self.localization_runtime += perf_counter() - start_time
-            return
-
-        # Process all buffered odom messages stamped AT or BEFORE the scan time
-        while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
-            t_odom, v, omega = self.odom_buffer.pop(0)
-
-            dt = t_odom - self.last_time
-            if dt > 0:
-                self.x_est, self.covariance = self._predict(v, omega, dt)
-                self.last_time = t_odom
-
-            # Keep track of the latest velocities for the partial step
-            self.current_v = v
-            self.current_omega = omega
-
-        # Add one final partial step exactly up to the scan timestamp
-        dt_partial = t_scan - self.last_time
-        if dt_partial > 0:
-            self.x_est, self.covariance = self._predict(
-                self.current_v, self.current_omega, dt_partial
-            )
-            self.last_time = t_scan
-
-        # update step (Using LaserScan ICP)
-        y_pose, is_valid, match_error = self.scan_match(msg)
-
-        if is_valid:
-            self.x_est, self.covariance, accepted = self._update(y_pose, match_error)
-
-            if not accepted:
-                self.get_logger().debug('ICP match rejected by Mahalanobis check.')
-
-        # Publish state
-        self.localization_runtime += perf_counter() - start_time
-        self.publish_pose_and_tf_runtime(
-            stamp=msg.header.stamp,
-            cov_3x3=self.covariance,
-            start_time=0.0,
-            end_time=self.localization_runtime,
+        # Proportional Control Noise Covariance (M)
+        M: ndarray = EKFLocalizationNode.control_noise_covariance(
+            u=u,
+            alpha_tv_causedby_tv=alpha_tv_causedby_tv,
+            alpha_tv_causedby_rv=alpha_tv_causedby_rv,
+            alpha_rv_causedby_tv=alpha_rv_causedby_tv,
+            alpha_rv_causedby_rv=alpha_rv_causedby_rv,
         )
 
-        # Reset runtime for the next cycle
-        self.localization_runtime = 0.0
-
-    def _predict(self, v: float, omega: float, dt: float) -> Tuple[ndarray, ndarray]:
-        """Prediction step. Apply Kinematic model"""
-        new_x_est: ndarray = self.x_est
-        new_cov: ndarray = self.covariance
-
-        # Package the inputs for the motion model
-        s: float = new_x_est[3]
-        u: ndarray = array([v, s * omega])
+        # Mapped Process Noise (R)
+        R: ndarray = EKFLocalizationNode.mapped_process_noise(
+            x=prev_x, M=M, dt=dt, q_yaw_scale=q_yaw_scale
+        )
 
         # Calculate the Jacobian using the previous step.
         A: ndarray = eye(4)
-        A[:3, :3] = UnicycleMotionModel.linearize(state=new_x_est[:3], u=u, dt=dt)
+        A[:3, :3] = UnicycleMotionModel.state_jacobian(x=prev_x[:3], u=u, dt=dt)
         A[2, 3] = omega * dt
 
-        # Proportional Control Noise Covariance (M)
-        sigma_v: float = (
-            self.alpha_tv_causedby_tv * abs(v) + self.alpha_tv_causedby_rv * abs(omega) + 0.001
-        )
-        sigma_w: float = (
-            self.alpha_rv_causedby_tv * abs(v) + self.alpha_rv_causedby_rv * abs(omega) + 0.001
-        )
-        M: ndarray = diag([sigma_v**2, sigma_w**2])
-
-        # Mapped Process Noise (R)
-        theta: float = new_x_est[2]
-        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
-        R: ndarray = G @ M @ G.T * dt
-        R[3, 3] += self.q_yaw_scale**2 * dt
-
-        # Predict: Apply model forward kinematics
-        new_x_est[:3] = UnicycleMotionModel.forward(
-            state=new_x_est[:3], u=u, noise=zeros(3), dt=dt
-        )
-
         # Update the covariance
-        new_cov: ndarray = A @ new_cov @ A.T + R
-        new_x_est: ndarray = wrap_angle(new_x_est)
+        cov: ndarray = EKFLocalizationNode.update_covariance(A=A, cov=prev_cov, R=R)
 
-        return new_x_est, new_cov
+        return x, cov
 
-    def _update(self, y_pose: ndarray, match_error: float) -> Tuple[ndarray, ndarray, bool]:
-        new_x_est: ndarray = self.x_est
-        new_cov: ndarray = self.covariance
-
+    @staticmethod
+    def _update(
+        x_pred: ndarray, cov_pred: ndarray, W_pose: ndarray, z: ndarray, match_error: float
+    ) -> Tuple[ndarray, ndarray, bool]:
         error_scale: float = max(1.0, (match_error / 0.05) ** 2)
-        W_dynamic: ndarray = self.W_pose * error_scale
+        W_dynamic: ndarray = W_pose * error_scale
 
         # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
         H: ndarray = eye(3, 4)
 
         # Innovation covariance (S)
-        S: ndarray = H @ new_cov @ H.T + W_dynamic
+        S: ndarray = H @ cov_pred @ H.T + W_dynamic
 
         # Innovation (y_tilde) is the difference between observation and prediction
-        y_tilde: ndarray = wrap_angle(y_pose - new_x_est[:3])
+        y_tilde: ndarray = wrap_angle(z - x_pred[:3])
 
         # Statistical Acceptance Test
         mahalanobis_sq = y_tilde.T @ inv(S) @ y_tilde
 
-        if mahalanobis_sq > CHI2_TRESHOLD_3DOF_95CONF:
+        if mahalanobis_sq > chi2.ppf(0.95, 3):
             # The observation is statistically absurd given current belief.
             # Reject the update and keep prior estimate.
-            return new_x_est, new_cov, False
+            return x_pred, cov_pred, False
 
         # Kalman Gain (K)
-        K: ndarray = new_cov @ H.T @ inv(S)
+        K: ndarray = cov_pred @ H.T @ inv(S)
 
         # Update the state estimate and shrink the covariance
-        new_x_est: ndarray = new_x_est + K @ y_tilde
-        new_x_est[3] = clip(new_x_est[3], 0.5, 1.2)
-        new_cov: ndarray = (eye(4) - K @ H) @ new_cov
+        x_update: ndarray = x_pred + K @ y_tilde
+        x_update[3] = clip(x_update[3], 0.5, 1.2)
+        cov_update: ndarray = (eye(4) - K @ H) @ cov_pred
 
         # Wrap heading to [-pi, pi] to prevent runaway angle values over time
-        new_x_est = wrap_angle(new_x_est)
+        x_update = wrap_angle(x_update)
 
-        return new_x_est, new_cov, True
+        return x_update, cov_update, True
 
 
 def main(args=None):

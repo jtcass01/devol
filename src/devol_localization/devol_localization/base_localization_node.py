@@ -2,6 +2,7 @@
 
 from zlib import crc32
 from numpy import ndarray, array, linspace, isinf, isnan, diag, deg2rad, zeros
+from numpy.random import default_rng
 
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
@@ -28,13 +29,14 @@ class BaseLocalizationNode(Node):
 
         # Declare Parameters
         self.declare_parameter('odom_topic', '/devol_drive/odom')
-        self.declare_parameter('map_topic', '/devol_drive/projected_map')
+        self.declare_parameter('map_topic', '/devol_drive/localization/projected_map')
         self.declare_parameter('scan_topic', '/devol_drive/sensors/lidar2d_0/scan')
         self.declare_parameter('pose_topic', pose_topic)
         self.declare_parameter('runtime_topic', runtime_topic)
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'a200_base_link')
+        self.declare_parameter('seed', '31')
 
         # Retrieve Parameters
         self.odom_topic: str = self.get_parameter('odom_topic').value
@@ -45,6 +47,7 @@ class BaseLocalizationNode(Node):
         self.map_frame: str = self.get_parameter('map_frame').value
         self.odom_frame: str = self.get_parameter('odom_frame').value
         self.base_frame: str = self.get_parameter('base_frame').value
+        self.seed: int = int(self.get_parameter('seed').value)
 
         # Shared State and Models
         self.v: float = 0.0
@@ -58,6 +61,9 @@ class BaseLocalizationNode(Node):
         self.alpha_rv_causedby_tv: float = 0.01
         self.alpha_rv_causedby_rv: float = 0.20
 
+        # Initialize random number generator
+        self.rng = default_rng(self.seed)
+
         self.latest_odom_pose = array([0.0, 0.0, 0.0])
         self.last_map_crc = None
         self.last_scan_time = None
@@ -68,9 +74,6 @@ class BaseLocalizationNode(Node):
 
     def odom_callback(self, msg: Odometry):
         """Base callback to track the latest odometry twist."""
-        self.v: float = msg.twist.twist.linear.x
-        self.omega: float = msg.twist.twist.angular.z
-        self.u: ndarray = array([self.v, self.omega])
         self.v: float = msg.twist.twist.linear.x
         self.omega: float = msg.twist.twist.angular.z
         self.u: ndarray = array([self.v, self.omega])
@@ -108,7 +111,8 @@ class BaseLocalizationNode(Node):
         self.last_scan_time = msg_time
         return dt
 
-    def preprocess_scan(self, msg: LaserScan):
+    @staticmethod
+    def preprocess_scan(msg: LaserScan):
         """Standardizes LiDAR extraction for all algorithms."""
         angles: ndarray = linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
         ranges: ndarray = array(msg.ranges)
@@ -126,6 +130,28 @@ class BaseLocalizationNode(Node):
     def get_laser_offset(self):
         """Looks up the physical LiDAR mount offset."""
         return array([0.32825, 0.0, 0.0])
+
+    @staticmethod
+    def control_noise_covariance(
+        u: ndarray,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> ndarray:
+        """M"""
+        v: float = u[0]
+        omega: float = u[1]
+
+        sigma_v: float = alpha_tv_causedby_tv * abs(v) + alpha_tv_causedby_rv * abs(omega) + 0.001
+        sigma_w: float = alpha_rv_causedby_tv * abs(v) + alpha_rv_causedby_rv * abs(omega) + 0.001
+
+        return diag([sigma_v**2, sigma_w**2])
+
+    @staticmethod
+    def update_covariance(A: ndarray, cov: ndarray, R: ndarray) -> ndarray:
+        """Sigma"""
+        return A @ cov @ A.T + R
 
     def publish_pose_and_tf_runtime(self, stamp, cov_3x3, start_time: float, end_time: float):
         """Standardized publishing of Pose + Covariance and REP-105 TF."""

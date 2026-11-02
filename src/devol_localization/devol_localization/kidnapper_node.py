@@ -11,7 +11,6 @@ from scipy.ndimage import distance_transform_edt
 from zlib import crc32
 from math import sin, cos, sqrt, hypot, pi
 from subprocess import run
-from random import choice, uniform
 from dataclasses import dataclass
 
 
@@ -97,6 +96,7 @@ class KidnapperNode(Node):
         self.declare_parameter('wait_time', 10.0)
         self.declare_parameter('world_name', 'maze_world')
         self.declare_parameter('entity_name', 'devol_drive')
+        self.declare_parameter('seed', '31')
 
         # Retrieve Parameters
         self.odom_topic: str = self.get_parameter('odom_topic').value
@@ -110,10 +110,14 @@ class KidnapperNode(Node):
         self.target_y: float = self.get_parameter('target_y').value
         self.tolerance: float = self.get_parameter('tolerance').value
         self.wait_time: float = self.get_parameter('wait_time').value
+        self.seed: int = int(self.get_parameter('seed').value)
 
         # Automatic safe radius calculation with an extra 0.1m buffer
         self.safe_radius = calculate_safe_radius(DEFAULT_BODY) + 0.1
         self.get_logger().info(f'Calculated safe spawn radius: {self.safe_radius:.2f}m')
+
+        # Initialize random number generator
+        self.rng = default_rng(self.seed)
 
         # State variables
         self.last_map_crc = None
@@ -241,10 +245,10 @@ class KidnapperNode(Node):
             self.get_logger().error('No spaces found with sufficient clearance for the robot!')
             return
 
-        chosen_idx = choice(safe_indices)
+        chosen_idx = self.rng.choice(safe_indices)
         target_x = self.map_dict['free_x'][chosen_idx]
         target_y = self.map_dict['free_y'][chosen_idx]
-        target_yaw = uniform(-pi, pi)
+        target_yaw = self.rng.uniform(-pi, pi)
 
         world = self.get_parameter('world_name').value
         entity = self.get_parameter('entity_name').value
