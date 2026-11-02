@@ -239,7 +239,7 @@ def launch_setup(context):
                 {
                     'pointcloud_file': os.path.join(world_dir, 'static_world.pcd'),
                     'frame_id': 'map',
-                    'publish_rate': 0.1,
+                    'publish_rate': 0.5,
                     'topic_name': 'static_map_pointcloud',
                     'namespace': ns,
                 }
@@ -253,7 +253,7 @@ def launch_setup(context):
                 {
                     'pointcloud_file': os.path.join(world_dir, 'static_world.pcd'),
                     'frame_id': 'map',
-                    'publish_rate': 0.1,
+                    'publish_rate': 0.5,
                     'topic_name': 'static_map_pointcloud',
                     'namespace': f'{ns}/localization',
                 }

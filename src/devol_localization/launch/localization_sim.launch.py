@@ -2,7 +2,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler, EmitEvent
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -108,15 +110,30 @@ def launch_setup(context):
         )
     )
 
+    goal_monitor = Node(
+        package=loc_share,
+        executable='goal_monitor_node',
+        name='goal_monitor_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+        condition=IfCondition(LaunchConfiguration('monitor_goal')),
+    )
+
+    actions.append(goal_monitor)
+
     actions.append(
-        Node(
-            package=loc_share,
-            executable='goal_monitor_node',
-            name='goal_monitor_node',
-            output='screen',
-            parameters=[{'use_sim_time': True}],
-            condition=IfCondition(LaunchConfiguration('monitor_goal')),
-        )
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=goal_monitor,
+                on_exit=[
+                    EmitEvent(
+                        event=Shutdown(
+                            reason='Goal reached. Test complete.'
+                        )
+                    )
+                ],
+            )
+        )    
     )
 
     return actions
@@ -129,8 +146,8 @@ def generate_launch_description():
         ('max_linear_velocity', '1.0', 'Path follower top speed in m/s'),
         ('pf_num_particles', '400', 'Number of Particles for Particle Filter'),
         ('gz_gui', 'false', 'Show the Gazebo GUI'),
-        ('kidnap', 'false', 'kidnap?'),
-        ('monitor_goal', 'false', 'Monitor goal?'),
+        ('kidnap', 'true', 'kidnap?'),
+        ('monitor_goal', 'true', 'Monitor goal for shutdown?'),
         ('log_metrics', 'true', 'log metrics?'),
         ('show_vis', 'true', 'Visualize?'),
         ('seed', '31', 'Seed for RNG'),

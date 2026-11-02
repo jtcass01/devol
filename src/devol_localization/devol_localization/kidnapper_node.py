@@ -7,6 +7,7 @@ from nav_msgs.msg import OccupancyGrid
 from tf2_ros import Buffer, TransformListener
 
 from numpy import array, float32, ones_like, where, ndarray
+from numpy.random import default_rng
 from scipy.ndimage import distance_transform_edt
 from zlib import crc32
 from math import sin, cos, sqrt, hypot, pi

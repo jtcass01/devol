@@ -48,7 +48,7 @@ class GoalMonitorNode(Node):
         if dist <= tolerance:
             self.get_logger().info(f'Goal 3 reached (dist: {dist:.2f}m). Terminating test run.')
             # Exit the node cleanly, triggering the OnProcessExit handler in the launch file
-            sys.exit(0)
+            try_shutdown()
 
 def main(args=None):
     init(args=args)

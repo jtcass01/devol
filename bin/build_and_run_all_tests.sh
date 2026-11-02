@@ -66,7 +66,9 @@ for NUM_PARTICLES in "${PARTICLE_COUNTS[@]}"; do
             else
                 echo "  [X] Run $SEED complete."
             fi
-            
+
+            . bin/clean.sh
+
             echo "  Results saved to $RUN_RESULTS_DIR"
             echo ""
         done
