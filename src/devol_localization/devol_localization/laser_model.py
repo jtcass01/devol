@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
 
-from numpy import cos, sin, ndarray, round as np_round, clip, abs, sum as np_sum
-
+from numpy import (
+    ndarray,
+    cos,
+    sin,
+    floor,
+    clip,
+    abs as np_abs,
+    sum as np_sum,
+    log,
+    logaddexp,
+    sqrt,
+    pi,
+)
 
 __author__ = 'Jacob Taylor Cassady'
 __email__ = 'jcassad1@jh.edu'
@@ -9,31 +20,41 @@ __email__ = 'jcassad1@jh.edu'
 
 class LaserModel:
     @staticmethod
-    def likelihood_field_range_finder(
-        z_dists: ndarray, z_thetas: ndarray, x: ndarray, map_dict: dict, std: float = 0.1
-    ) -> float:
-        map_data = map_dict['grid']
+    def endpoint_distances(
+        laser_poses: ndarray, z_dists: ndarray, z_thetas: ndarray, map_dict: dict
+    ) -> ndarray:
+        """Distance from every beam endpoint to the nearest obstacle. Shape (M, K)."""
+        edt: ndarray = map_dict['grid']
         info = map_dict['info']
-        res = info.resolution
+        res: float = info.resolution
+        height, width = edt.shape
 
-        # Project end points to global frame
-        ray_thetas = x[2] + z_thetas
-        pts_x = x[0] + z_dists * cos(ray_thetas)
-        pts_y = x[1] + z_dists * sin(ray_thetas)
+        # Beam endpoints in the map frame (M x K)
+        ang: ndarray = laser_poses[:, 2:3] + z_thetas[None, :]
+        ex: ndarray = laser_poses[:, 0:1] + z_dists[None, :] * cos(ang)
+        ey: ndarray = laser_poses[:, 1:2] + z_dists[None, :] * sin(ang)
 
-        # Conversion to map indices
-        cols: ndarray = np_round((pts_x - info.origin.position.x) / res - 0.5).astype(int)
-        rows: ndarray = np_round((pts_y - info.origin.position.y) / res - 0.5).astype(int)
-        height, width = map_data.shape
+        # Cell indices
+        cols: ndarray = floor((ex - info.origin.position.x) / res).astype(int)
+        rows: ndarray = floor((ey - info.origin.position.y) / res).astype(int)
 
-        # Out of bounds handling
-        clipped_cols: ndarray = clip(cols, 0, width - 1)
-        clipped_rows: ndarray = clip(rows, 0, height - 1)
-        out_of_bounds_distance: float = (abs(cols - clipped_cols) + abs(rows - clipped_rows)) * res
+        # Out-of-bounds: clamp to the edge and add the L1 distance to the map boundary
+        c: ndarray = clip(cols, 0, width - 1)
+        r: ndarray = clip(rows, 0, height - 1)
+        oob: ndarray = (np_abs(cols - c) + np_abs(rows - r)) * res
 
-        # Distance lookup
-        dists: ndarray = map_data[clipped_rows, clipped_cols] + out_of_bounds_distance
+        return edt[r, c] + oob
 
-        # Find the sum of the log probabilities
-        log_prob: float = np_sum(-(dists**2) / (2 * std**2))
-        return float(log_prob)
+    @staticmethod
+    def log_likelihood_gaussian(d: ndarray, sigma_hit: float) -> ndarray:
+        """Returns shape (M,)."""
+        return -0.5 * np_sum(d**2, axis=1) / sigma_hit**2
+
+    @staticmethod
+    def log_likelihood_mixture(
+        d: ndarray, sigma_hit: float, z_hit: float, z_rand: float, z_max: float
+    ) -> ndarray:
+        """Thrun Table 6.3 likelihood field: z_hit * N(d; 0, sigma) + z_rand / z_max."""
+        log_hit: ndarray = log(z_hit) - log(sqrt(2.0 * pi) * sigma_hit) - 0.5 * (d / sigma_hit) ** 2
+        log_rand: float = log(z_rand / z_max)
+        return np_sum(logaddexp(log_hit, log_rand), axis=1)

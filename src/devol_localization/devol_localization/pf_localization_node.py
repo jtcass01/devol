@@ -55,9 +55,18 @@ class ParticleFilterNode(BaseLocalizationNode):
         )
 
         self.declare_parameter('num_particles', '500')
+        self.declare_parameter('z_hit', '0.95')
+        self.declare_parameter('z_rand', '0.05')
+        self.declare_parameter('kappa', '1.0')
+        self.declare_parameter('sigma_hit', 0.1)
 
         self.map_dict = None
+
         self.num_particles: int = int(self.get_parameter('num_particles').value)
+        self.z_hit: float = float(self.get_parameter('z_hit').value)
+        self.z_rand: float = float(self.get_parameter('z_rand').value)
+        self.kappa: float = float(self.get_parameter('kappa').value)
+        self.sigma_hit: float = float(self.get_parameter('sigma_hit').value)
 
         # Initialize particles clustered around starting origin
         self.particles: ndarray = self.rng.multivariate_normal(
@@ -250,23 +259,14 @@ class ParticleFilterNode(BaseLocalizationNode):
         # Shift Yaw
         laser_poses[:, 2] += laser_offset[2]
 
-        # Computes log probabilities
-        log_weights = array(
-            [
-                LaserModel.likelihood_field_range_finder(
-                    z_dists=z_dists, z_thetas=z_thetas, x=particle, map_dict=self.map_dict, std=0.1
-                )
-                for particle in laser_poses
-            ],
-            dtype=float,
+        d: ndarray = LaserModel.endpoint_distances(laser_poses, z_dists, z_thetas, self.map_dict)
+        log_lik: ndarray = LaserModel.log_likelihood_mixture(
+            d, self.sigma_hit, self.z_hit, self.z_rand, self.z_max
         )
+        avg_raw_likelihood: float = np_mean(np_exp(log_lik / d.shape[1]))
 
-        # shift all weights so their highest value is 0.
-        max_log_weights: ndarray = np_max(log_weights)
-        step_weights: ndarray = np_exp(log_weights - max_log_weights)
-
-        # Calculate raw likelihood average for the adaptive injection logic
-        avg_raw_likelihood = np_mean(np_exp(log_weights / len(z_dists)))
+        log_weights: ndarray = log_lik / self.kappa
+        step_weights: ndarray = np_exp(log_weights - np_max(log_weights))
 
         # Initialize running averages on the very first update
         if self.slow_avg_lik == 0.0:
