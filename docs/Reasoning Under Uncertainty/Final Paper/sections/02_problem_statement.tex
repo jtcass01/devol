@@ -1,0 +1,66 @@
+\section{Problem Statement}\label{sec:Problem-Statement}
+In mobile robotics, the planning environment is often projected onto a two-dimensional plane.
+Let the pose of the robot at time $t$ be defined by the state vector $\mathbf{x}_t = [x_t, y_t, \theta_t]^T$, where $x_t$ and $y_t$ represent the planar coordinates and $\theta_t$ represents the heading. As the robot moves, its true state transitions according to a non-linear motion model:
+
+\begin{equation}
+    \mathbf{x}_t = f(\mathbf{x}_{t-1}, \mathbf{u}_t) + \mathbf{w}_t
+\end{equation}
+where $\mathbf{u}_t$ is the control input (such as translational velocity $v_t$ and rotational velocity $\omega_t$) and $\mathbf{w}_t$ represents process noise caused by factors like wheel slip or mechanical imperfections. 
+
+To correct the drift induced by the process noise, the robot relies on exteroceptive sensors, modeled as:
+\begin{equation}
+    \mathbf{z}_t = h(\mathbf{x}_t) + \mathbf{v}_t
+\end{equation}
+where $\mathbf{z}_t$ is the sensor measurement (such as a LiDAR scan) and $\mathbf{v}_t$ represents the measurement noise. 
+The core problem of localization is to estimate the \textit{belief}, or the probability distribution over the state $\mathbf{x}_t$ at time $t$, conditioned on all past measurements $z_{1:t}$ and all past controls $u_{1:t}$ \cite{thrun2005probabilistic}.
+
+\begin{equation}\label{eq:belief}
+    bel(x_t) = p(x_t \mid z_{1:t}, u_{1:t})
+\end{equation}
+
+\subsection{Kidnapping}
+While tracking a robot's pose under normal operating conditions is well understood, catastrophic localization failures remain a significant challenge. 
+The most extreme form of this failure is known as the ``kidnapped robot problem'' \cite{DBLP:journals/corr/abs-1106-0222}. 
+This occurs when a robot is teleported to a different location without its odometry registering the movement, completely invalidating its current belief state.
+
+In the real world, this could happen if a robot loses power and is re-powered at a different position, or if the robot being tracked loses connection with a tracking hub and then reconnects at a different time.
+To recover from a kidnapping event, a localization algorithm must be capable of abandoning its incorrect localized belief and searching the map to determine its new true pose.
+
+\subsection{Bayes Filter}
+The most general algorithm for calculating beliefs, shown in Equation \ref{eq:belief}, is the \textbf{Bayes filter} \cite{thrun2005probabilistic}.
+The Bayes filter is recursive and calculates the belief $bel(x_t)$ at time $t$ from the belief $bel(x_{t-1})$ at time $t-1$.
+The Bayes filter has two steps: prediction and measurement update.
+The prediction calculates the belief $\overline{bel}(x_t)$ over $x_t$ based on the prior belief over $x_{t-1}$ and the control $u_t$ as shown in Equation \ref{eq:bayes_prediction}.
+
+\begin{equation}\label{eq:bayes_prediction}
+    \overline{bel}(x_t)=\int p(x_t \mid u_t, x_{t-1})bel(x_{t-1}) \,dx 
+\end{equation}
+
+The measurement update calculates the final belief $bel(x_t)$ by multiplying the prior predicted belief $\overline{bel}(x_t)$ by the probability that the measurement $z_t$ was observed, as shown in Equation \ref{eq:bayes_measurement_update}.
+
+\begin{equation}\label{eq:bayes_measurement_update}
+    bel(x_t)= \eta p(z_t \mid x_t) \overline{bel}(x_t) 
+\end{equation}
+
+\subsection{Algorithm Overview}
+Various algorithms exist to solve the localization problem.
+The three algorithms selected for this study have varying levels of robustness to kidnapping events, as well as different expected accuracies and computational costs.
+They are all based on the Bayes filter, with increasing levels of complexity.
+
+The first algorithm, \textbf{Dead Reckoning}, is the most basic form of state estimation.
+It relies only on integrating the control inputs $u_t$ over time to estimate the current pose \cite{ros2_control_mobile_robot_kinematics}.
+The Dead Reckoning algorithm implements only the prediction step of the Bayes filter.
+Because Dead Reckoning lacks a measurement update step, process noise accumulates with time, causing the predicted pose to diverge from the true pose over time.
+This algorithm is used as a comparative baseline for the other two algorithms.
+
+The second algorithm, \textbf{Extended Kalman Filter (EKF)}, tackles the non-linear motion and measurement models by linearizing them via Taylor series expansion and computing the Jacobians of $f$ and $h$ from a kinematic model and sensor model \cite{thrun2005probabilistic}.
+The EKF includes both the prediction step and the measurement update step described by the Bayes filter.
+Both Dead Reckoning and the EKF are considered \textit{Gaussian filters}, where the probability density over $x_t$ can be characterized by the mean $\mu$ and the covariance $\Sigma$.
+Gaussians are unimodal, meaning they possess a single maximum and perform poorly in problems in which many distinct hypotheses exist.
+
+The third algorithm, \textbf{Particle Filter (PF)}, is a non-parametric approach that represents the belief state using finite sets of weighted random samples called particles \cite{doucet2000sequential}.
+Because the PF does not assume a single Gaussian distribution as the EKF does, the PF can represent complex, multi-modal beliefs.
+
+This study evaluates these algorithms under various factory conditions to test two primary hypotheses. First, it is hypothesized that the Particle Filter will recover localization accuracy following a kidnapping event significantly more reliably than the Extended Kalman Filter. 
+This is due to the Particle Filter's ability to maintain multiple pose hypotheses simultaneously. 
+Second, it is hypothesized that given a well-defined Gaussian initial pose prior (where the robot's starting location is known), the Extended Kalman Filter will achieve localization accuracy comparable to or better than the Particle Filter while requiring a significantly lower computational cost.

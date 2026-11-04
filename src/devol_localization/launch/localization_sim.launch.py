@@ -2,7 +2,16 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    RegisterEventHandler,
+    EmitEvent,
+)
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -51,7 +60,13 @@ def launch_setup(context):
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
-            parameters=[{'use_sim_time': True, 'num_particles': arg('pf_num_particles')}],
+            parameters=[
+                {
+                    'use_sim_time': True,
+                    'num_particles': arg('pf_num_particles'),
+                    'seed': arg('seed'),
+                }
+            ],
         )
     )
 
@@ -74,6 +89,7 @@ def launch_setup(context):
             name='localization_vis_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
+            condition=IfCondition(LaunchConfiguration('show_vis')),
         )
     )
 
@@ -84,7 +100,39 @@ def launch_setup(context):
             executable='metrics_node',
             name='metrics_vis_node',
             output='screen',
+            parameters=[{'use_sim_time': True, 'results_dir': arg('results_dir')}],
+            condition=IfCondition(LaunchConfiguration('log_metrics')),
+        )
+    )
+
+    actions.append(
+        Node(
+            package=loc_share,
+            executable='kidnapper_node',
+            name='kidnapper_node',
+            output='screen',
             parameters=[{'use_sim_time': True}],
+            condition=IfCondition(LaunchConfiguration('kidnap')),
+        )
+    )
+
+    goal_monitor = Node(
+        package=loc_share,
+        executable='goal_monitor_node',
+        name='goal_monitor_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+        condition=IfCondition(LaunchConfiguration('monitor_goal')),
+    )
+
+    actions.append(goal_monitor)
+
+    actions.append(
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=goal_monitor,
+                on_exit=[EmitEvent(event=Shutdown(reason='Goal reached. Test complete.'))],
+            )
         )
     )
 
@@ -97,7 +145,13 @@ def generate_launch_description():
         ('planner', 'rrt_star', 'a_star | rrt | rrt_star'),
         ('max_linear_velocity', '1.0', 'Path follower top speed in m/s'),
         ('pf_num_particles', '400', 'Number of Particles for Particle Filter'),
-        ('gz_gui', 'true', 'Show the Gazebo GUI'),
+        ('gz_gui', 'false', 'Show the Gazebo GUI'),
+        ('kidnap', 'true', 'kidnap?'),
+        ('monitor_goal', 'true', 'Monitor goal for shutdown?'),
+        ('log_metrics', 'true', 'log metrics?'),
+        ('show_vis', 'true', 'Visualize?'),
+        ('seed', '31', 'Seed for RNG'),
+        ('results_dir', 'results', 'relative directory for results'),
     ]
 
     return LaunchDescription(

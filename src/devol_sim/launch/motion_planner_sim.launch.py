@@ -215,17 +215,47 @@ def launch_setup(context):
             remappings=[('cloud_in', 'static_map_pointcloud')],
         ),
         Node(
+            package='octomap_server',
+            executable='octomap_server_node',
+            name='octomap_server_node',
+            namespace=f'{ns}/localization',
+            parameters=[
+                {
+                    'resolution': 0.05,
+                    'occupancy_min_z': 0.45,
+                    'occupancy_max_z': 0.55,
+                    'point_cloud_min_z': 0.35,
+                    'point_cloud_max_z': 0.65,
+                    'use_sim_time': True,
+                }
+            ],
+            remappings=[('cloud_in', f'static_map_pointcloud')],
+        ),
+        Node(
             package='devol_sim',
             executable='pointcloud_publisher',
             name='pointcloud_publisher',
-            output='screen',
             parameters=[
                 {
                     'pointcloud_file': os.path.join(world_dir, 'static_world.pcd'),
                     'frame_id': 'map',
-                    'publish_rate': 1.0,
+                    'publish_rate': 0.5,
                     'topic_name': 'static_map_pointcloud',
                     'namespace': ns,
+                }
+            ],
+        ),
+        Node(
+            package='devol_sim',
+            executable='pointcloud_publisher',
+            name='pointcloud_publisher',
+            parameters=[
+                {
+                    'pointcloud_file': os.path.join(world_dir, 'static_world.pcd'),
+                    'frame_id': 'map',
+                    'publish_rate': 0.5,
+                    'topic_name': 'static_map_pointcloud',
+                    'namespace': f'{ns}/localization',
                 }
             ],
         ),

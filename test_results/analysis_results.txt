@@ -1,0 +1,34 @@
+=== Accuracy Results (Baseline) with 95% CI ===
+EKF        | Pos RMSE: 4.1425 ± 2.1203 m | Yaw RMSE: 0.6870 ± 0.3683 rad
+DR         | Pos RMSE: 6.8646 ± 0.9036 m | Yaw RMSE: 0.9991 ± 0.1569 rad
+PF_100     | Pos RMSE: 0.0509 ± 0.0041 m | Yaw RMSE: 0.0331 ± 0.0120 rad
+PF_500     | Pos RMSE: 0.0545 ± 0.0020 m | Yaw RMSE: 0.0264 ± 0.0014 rad
+PF_2000    | Pos RMSE: 0.0485 ± 0.0033 m | Yaw RMSE: 0.0518 ± 0.0038 rad
+Graph saved to accuracy_comparison_ci.png
+=== Robustness to Kidnapping (Position RMSE) ===
+EKF      | Baseline: 4.1425 ± 2.1203 m | Kidnapped: 8.0749 ± 0.5480 m
+DR       | Baseline: 6.8646 ± 0.9036 m | Kidnapped: 6.1764 ± 0.3763 m
+PF_100   | Baseline: 0.0509 ± 0.0041 m | Kidnapped: 1.2840 ± 0.6899 m
+PF_500   | Baseline: 0.0545 ± 0.0020 m | Kidnapped: 0.6015 ± 0.0757 m
+PF_2000  | Baseline: 0.0485 ± 0.0033 m | Kidnapped: 0.7574 ± 0.0512 m
+Graph saved to kidnapping_robustness_ci.png
+=== PF Particle Count Trade-offs (95% CI) ===
+Particles:  100 | Pos RMSE: 0.0509 ± 0.0041 m | Runtime: 0.013339 ± 0.001911 s
+Particles:  500 | Pos RMSE: 0.0545 ± 0.0020 m | Runtime: 0.048043 ± 0.000494 s
+Particles: 2000 | Pos RMSE: 0.0485 ± 0.0033 m | Runtime: 0.186149 ± 0.006725 s
+=== Recovery Time Results with 95% CI ===
+EKF      : 33.40 ± 3.93 s
+DR       : 45.48 ± 5.91 s
+PF_100   : 12.93 ± 5.94 s
+PF_500   : 2.11 ± 0.71 s
+PF_2000  : 3.13 ± 1.15 s
+Graph saved to kidnapping_recovery_time_ci.png
+/home/jacob/Programming/devol/test_scripts/analyze_runtime.py:72: UserWarning: set_ticklabels() should only be used with a fixed number of ticks, i.e. after set_ticks() or using a FixedLocator. Otherwise, ticks may be mislabeled.
+  ax.set_xticklabels(labels, rotation=45, ha='right')
+=== Runtime Results (milliseconds per step) with 95% CI ===
+EKF      : 12.608 ± 2.563 ms
+DR       : 0.200 ± 0.016 ms
+PF_100   : 13.339 ± 1.911 ms
+PF_500   : 48.043 ± 0.494 ms
+PF_2000  : 186.149 ± 6.725 ms
+Graph saved to runtime_comparison_ci.png

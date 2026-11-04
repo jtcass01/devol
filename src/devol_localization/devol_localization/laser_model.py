@@ -1,119 +1,62 @@
-"""This LaserModel comes from Introduction of Robotics course notes."""
+#!/usr/bin/env python3
 
-from numpy import array, cos, sin, linspace, arange, pi, ndarray, exp, sqrt
-from typing import Tuple
-from math import pi
+from numpy import (
+    ndarray,
+    cos,
+    sin,
+    floor,
+    clip,
+    abs as np_abs,
+    sum as np_sum,
+    log,
+    logaddexp,
+    sqrt,
+    pi,
+)
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
 
 
 class LaserModel:
     @staticmethod
-    def distance_ray(x, theta, map, max_range=4, step=0.1) -> float:
-        n, m = map.shape
-        ray_theta = x[2] + theta
-        ray = array([cos(ray_theta), sin(ray_theta)])
-        for d in linspace(0, max_range, int(max_range // step)):
-            point = x[:2] + d * ray
-            cell = (round(point[0]), round(point[1]))
-            if cell[0] < 0 or cell[0] >= n or cell[1] < 0 or cell[1] >= m:
-                return d - step
-            if map[cell[0], cell[1]] == 0:
-                return d
-        return max_range
-
-    @staticmethod
-    def scan_map(x, map, max_range=4.0, theta_res=0.2) -> Tuple[ndarray, ndarray]:
-        theta_range = arange(-pi, pi, theta_res)
-        dists = []
-        for theta in theta_range:
-            dist = LaserModel.distance_ray(x, theta, map, max_range=max_range)
-            dists.append(dist)
-        dists = array(dists)
-        return dists, theta_range
-
-    @staticmethod
-    def ray_prob(point: ndarray, map: ndarray, std=0.1):
-        i, j = round(point[0]), round(point[1])
-        n, m = map.shape
-        out_of_bounds_dist = 0
-        # Handle rays that go out of bounds
-        if i < 0:
-            i = 0
-            out_of_bounds_dist += abs(i - point[0])
-        elif i >= n:
-            i = n - 1
-            out_of_bounds_dist += abs(i - point[0])
-        if j < 0:
-            j = 0
-            out_of_bounds_dist += abs(j - point[1])
-        elif j >= m:
-            j = m - 1
-            out_of_bounds_dist += abs(j - point[1])
-
-        dist = map[i, j] + out_of_bounds_dist
-        return exp(-(dist**2) / (2 * std**2)) / sqrt(2 * pi * std**2)
-
-    @staticmethod
-    def likelihood_field_range_finder(z_dists, z_thetas, x, map, z_max=4.0, std=0.1):
-        q = 1
-        eps = 0.02
-        n, m = map.shape
-        for z, theta in zip(z_dists, z_thetas):
-            if z > z_max - eps:
-                continue
-            ray_theta = x[2] + theta
-            ray = array([cos(ray_theta), sin(ray_theta)])
-            point = x[:2] + z * ray
-            q *= LaserModel.ray_prob(point, map, std=std)
-        return q
-
-
-"""
-The updated ROSLaserModel was developed by the author.
-"""
-
-import numpy as np
-
-
-class ROSLaserModel(LaserModel):
-    @staticmethod
-    def ray_prob(point: np.ndarray, map_dict: dict, std=0.1):
-        map_data = map_dict['grid']
+    def endpoint_distances(
+        laser_poses: ndarray, z_dists: ndarray, z_thetas: ndarray, map_dict: dict
+    ) -> ndarray:
+        """Distance from every beam endpoint to the nearest obstacle. Shape (M, K)."""
+        edt: ndarray = map_dict['grid']
         info = map_dict['info']
+        res: float = info.resolution
+        height, width = edt.shape
 
-        # Convert metric point (meters) to map indices (cells)
-        col = int(round((point[0] - info.origin.position.x) / info.resolution))
-        row = int(round((point[1] - info.origin.position.y) / info.resolution))
+        # Beam endpoints in the map frame (M x K)
+        ang: ndarray = laser_poses[:, 2:3] + z_thetas[None, :]
+        ex: ndarray = laser_poses[:, 0:1] + z_dists[None, :] * cos(ang)
+        ey: ndarray = laser_poses[:, 1:2] + z_dists[None, :] * sin(ang)
 
-        n, m = map_data.shape  # n=rows (Y), m=cols (X)
+        # Cell indices
+        cols: ndarray = floor((ex - info.origin.position.x) / res).astype(int)
+        rows: ndarray = floor((ey - info.origin.position.y) / res).astype(int)
 
-        # Handle rays that go out of bounds (add distance to the map edge)
-        out_of_bounds_dist = 0.0
-        if row < 0:
-            out_of_bounds_dist += abs(row) * info.resolution
-            row = 0
-        elif row >= n:
-            out_of_bounds_dist += (row - n + 1) * info.resolution
-            row = n - 1
+        # Out-of-bounds: clamp to the edge and add the L1 distance to the map boundary
+        c: ndarray = clip(cols, 0, width - 1)
+        r: ndarray = clip(rows, 0, height - 1)
+        oob: ndarray = (np_abs(cols - c) + np_abs(rows - r)) * res
 
-        if col < 0:
-            out_of_bounds_dist += abs(col) * info.resolution
-            col = 0
-        elif col >= m:
-            out_of_bounds_dist += (col - m + 1) * info.resolution
-            col = m - 1
-
-        dist = map_data[row, col] + out_of_bounds_dist
-        return np.exp(-(dist**2) / (2 * std**2)) / np.sqrt(2 * pi * std**2)
+        return edt[r, c] + oob
 
     @staticmethod
-    def likelihood_field_range_finder(z_dists, z_thetas, x, map_dict, z_max=4.0, std=0.1):
-        q = 1.0
-        eps = 0.02
-        for z, theta in zip(z_dists, z_thetas):
-            if z > z_max - eps:
-                continue
-            ray_theta = x[2] + theta
-            ray = np.array([cos(ray_theta), sin(ray_theta)])
-            point = x[:2] + z * ray
-            q *= ROSLaserModel.ray_prob(point, map_dict, std=std)
-        return q
+    def log_likelihood_gaussian(d: ndarray, sigma_hit: float) -> ndarray:
+        """Returns shape (M,)."""
+        return -0.5 * np_sum(d**2, axis=1) / sigma_hit**2
+
+    @staticmethod
+    def log_likelihood_mixture(
+        d: ndarray, sigma_hit: float, z_hit: float, z_rand: float, z_max: float
+    ) -> ndarray:
+        """Thrun Table 6.3 likelihood field: z_hit * N(d; 0, sigma) + z_rand / z_max."""
+        log_hit: ndarray = (
+            log(z_hit) - log(sqrt(2.0 * pi) * sigma_hit) - 0.5 * (d / sigma_hit) ** 2
+        )
+        log_rand: float = log(z_rand / z_max)
+        return np_sum(logaddexp(log_hit, log_rand), axis=1)

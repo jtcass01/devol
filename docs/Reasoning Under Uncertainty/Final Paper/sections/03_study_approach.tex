@@ -1,0 +1,24 @@
+\section{Study Approach}\label{Study-Approach}
+This section begins by outlining the system model that the three algorithms share, including the mobile platform and its sensors, the kinematic model and its Jacobians, the odometry noise model, and the map representations.
+Next, it describes the algorithms and their implementation specifics.
+Finally, this section details the mechanisms for simulated kidnapping in the Gazebo environment and the metrics collected during the experiments presented in Section \ref{sec:Results}.
+
+\input{sections/03_01_system_model.tex}
+
+\input{sections/03_02_dead_reckoning.tex}
+
+\input{sections/03_03_ekf.tex}
+
+\input{sections/03_04_pf.tex}
+
+\subsection{Kidnapping}
+Kidnapping is performed by a separate \texttt{Kidnap} node.
+The \texttt{Kidnap} node monitors the ground truth state of the robot.
+When the robot is within $0.3$ m of the Goal 1 pose, the node starts a 15-second timer.
+When the 15-second timer elapses, the \texttt{Kidnap} node chooses a random valid position in free space and teleports the robot using a service call to Gazebo.
+The local motion planner is robust to this disruption and replans from its new current pose to the existing goal (i.e., Goal 2).
+
+\subsection{Metric Collection}
+Metric collection is performed by the \texttt{Metric} node.
+This node monitors the poses published by the localization algorithms and compares them to the ground truth transform to calculate the Root Mean Square Error (RMSE) for both position and orientation.
+Additionally, the \texttt{Metric} node subscribes to the runtime topics for each localization node to record the computational time required for each estimation step.
