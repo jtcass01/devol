@@ -55,6 +55,8 @@ class LaserModel:
         d: ndarray, sigma_hit: float, z_hit: float, z_rand: float, z_max: float
     ) -> ndarray:
         """Thrun Table 6.3 likelihood field: z_hit * N(d; 0, sigma) + z_rand / z_max."""
-        log_hit: ndarray = log(z_hit) - log(sqrt(2.0 * pi) * sigma_hit) - 0.5 * (d / sigma_hit) ** 2
+        log_hit: ndarray = (
+            log(z_hit) - log(sqrt(2.0 * pi) * sigma_hit) - 0.5 * (d / sigma_hit) ** 2
+        )
         log_rand: float = log(z_rand / z_max)
         return np_sum(logaddexp(log_hit, log_rand), axis=1)
