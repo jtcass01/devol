@@ -20,6 +20,7 @@ from numpy import (
     arange,
     exp as np_exp,
     max as np_max,
+    sum as np_sum,
     zeros,
     vstack,
     where,
@@ -54,19 +55,29 @@ class ParticleFilterNode(BaseLocalizationNode):
             runtime_topic='/devol_drive/pf_pose/runtime',
         )
 
-        self.declare_parameter('num_particles', '500')
-        self.declare_parameter('z_hit', '0.95')
-        self.declare_parameter('z_rand', '0.05')
-        self.declare_parameter('kappa', '1.0')
-        self.declare_parameter('sigma_hit', 0.1)
+        self.declare_parameter('num_particles', 500)
+        self.declare_parameter('z_hit', 1.0)
+        self.declare_parameter('z_rand', 1e-6)
+        self.declare_parameter('z_max', 0.0)
+        self.declare_parameter('kappa', 1.0)
+        self.declare_parameter('sigma_hit', 0.25)
+        self.declare_parameter('alpha_slow', 0.001)
+        self.declare_parameter('alpha_fast', 0.1)
+        self.declare_parameter('max_escape_fraction', 0.05)
+        self.declare_parameter('neff_threshold', 0.5)
 
         self.map_dict = None
 
-        self.num_particles: int = int(self.get_parameter('num_particles').value)
-        self.z_hit: float = float(self.get_parameter('z_hit').value)
-        self.z_rand: float = float(self.get_parameter('z_rand').value)
-        self.kappa: float = float(self.get_parameter('kappa').value)
-        self.sigma_hit: float = float(self.get_parameter('sigma_hit').value)
+        self.num_particles: int = self.get_parameter('num_particles').value
+        self.z_hit: float = self.get_parameter('z_hit').value
+        self.z_rand: float = self.get_parameter('z_rand').value
+        self.z_max: float = self.get_parameter('z_max').value
+        self.kappa: float = self.get_parameter('kappa').value
+        self.sigma_hit: float = self.get_parameter('sigma_hit').value
+        self.alpha_fast: float = self.get_parameter('alpha_fast').value
+        self.alpha_slow: float = self.get_parameter('alpha_slow').value
+        self.max_escape_fraction: float = self.get_parameter('max_escape_fraction').value
+        self.neff_threshold: float = self.get_parameter('neff_threshold').value
 
         # Initialize particles clustered around starting origin
         self.particles: ndarray = self.rng.multivariate_normal(
@@ -159,6 +170,9 @@ class ParticleFilterNode(BaseLocalizationNode):
             self.localization_runtime += perf_counter() - start_time
             return
 
+        if self.z_max <= 0.0:
+            self.z_max: float = float(msg.range_max)
+
         z_dists, z_thetas = self.preprocess_scan(msg=msg)
 
         if len(z_dists) == 0:
@@ -245,105 +259,60 @@ class ParticleFilterNode(BaseLocalizationNode):
         return new_particles
 
     def _update(self, z_dists: list, z_thetas: list):
-        ## Update
-        # Calculate where the laser actually is for each newly predicted particle
+        # LiDAR pose for each particle
         laser_poses: ndarray = np_copy(self.particles)
         laser_offset: ndarray = self.get_laser_offset()
-        # Shift X and Y based on the laser's physical mount and the robot's current yaw
         laser_poses[:, 0] += laser_offset[0] * cos(laser_poses[:, 2]) - laser_offset[1] * sin(
             laser_poses[:, 2]
         )
         laser_poses[:, 1] += laser_offset[0] * sin(laser_poses[:, 2]) + laser_offset[1] * cos(
             laser_poses[:, 2]
         )
-        # Shift Yaw
         laser_poses[:, 2] += laser_offset[2]
 
+        # Measurement likelihood
         d: ndarray = LaserModel.endpoint_distances(laser_poses, z_dists, z_thetas, self.map_dict)
         log_lik: ndarray = LaserModel.log_likelihood_mixture(
             d, self.sigma_hit, self.z_hit, self.z_rand, self.z_max
         )
+
+        # Injection statistic
         avg_raw_likelihood: float = np_mean(np_exp(log_lik / d.shape[1]))
-
-        log_weights: ndarray = log_lik / self.kappa
-        step_weights: ndarray = np_exp(log_weights - np_max(log_weights))
-
-        # Initialize running averages on the very first update
         if self.slow_avg_lik == 0.0:
             self.slow_avg_lik = avg_raw_likelihood
             self.fast_avg_lik = avg_raw_likelihood
+        self.slow_avg_lik += self.alpha_slow * (avg_raw_likelihood - self.slow_avg_lik)
+        self.fast_avg_lik += self.alpha_fast * (avg_raw_likelihood - self.fast_avg_lik)
 
-        # Update exponential moving averages (standard AMCL alpha values)
-        self.slow_avg_lik += 0.001 * (avg_raw_likelihood - self.slow_avg_lik)
-        self.fast_avg_lik += 0.1 * (avg_raw_likelihood - self.fast_avg_lik)
-
-        # Multiply the new step weights into the running weight accumulator
-        self.weights *= step_weights
-
-        # Prevent division by zero
+        # Weight update
+        log_weights: ndarray = log_lik / self.kappa
+        self.weights *= np_exp(log_weights - np_max(log_weights))
         self.weights += 1e-40
-        # normalize (\eta)
-        self.weights /= sum(self.weights)
+        self.weights /= np_sum(self.weights)
+        n_eff: float = float(1.0 / np_sum(self.weights**2))
 
-        # Calculate Effective Sample Size (N_eff)
-        n_eff = 1.0 / sum(self.weights**2)
+        # Weighted state estimate and covariance
+        x_est, self.cov_est = self.weighted_pose_estimate(particles=self.particles, 
+                                                          weights=self.weights)
 
-        # Estimate the state based on the weighted average of particles
-        x_est: ndarray = average(self.particles, axis=0, weights=self.weights)
+        # Augmented MCL injection fraction
+        escape_fraction: float = 0.0
+        if self.slow_avg_lik > 0.0:
+            escape_fraction: float = max(0.0, 1.0 - self.fast_avg_lik / self.slow_avg_lik)
+        escape_fraction: float = min(self.max_escape_fraction, escape_fraction)
+        num_random: int = int(self.num_particles * escape_fraction)
 
-        # Wrap angle
-        x_est[2] = arctan2(
-            average(sin(self.particles[:, 2]), weights=self.weights),
-            average(cos(self.particles[:, 2]), weights=self.weights),
-        )
-
-        # Conditional Resampling: Only resample if N_eff drops below 50%
-        if n_eff < (self.num_particles / 2.0):
-            # Calculate adaptive escape fraction
-            escape_fraction = 0.0
-            if self.slow_avg_lik > 0 and self.fast_avg_lik < self.slow_avg_lik:
-                # The fast average dropped below the slow average; spike injection rate.
-                escape_fraction = 1.0 - (self.fast_avg_lik / self.slow_avg_lik)
-
-            # Cap the maximum injection
-            escape_fraction = max(0.0, min(0.05, escape_fraction))
-
-            num_random = int(self.num_particles * escape_fraction)
-            num_normal = self.num_particles - num_random
-            normal_particles: ndarray = self.low_variance_resample(
-                self.particles, self.weights, num_samples=num_normal
-            )
-
-            # Draw fresh random particles uniformly from map freespace
-            free_x = self.map_dict.get('free_x', array([]))
-            free_y = self.map_dict.get('free_y', array([]))
-
-            if num_random > 0:
-                if len(free_x) > 0:
-                    rand_indices = self.rng.choice(len(free_x), size=num_random, replace=True)
-                    random_particles = zeros((num_random, 3))
-                    random_particles[:, 0] = free_x[rand_indices]
-                    random_particles[:, 1] = free_y[rand_indices]
-                    random_particles[:, 2] = self.rng.uniform(-pi, pi, num_random)
-                else:
-                    # Safe fallback if map processing missed freespace coordinates
-                    random_particles = self.rng.multivariate_normal(
-                        x_est, cov(self.particles, rowvar=False), num_random
-                    )
-
-                # Combine both groups to form the new generation
-                new_particles: ndarray = vstack((normal_particles, random_particles))
-            else:
-                new_particles = normal_particles
-
-            # Reset weights to uniform after a resample event
+        resampled: bool = (n_eff < self.neff_threshold * self.num_particles) or (num_random > 0)        
+        if resampled:
+            new_particles = self.resample_with_injection(num_random, x_est)
             self.weights = ones(self.num_particles) / self.num_particles
         else:
             new_particles = self.particles
 
+        self.last_diagnostics = (n_eff, self.fast_avg_lik, self.slow_avg_lik, escape_fraction, resampled)
         return new_particles, x_est
 
-    def low_variance_resample(
+    def resample(
         self, particles: ndarray, weights: ndarray, num_samples: Optional[int] = None
     ) -> ndarray:
         N = len(particles) if num_samples is None else num_samples
@@ -357,6 +326,52 @@ class ParticleFilterNode(BaseLocalizationNode):
         indexes = searchsorted(cumulative_sum, pointers)
 
         return particles[indexes]
+
+    def resample_with_injection(self, num_random: int, x_est: ndarray) -> ndarray:
+        num_random: int = max(0, min(num_random, self.num_particles))
+        num_normal: int = self.num_particles - num_random
+
+        resampled: ndarray = self.resample(particles=self.particles, 
+                                           weights=self.weights, 
+                                           num_samples=num_normal)
+
+        if num_random == 0:
+            return resampled
+
+        injected: ndarray = self.sample_free_space(num_random, x_est)
+        return vstack((resampled, injected))
+
+    def sample_free_space(self, n: int, x_est: ndarray) -> ndarray:
+        free_x: ndarray = self.map_dict.get('free_x', array([]))
+        free_y: ndarray = self.map_dict.get('free_y', array([]))
+
+        if len(free_x) == 0:
+            samples: ndarray = self.rng.multivariate_normal(x_est, self.cov_est, n)
+            samples[:, 2] = arctan2(sin(samples[:,2]), cos(samples[:,2]))
+            return samples
+
+        res: float = self.map_dict['info'].resolution
+        idx: ndarray = self.rng.choice(len(free_x), size=n, replace=True)
+
+        samples = zeros((n, 3))
+        samples[:, 0] = free_x[idx] + self.rng.uniform(-0.5*res, 0.5*res, n)
+        samples[:, 1] = free_y[idx] + self.rng.uniform(-0.5*res, 0.5*res, n)
+        samples[:, 2] = self.rng.uniform(-pi, pi, n)
+
+        return samples
+
+    @staticmethod
+    def weighted_pose_estimate(particles: ndarray, weights: ndarray):
+        x_est: ndarray = average(particles, axis=0, weights=weights)
+        x_est[2] = arctan2(
+            average(sin(particles[:,2]), weights=weights),
+            average(cos(particles[:,2]), weights=weights)
+        )
+
+        diff: ndarray = particles - x_est
+        diff[:,2] = arctan2(sin(diff[:,2]), cos(diff[:,2]))
+        cov_est: ndarray = (diff * weights[:,None]).T @ diff
+        return x_est, cov_est
 
 
 def main(args=None):

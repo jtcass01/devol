@@ -33,6 +33,7 @@ setup(
             'metrics_node = devol_localization.metrics_node:main',
             'kidnapper_node = devol_localization.kidnapper_node:main',
             'goal_monitor_node = devol_localization.goal_monitor_node:main',
+            'noise_injector_node = devol_localization.noise_injector_node:main',
         ],
     },
 )

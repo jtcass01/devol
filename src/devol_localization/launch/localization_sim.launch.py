@@ -8,6 +8,7 @@ from launch.actions import (
     OpaqueFunction,
     RegisterEventHandler,
     EmitEvent,
+    ExecuteProcess,
 )
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
@@ -21,9 +22,12 @@ def launch_setup(context):
     def arg(name):
         return context.perform_substitution(LaunchConfiguration(name))
 
+    actions = []
+
     sim_share = get_package_share_directory('devol_sim')
     loc_share = 'devol_localization'
-    actions = []
+    noisy: bool = arg('noise').lower() == 'true'
+    odom_topic = '/devol_drive/noisy/odom' if noisy else '/devol_drive/odom'
 
     # Start the Simulation Pipeline
     actions.append(
@@ -33,7 +37,7 @@ def launch_setup(context):
             ),
             launch_arguments={
                 'maze': arg('maze'),
-                'planner': arg('planner'),
+                'planner': 'none',
                 'max_linear_velocity': arg('max_linear_velocity'),
                 'gz_gui': arg('gz_gui'),
                 'rviz': 'false',
@@ -49,7 +53,9 @@ def launch_setup(context):
             executable='ekf_node',
             name='ekf_localization_node',
             output='screen',
-            parameters=[{'use_sim_time': True}],
+            parameters=[{'use_sim_time': True,
+                         'odom_topic': odom_topic,
+                         'seed': arg('seed')}],
         )
     )
 
@@ -63,8 +69,9 @@ def launch_setup(context):
             parameters=[
                 {
                     'use_sim_time': True,
-                    'num_particles': arg('pf_num_particles'),
                     'seed': arg('seed'),
+                    'odom_topic': odom_topic,
+                    'num_particles': int(arg('pf_num_particles')),
                 }
             ],
         )
@@ -77,7 +84,13 @@ def launch_setup(context):
             executable='dr_node',
             name='dead_reckoning_node',
             output='screen',
-            parameters=[{'use_sim_time': True}],
+            parameters=[
+                {
+                    'use_sim_time': True,
+                    'seed': arg('seed'),
+                    'odom_topic': odom_topic,
+                }
+            ],
         )
     )
 
@@ -116,6 +129,23 @@ def launch_setup(context):
         )
     )
 
+    actions.append(
+        Node(
+            package=loc_share,
+            executable='noise_injector_node',
+            name='noise_injector_node',
+            output='screen',
+            parameters=[
+                {
+                    'use_sim_time': True, 
+                    'seed': arg('seed'),
+                    'k': float(arg('noise_scale'))
+                }
+            ],
+            condition=IfCondition(LaunchConfiguration('noise')),
+        )
+    )
+
     goal_monitor = Node(
         package=loc_share,
         executable='goal_monitor_node',
@@ -126,6 +156,37 @@ def launch_setup(context):
     )
 
     actions.append(goal_monitor)
+
+    planner: Node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory('devol_local_planner'),
+                'launch',
+                'local_planner.launch.py',
+            )
+        ),
+        launch_arguments={
+            'namespace': '/devol_drive',
+            'planner': "rrt_star",
+            'max_linear_velocity': arg('max_linear_velocity'),
+            'x': '0.0',
+            'y': '0.0',
+            'yaw': '0.0',
+        }.items(),
+    )
+
+    wait_for_ekf = ExecuteProcess(
+        cmd=['ros2', 'topic', 'echo', '--once', 
+             '/devol_drive/ekf_pose',
+             'geometry_msgs/msg/PoseWithCovarianceStamped',],
+        output='log',
+    )
+
+    actions.append(wait_for_ekf)
+
+    actions.append(
+        RegisterEventHandler(OnProcessExit(target_action=wait_for_ekf, on_exit=[planner]))
+    )
 
     actions.append(
         RegisterEventHandler(
@@ -152,6 +213,8 @@ def generate_launch_description():
         ('show_vis', 'true', 'Visualize?'),
         ('seed', '31', 'Seed for RNG'),
         ('results_dir', 'results', 'relative directory for results'),
+        ('noise', 'true', 'Inject odometry noise?'),
+        ('noise_scale', '0.0', 'scale of odometry noise injection'),
     ]
 
     return LaunchDescription(

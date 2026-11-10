@@ -1,22 +1,25 @@
-graph LR
+graph TD
     subgraph Agent_Level_Nodes ["Agent Level Nodes"]
-        Sensors["Sensors"]
-        Octo["octomap_server"]
-        AL["AgentLocalizer"]
-        LMP["Local Motion Planner"]
-        PC["Position Controller"]
-        DDM["DiffDrive Model"]
-        Actuators["Actuators"]
+        LiDAR["LiDAR"]:::outOfScope
+        NoiseInjector["NoiseInjector"]:::jhuPrimary
+        Octo["octomap_server"]:::outOfScope
+        AL["AgentLocalizer"]:::jhuPrimary
+        LMP["Local Motion Planner"]:::outOfScope
+        PC["Position Controller"]:::outOfScope
+        DDM["DiffDrive Model"]:::outOfScope
+        Actuators["Actuators"]:::outOfScope
     end
     
     Octo -->|"Map"| LMP
     Octo ==>|"Map"| AL
     
-    AL ==>|"x_t"| LMP
+    AL ==>|"X_t"| LMP
     LMP -->|"Target"| PC
     
-    Sensors ==>|"Sensor\nData"| AL
-    AL ==>|"x_t"| PC
+    LiDAR ==>|"LaserScan"| AL
+    DDM ==>|"Odometry"| NoiseInjector
+    NoiseInjector ==>|"Noisy Odometry"| AL
+    AL ==>|"X_t"| PC
     PC -->|"(v, ω)"| DDM
     DDM -->|"Joint\nVelocities"| Actuators
 

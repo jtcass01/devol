@@ -1082,7 +1082,7 @@ class ParticleFilterNode(BaseLocalizationNode):
 
             num_random = int(self.num_particles * escape_fraction)
             num_normal = self.num_particles - num_random
-            normal_particles: ndarray = self.low_variance_resample(
+            normal_particles: ndarray = self.resample(
                 self.particles, self.weights, num_samples=num_normal
             )
 
@@ -1115,7 +1115,7 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         return new_particles, x_est
 
-    def low_variance_resample(
+    def resample(
         self, particles: ndarray, weights: ndarray, num_samples: Optional[int] = None
     ) -> ndarray:
         N = len(particles) if num_samples is None else num_samples
