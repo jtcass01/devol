@@ -53,9 +53,7 @@ def launch_setup(context):
             executable='ekf_node',
             name='ekf_localization_node',
             output='screen',
-            parameters=[{'use_sim_time': True,
-                         'odom_topic': odom_topic,
-                         'seed': arg('seed')}],
+            parameters=[{'use_sim_time': True, 'odom_topic': odom_topic, 'seed': arg('seed')}],
         )
     )
 
@@ -136,11 +134,7 @@ def launch_setup(context):
             name='noise_injector_node',
             output='screen',
             parameters=[
-                {
-                    'use_sim_time': True, 
-                    'seed': arg('seed'),
-                    'k': float(arg('noise_scale'))
-                }
+                {'use_sim_time': True, 'seed': arg('seed'), 'k': float(arg('noise_scale'))}
             ],
             condition=IfCondition(LaunchConfiguration('noise')),
         )
@@ -167,7 +161,7 @@ def launch_setup(context):
         ),
         launch_arguments={
             'namespace': '/devol_drive',
-            'planner': "rrt_star",
+            'planner': 'rrt_star',
             'max_linear_velocity': arg('max_linear_velocity'),
             'x': '0.0',
             'y': '0.0',
@@ -176,9 +170,14 @@ def launch_setup(context):
     )
 
     wait_for_ekf = ExecuteProcess(
-        cmd=['ros2', 'topic', 'echo', '--once', 
-             '/devol_drive/ekf_pose',
-             'geometry_msgs/msg/PoseWithCovarianceStamped',],
+        cmd=[
+            'ros2',
+            'topic',
+            'echo',
+            '--once',
+            '/devol_drive/ekf_pose',
+            'geometry_msgs/msg/PoseWithCovarianceStamped',
+        ],
         output='log',
     )
 

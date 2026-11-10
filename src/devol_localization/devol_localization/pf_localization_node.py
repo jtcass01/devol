@@ -292,8 +292,9 @@ class ParticleFilterNode(BaseLocalizationNode):
         n_eff: float = float(1.0 / np_sum(self.weights**2))
 
         # Weighted state estimate and covariance
-        x_est, self.cov_est = self.weighted_pose_estimate(particles=self.particles, 
-                                                          weights=self.weights)
+        x_est, self.cov_est = self.weighted_pose_estimate(
+            particles=self.particles, weights=self.weights
+        )
 
         # Augmented MCL injection fraction
         escape_fraction: float = 0.0
@@ -302,14 +303,20 @@ class ParticleFilterNode(BaseLocalizationNode):
         escape_fraction: float = min(self.max_escape_fraction, escape_fraction)
         num_random: int = int(self.num_particles * escape_fraction)
 
-        resampled: bool = (n_eff < self.neff_threshold * self.num_particles) or (num_random > 0)        
+        resampled: bool = (n_eff < self.neff_threshold * self.num_particles) or (num_random > 0)
         if resampled:
             new_particles = self.resample_with_injection(num_random, x_est)
             self.weights = ones(self.num_particles) / self.num_particles
         else:
             new_particles = self.particles
 
-        self.last_diagnostics = (n_eff, self.fast_avg_lik, self.slow_avg_lik, escape_fraction, resampled)
+        self.last_diagnostics = (
+            n_eff,
+            self.fast_avg_lik,
+            self.slow_avg_lik,
+            escape_fraction,
+            resampled,
+        )
         return new_particles, x_est
 
     def resample(
@@ -331,9 +338,9 @@ class ParticleFilterNode(BaseLocalizationNode):
         num_random: int = max(0, min(num_random, self.num_particles))
         num_normal: int = self.num_particles - num_random
 
-        resampled: ndarray = self.resample(particles=self.particles, 
-                                           weights=self.weights, 
-                                           num_samples=num_normal)
+        resampled: ndarray = self.resample(
+            particles=self.particles, weights=self.weights, num_samples=num_normal
+        )
 
         if num_random == 0:
             return resampled
@@ -347,15 +354,15 @@ class ParticleFilterNode(BaseLocalizationNode):
 
         if len(free_x) == 0:
             samples: ndarray = self.rng.multivariate_normal(x_est, self.cov_est, n)
-            samples[:, 2] = arctan2(sin(samples[:,2]), cos(samples[:,2]))
+            samples[:, 2] = arctan2(sin(samples[:, 2]), cos(samples[:, 2]))
             return samples
 
         res: float = self.map_dict['info'].resolution
         idx: ndarray = self.rng.choice(len(free_x), size=n, replace=True)
 
         samples = zeros((n, 3))
-        samples[:, 0] = free_x[idx] + self.rng.uniform(-0.5*res, 0.5*res, n)
-        samples[:, 1] = free_y[idx] + self.rng.uniform(-0.5*res, 0.5*res, n)
+        samples[:, 0] = free_x[idx] + self.rng.uniform(-0.5 * res, 0.5 * res, n)
+        samples[:, 1] = free_y[idx] + self.rng.uniform(-0.5 * res, 0.5 * res, n)
         samples[:, 2] = self.rng.uniform(-pi, pi, n)
 
         return samples
@@ -364,13 +371,13 @@ class ParticleFilterNode(BaseLocalizationNode):
     def weighted_pose_estimate(particles: ndarray, weights: ndarray):
         x_est: ndarray = average(particles, axis=0, weights=weights)
         x_est[2] = arctan2(
-            average(sin(particles[:,2]), weights=weights),
-            average(cos(particles[:,2]), weights=weights)
+            average(sin(particles[:, 2]), weights=weights),
+            average(cos(particles[:, 2]), weights=weights),
         )
 
         diff: ndarray = particles - x_est
-        diff[:,2] = arctan2(sin(diff[:,2]), cos(diff[:,2]))
-        cov_est: ndarray = (diff * weights[:,None]).T @ diff
+        diff[:, 2] = arctan2(sin(diff[:, 2]), cos(diff[:, 2]))
+        cov_est: ndarray = (diff * weights[:, None]).T @ diff
         return x_est, cov_est
 
 

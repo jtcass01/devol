@@ -37,7 +37,9 @@ class NoiseInjectorNode(Node):
         self.rng = default_rng(self.seed)
 
         self.odom_pub = self.create_publisher(Odometry, self.get_parameter('odom_out').value, 50)
-        self.create_subscription(Odometry, self.get_parameter('odom_in').value, self.odom_callback, 50)
+        self.create_subscription(
+            Odometry, self.get_parameter('odom_in').value, self.odom_callback, 50
+        )
 
     def odom_callback(self, msg: Odometry) -> None:
         v: float = msg.twist.twist.linear.x
@@ -50,7 +52,9 @@ class NoiseInjectorNode(Node):
 
     def sample(self, v: float, omega: float) -> tuple:
         variance_v: float = self.alpha_tv_causedby_tv * v**2 + self.alpha_tv_causedby_rv * omega**2
-        variance_omega: float = self.alpha_rv_causedby_tv * v**2 + self.alpha_rv_causedby_rv * omega**2
+        variance_omega: float = (
+            self.alpha_rv_causedby_tv * v**2 + self.alpha_rv_causedby_rv * omega**2
+        )
 
         v_hat: float = v + self.rng.normal(0.0, self.noise_scale * sqrt(variance_v))
         omega_hat: float = omega + self.rng.normal(0.0, self.noise_scale * sqrt(variance_omega))
