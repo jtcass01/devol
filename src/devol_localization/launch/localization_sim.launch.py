@@ -57,8 +57,9 @@ def launch_setup(context):
             executable='ekf_node',
             name='ekf_localization_node',
             output='screen',
-            parameters=[{'use_sim_time': True, 'odom_topic': odom_topic, 
-                         'seed': int(arg('seed'))}],
+            parameters=[
+                {'use_sim_time': True, 'odom_topic': odom_topic, 'seed': int(arg('seed'))}
+            ],
         ),
         Node(
             package=LOC_PKG,
@@ -86,7 +87,7 @@ def launch_setup(context):
                     'odom_topic': odom_topic,
                 }
             ],
-        )
+        ),
     ]
 
     # visualization
@@ -110,9 +111,13 @@ def launch_setup(context):
                 executable='localization_logging_node',
                 name='localization_logging_node',
                 output='screen',
-                parameters=[{'use_sim_time': True, 
-                             'rate_hz': float(arg('log_rate_hz')),
-                             'results_dir': arg('results_dir')}],
+                parameters=[
+                    {
+                        'use_sim_time': True,
+                        'rate_hz': float(arg('log_rate_hz')),
+                        'results_dir': arg('results_dir'),
+                    }
+                ],
             )
         )
 
@@ -124,7 +129,7 @@ def launch_setup(context):
                 executable='kidnapper_node',
                 name='kidnapper_node',
                 output='screen',
-                parameters=[{'use_sim_time': True}]
+                parameters=[{'use_sim_time': True}],
             )
         )
 
@@ -138,7 +143,7 @@ def launch_setup(context):
                 output='screen',
                 parameters=[
                     {'use_sim_time': True, 'seed': arg('seed'), 'k': float(arg('noise_scale'))}
-                ]
+                ],
             )
         )
 
@@ -159,7 +164,7 @@ def launch_setup(context):
                     target_action=goal_monitor,
                     on_exit=[EmitEvent(event=Shutdown(reason='Goal reached. Test complete.'))],
                 )
-            )
+            ),
         ]
 
     # Planner
@@ -195,7 +200,7 @@ def launch_setup(context):
 
     actions += [
         wait_for_ekf,
-        RegisterEventHandler(OnProcessExit(target_action=wait_for_ekf, on_exit=[planner]))
+        RegisterEventHandler(OnProcessExit(target_action=wait_for_ekf, on_exit=[planner])),
     ]
 
     return actions

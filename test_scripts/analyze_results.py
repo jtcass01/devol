@@ -19,21 +19,21 @@ RESULTS_DIR = Path('test_results')
 TABLE_DIR = Path('tables')
 OUT_DIR = Path('figures')
 ALGOS = ['EKF', 'DR', 'PF']
-REF_NOISE = 0.0            # noise scale used for the headline accuracy figure
-KIDNAP_JUMP = 1.0          # [m] ground truth (or shared error) jump that marks the kidnap
+REF_NOISE = 0.0  # noise scale used for the headline accuracy figure
+KIDNAP_JUMP = 1.0  # [m] ground truth (or shared error) jump that marks the kidnap
 
 # Mahalanobis recovery criterion
-HOLD_TIME = 2.0            # [s] window over which the criterion must hold
-RECOVERY_HORIZON = 20.0    # [s] every kidnapped run is judged over this window after the kidnap
-NEES_DOF = 3               # x, y, yaw
-NEES_CONF = 0.95           # chi-square confidence for the windowed NEES bound
-MAX_POS_SIGMA = 0.3        # [m] filter must also be this confident in position
-MAX_YAW_SIGMA = 0.2        # [rad] and in yaw, so "very uncertain" does not count as recovered
+HOLD_TIME = 2.0  # [s] window over which the criterion must hold
+RECOVERY_HORIZON = 20.0  # [s] every kidnapped run is judged over this window after the kidnap
+NEES_DOF = 3  # x, y, yaw
+NEES_CONF = 0.95  # chi-square confidence for the windowed NEES bound
+MAX_POS_SIGMA = 0.3  # [m] filter must also be this confident in position
+MAX_YAW_SIGMA = 0.2  # [rad] and in yaw, so "very uncertain" does not count as recovered
 NEES_GATE = chi2.ppf(NEES_CONF, NEES_DOF)  # per-sample gate, used for coverage
 
 # Absolute-error criterion, kept only as a sensitivity check
-RECOVER_POS_THRESH = 0.3   # [m]
-RECOVER_YAW_THRESH = 0.2   # [rad]
+RECOVER_POS_THRESH = 0.3  # [m]
+RECOVER_YAW_THRESH = 0.2  # [rad]
 
 # Kidnap-aligned error profiles
 PROFILE_TAU = np.arange(-5.0, 40.0 + 1e-9, 0.1)  # [s] time since kidnap
@@ -54,8 +54,14 @@ FULL_NAMES = {
     'DR': 'Dead Reckoning (DR)',
     'PF': 'Particle Filter (PF)',
 }
-COV_IJ = {'Var_X': (0, 0), 'Var_Y': (1, 1), 'Var_Yaw': (2, 2),
-          'Cov_XY': (0, 1), 'Cov_XYaw': (0, 2), 'Cov_YYaw': (1, 2)}
+COV_IJ = {
+    'Var_X': (0, 0),
+    'Var_Y': (1, 1),
+    'Var_Yaw': (2, 2),
+    'Cov_XY': (0, 1),
+    'Cov_XYaw': (0, 2),
+    'Cov_YYaw': (1, 2),
+}
 
 # JHU brand palette (verify hex values against brand.jhu.edu)
 JHU = {
@@ -68,13 +74,19 @@ JHU = {
     'gold': '#F1C400',
 }
 COLORS = list(JHU.values())
-rcParams.update({
-    'axes.prop_cycle': cycler(color=COLORS),
-    'axes.grid': True, 'grid.linestyle': ':', 'grid.alpha': 0.6,
-    'axes.spines.top': False, 'axes.spines.right': False,
-    'errorbar.capsize': 4,
-    'savefig.dpi': 300, 'savefig.bbox': 'tight',
-})
+rcParams.update(
+    {
+        'axes.prop_cycle': cycler(color=COLORS),
+        'axes.grid': True,
+        'grid.linestyle': ':',
+        'grid.alpha': 0.6,
+        'axes.spines.top': False,
+        'axes.spines.right': False,
+        'errorbar.capsize': 4,
+        'savefig.dpi': 300,
+        'savefig.bbox': 'tight',
+    }
+)
 
 PATH_RE = re.compile(r'particles_(\d+)/noise_([\d.]+)/(baseline|kidnapped)/run_(\d+)/')
 PALETTE = {}  # label -> color, filled in main() so every figure and table uses the same order
@@ -154,8 +166,13 @@ def accuracy_metrics(pos, yaw, nees_v):
 
 
 def recovery_metrics(df, a, times, t0):
-    out = dict(recovery_s=np.nan, recovered=np.nan, recovered_abs=np.nan,
-               post_pos_rmse=np.nan, post_yaw_rmse=np.nan)
+    out = dict(
+        recovery_s=np.nan,
+        recovered=np.nan,
+        recovered_abs=np.nan,
+        post_pos_rmse=np.nan,
+        post_yaw_rmse=np.nan,
+    )
     if np.isnan(t0):
         return out
     after = times >= t0
@@ -168,13 +185,15 @@ def recovery_metrics(df, a, times, t0):
     # AND the filter is confident for the whole window.
     gate = chi2.ppf(NEES_CONF, NEES_DOF * n) / n
     consistent = (d[f'{a}_NEES'].rolling(n, min_periods=n).mean() < gate).to_numpy()
-    confident = held((d[f'{a}_Sigma_Pos'] < MAX_POS_SIGMA) &
-                     (d[f'{a}_Sigma_Yaw'] < MAX_YAW_SIGMA), n)
+    confident = held(
+        (d[f'{a}_Sigma_Pos'] < MAX_POS_SIGMA) & (d[f'{a}_Sigma_Yaw'] < MAX_YAW_SIGMA), n
+    )
     rec = first_start(tt, consistent & confident, n) - t0
 
     # Absolute-error criterion (sensitivity check only)
-    abs_ok = held((d[f'{a}_Pos_Err'] < RECOVER_POS_THRESH) &
-                  (d[f'{a}_Yaw_Err'] < RECOVER_YAW_THRESH), n)
+    abs_ok = held(
+        (d[f'{a}_Pos_Err'] < RECOVER_POS_THRESH) & (d[f'{a}_Yaw_Err'] < RECOVER_YAW_THRESH), n
+    )
     rec_abs = first_start(tt, abs_ok, n) - t0
 
     # Judge every run over the same window. A recovery starting at RECOVERY_HORIZON
@@ -227,25 +246,40 @@ def load(root=RESULTS_DIR):
 
             for a in ALGOS:
                 label = label_of(a, particles)
-                pos, yaw, nees_v = (df[f'{a}_{k}'].to_numpy() for k in ('Pos_Err', 'Yaw_Err', 'NEES'))
-                row = dict(particles=particles, noise=noise, condition=cond, seed=seed,
-                           algo=a, label=label,
-                           runtime_ms=df[f'{a}_Runtime'].mean() * 1e3,
-                           **accuracy_metrics(pos, yaw, nees_v))
+                pos, yaw, nees_v = (
+                    df[f'{a}_{k}'].to_numpy() for k in ('Pos_Err', 'Yaw_Err', 'NEES')
+                )
+                row = dict(
+                    particles=particles,
+                    noise=noise,
+                    condition=cond,
+                    seed=seed,
+                    algo=a,
+                    label=label,
+                    runtime_ms=df[f'{a}_Runtime'].mean() * 1e3,
+                    **accuracy_metrics(pos, yaw, nees_v),
+                )
                 if kidnapped:
                     row.update(recovery_metrics(df, a, times, t0))
                     if not np.isnan(t0) and np.isnan(row['recovered']):
-                        print(f'Warning: {csv} ({a}) ended < {RECOVERY_HORIZON + HOLD_TIME:g} s '
-                              'after kidnap; excluded from recovery stats')
+                        print(
+                            f'Warning: {csv} ({a}) ended < {RECOVERY_HORIZON + HOLD_TIME:g} s '
+                            'after kidnap; excluded from recovery stats'
+                        )
                 runs.append(row)
 
                 if not np.isnan(t0):
                     rel = times - t0
-                    traces.append(dict(
-                        label=label, noise=noise,
-                        **{k: np.interp(PROFILE_TAU, rel, v, left=np.nan, right=np.nan)
-                           for k, v in (('pos', pos), ('yaw', yaw), ('nees', nees_v))},
-                    ))
+                    traces.append(
+                        dict(
+                            label=label,
+                            noise=noise,
+                            **{
+                                k: np.interp(PROFILE_TAU, rel, v, left=np.nan, right=np.nan)
+                                for k, v in (('pos', pos), ('yaw', yaw), ('nees', nees_v))
+                            },
+                        )
+                    )
         except Exception as e:
             print(f'Skipping {csv}: {e}')
     return DataFrame(runs), traces
@@ -253,9 +287,11 @@ def load(root=RESULTS_DIR):
 
 def by_estimator(df):
     pf = df[df.algo == 'PF']
-    other = (df[df.algo != 'PF']
-             .groupby(['label', 'algo', 'noise', 'condition', 'seed'], as_index=False)
-             .mean(numeric_only=True))
+    other = (
+        df[df.algo != 'PF']
+        .groupby(['label', 'algo', 'noise', 'condition', 'seed'], as_index=False)
+        .mean(numeric_only=True)
+    )
     out = concat([other, pf], ignore_index=True)
     out['label'] = Categorical(out.label, categories=list(PALETTE), ordered=True)
     return out
@@ -265,8 +301,9 @@ def by_estimator(df):
 def lines(ax, d, x, col, ylabel):
     s = summarize(d, ['label', x], col)
     for label, g in s.groupby('label', observed=True):
-        ax.errorbar(g[x], g['mean'], yerr=g['ci'], marker='o', label=str(label),
-                    color=PALETTE[str(label)])
+        ax.errorbar(
+            g[x], g['mean'], yerr=g['ci'], marker='o', label=str(label), color=PALETTE[str(label)]
+        )
     ax.set_ylabel(ylabel)
     return s.assign(metric=col)
 
@@ -280,8 +317,15 @@ def bars(ax, d, col, ylabel):
     rng = np.random.default_rng(0)
     for i, name in enumerate(names):
         y = d.loc[d.label == name, col].dropna().to_numpy()
-        ax.scatter(i + rng.uniform(-0.2, 0.2, y.size), y, s=10, color='k', alpha=0.5,
-                   linewidths=0, zorder=3)
+        ax.scatter(
+            i + rng.uniform(-0.2, 0.2, y.size),
+            y,
+            s=10,
+            color='k',
+            alpha=0.5,
+            linewidths=0,
+            zorder=3,
+        )
     ax.set_xticks(x, names, rotation=30)
     ax.set_ylabel(ylabel)
     return s.assign(metric=col)
@@ -371,9 +415,13 @@ def latex(s, name, caption, cols='metric', head=None, digits=3):
     p = s.pivot(index='label', columns=cols, values=['mean', 'ci']).reindex(order)
     keys = p['mean'].columns
     heads = ['Algorithm'] + [METRIC_NAMES[k] if head is None else head.format(k) for k in keys]
-    rows = [' & '.join([full_name(lbl)] +
-                       [fmt(p['mean'].at[lbl, k], p['ci'].at[lbl, k], digits) for k in keys])
-            for lbl in p.index]
+    rows = [
+        ' & '.join(
+            [full_name(lbl)]
+            + [fmt(p['mean'].at[lbl, k], p['ci'].at[lbl, k], digits) for k in keys]
+        )
+        for lbl in p.index
+    ]
 
     out = [
         r'\begin{table}[!htbp]',
@@ -408,32 +456,56 @@ def main():
     # Accuracy at the reference noise level
     fig, axs = subplots(1, 2, figsize=(11, 4))
     ref = base[base.noise == REF_NOISE]
-    s = [bars(axs[0], ref, 'pos_rmse', 'Position RMSE (m)'),
-         bars(axs[1], ref, 'yaw_rmse', 'Yaw RMSE (rad)')]
+    s = [
+        bars(axs[0], ref, 'pos_rmse', 'Position RMSE (m)'),
+        bars(axs[1], ref, 'yaw_rmse', 'Yaw RMSE (rad)'),
+    ]
     fig.suptitle(f'Accuracy, baseline, noise scale {REF_NOISE:g} (95% CI, dots = runs)')
     save(fig, 'accuracy', s)
-    latex(concat(s), 'accuracy',
-          f'Baseline localization accuracy at odometry noise scale {REF_NOISE:g}.')
+    latex(
+        concat(s),
+        'accuracy',
+        f'Baseline localization accuracy at odometry noise scale {REF_NOISE:g}.',
+    )
 
     # Noise sensitivity (log y so DR drift doesn't flatten the other curves)
     fig, axs = subplots(1, 2, figsize=(11, 4), sharex=True)
-    s = [lines(axs[0], base, 'noise', 'pos_rmse', 'Position RMSE (m)'),
-         lines(axs[1], base, 'noise', 'yaw_rmse', 'Yaw RMSE (rad)')]
+    s = [
+        lines(axs[0], base, 'noise', 'pos_rmse', 'Position RMSE (m)'),
+        lines(axs[1], base, 'noise', 'yaw_rmse', 'Yaw RMSE (rad)'),
+    ]
     for ax in axs:
         ax.set(xlabel=noise_x, yscale='log')
     axs[0].legend()
     fig.suptitle('Accuracy vs. odometry noise, baseline (95% CI)')
     save(fig, 'noise', s)
-    latex(s[0], 'noise_pos', 'Baseline position RMSE (m) vs. odometry noise scale.',
-          cols='noise', head=noise_col)
-    latex(s[1], 'noise_yaw', 'Baseline yaw RMSE (rad) vs. odometry noise scale.',
-          cols='noise', head=noise_col)
+    latex(
+        s[0],
+        'noise_pos',
+        'Baseline position RMSE (m) vs. odometry noise scale.',
+        cols='noise',
+        head=noise_col,
+    )
+    latex(
+        s[1],
+        'noise_yaw',
+        'Baseline yaw RMSE (rad) vs. odometry noise scale.',
+        cols='noise',
+        head=noise_col,
+    )
 
     # Consistency: does each filter's covariance honestly describe its error?
     fig, axs = subplots(1, 2, figsize=(11, 4), sharex=True)
-    s = [lines(axs[0], base, 'noise', 'anees', 'ANEES'),
-         lines(axs[1], base, 'noise', 'nees_coverage',
-               f'Fraction of samples inside {NEES_CONF:.0%} gate')]
+    s = [
+        lines(axs[0], base, 'noise', 'anees', 'ANEES'),
+        lines(
+            axs[1],
+            base,
+            'noise',
+            'nees_coverage',
+            f'Fraction of samples inside {NEES_CONF:.0%} gate',
+        ),
+    ]
     axs[0].axhline(NEES_DOF, color='k', ls='--', lw=1, label=f'Consistent ({NEES_DOF})')
     axs[0].set_yscale('log')
     axs[1].axhline(NEES_CONF, color='k', ls='--', lw=1, label=f'Consistent ({NEES_CONF:g})')
@@ -443,48 +515,83 @@ def main():
     axs[0].legend()
     fig.suptitle('Filter consistency vs. odometry noise, baseline (95% CI)')
     save(fig, 'consistency', s)
-    latex(s[0], 'consistency_anees',
-          f'Baseline average NEES vs. odometry noise scale (consistent filter: {NEES_DOF}; '
-          'higher is overconfident, lower is underconfident).',
-          cols='noise', head=noise_col, digits=2)
-    latex(s[1], 'consistency_coverage',
-          f'Fraction of baseline samples with NEES inside the {NEES_CONF * 100:g}\\% '
-          f'$\\chi^2_{{{NEES_DOF}}}$ gate (consistent filter: {NEES_CONF:g}).',
-          cols='noise', head=noise_col, digits=2)
+    latex(
+        s[0],
+        'consistency_anees',
+        f'Baseline average NEES vs. odometry noise scale (consistent filter: {NEES_DOF}; '
+        'higher is overconfident, lower is underconfident).',
+        cols='noise',
+        head=noise_col,
+        digits=2,
+    )
+    latex(
+        s[1],
+        'consistency_coverage',
+        f'Fraction of baseline samples with NEES inside the {NEES_CONF * 100:g}\\% '
+        f'$\\chi^2_{{{NEES_DOF}}}$ gate (consistent filter: {NEES_CONF:g}).',
+        cols='noise',
+        head=noise_col,
+        digits=2,
+    )
 
     # Kidnap recovery summary
-    crit_txt = (f'mean NEES over {HOLD_TIME:g} s within {NEES_CONF:.0%} chi-square bound, '
-                f'sigma_pos < {MAX_POS_SIGMA} m, sigma_yaw < {MAX_YAW_SIGMA} rad')
-    crit_tex = (f'mean NEES over {HOLD_TIME:g} s within the {NEES_CONF * 100:g}\\% $\\chi^2$ '
-                f'bound, $\\sigma_{{pos}} <$ {MAX_POS_SIGMA} m and '
-                f'$\\sigma_{{yaw}} <$ {MAX_YAW_SIGMA} rad')
+    crit_txt = (
+        f'mean NEES over {HOLD_TIME:g} s within {NEES_CONF:.0%} chi-square bound, '
+        f'sigma_pos < {MAX_POS_SIGMA} m, sigma_yaw < {MAX_YAW_SIGMA} rad'
+    )
+    crit_tex = (
+        f'mean NEES over {HOLD_TIME:g} s within the {NEES_CONF * 100:g}\\% $\\chi^2$ '
+        f'bound, $\\sigma_{{pos}} <$ {MAX_POS_SIGMA} m and '
+        f'$\\sigma_{{yaw}} <$ {MAX_YAW_SIGMA} rad'
+    )
     fig, axs = subplots(1, 3, figsize=(16, 4), sharex=True)
-    s = [lines(axs[0], kid, 'noise', 'recovered', 'Recovery rate'),
-         lines(axs[1], kid, 'noise', 'recovery_s', 'Time to recover (s), recovered runs'),
-         lines(axs[2], kid, 'noise', 'post_pos_rmse', 'Post-recovery position RMSE (m)')]
+    s = [
+        lines(axs[0], kid, 'noise', 'recovered', 'Recovery rate'),
+        lines(axs[1], kid, 'noise', 'recovery_s', 'Time to recover (s), recovered runs'),
+        lines(axs[2], kid, 'noise', 'post_pos_rmse', 'Post-recovery position RMSE (m)'),
+    ]
     axs[0].set_ylim(0, 1.05)
     for ax in axs:
         ax.set_xlabel(noise_x)
     axs[0].legend()
     fig.suptitle(f'Kidnapping recovery ({crit_txt}; 95% CI)')
     save(fig, 'recovery', s)
-    latex(s[0], 'recovery_rate',
-          f'Fraction of kidnapped runs recovered within {RECOVERY_HORIZON:g} s ({crit_tex}).',
-          cols='noise', head=noise_col, digits=2)
-    latex(s[1], 'recovery_time',
-          f'Time to recover (s) from kidnapping, recovered runs only ({crit_tex}).',
-          cols='noise', head=noise_col, digits=1)
-    latex(s[2], 'recovery_rmse',
-          'Position RMSE (m) from the moment of recovery to the end of the run.',
-          cols='noise', head=noise_col)
+    latex(
+        s[0],
+        'recovery_rate',
+        f'Fraction of kidnapped runs recovered within {RECOVERY_HORIZON:g} s ({crit_tex}).',
+        cols='noise',
+        head=noise_col,
+        digits=2,
+    )
+    latex(
+        s[1],
+        'recovery_time',
+        f'Time to recover (s) from kidnapping, recovered runs only ({crit_tex}).',
+        cols='noise',
+        head=noise_col,
+        digits=1,
+    )
+    latex(
+        s[2],
+        'recovery_rmse',
+        'Position RMSE (m) from the moment of recovery to the end of the run.',
+        cols='noise',
+        head=noise_col,
+    )
 
     # Criterion sensitivity: do the Mahalanobis and absolute-error criteria agree?
-    sens = concat([summarize(kid, ['label'], c).assign(metric=c)
-                   for c in ('recovered', 'recovered_abs')])
-    latex(sens, 'recovery_criteria',
-          f'Recovery rate under the Mahalanobis criterion ({crit_tex}) and the absolute-error '
-          f'criterion (error $<$ {RECOVER_POS_THRESH} m and $<$ {RECOVER_YAW_THRESH} rad for '
-          f'{HOLD_TIME:g} s), pooled over noise levels.', digits=2)
+    sens = concat(
+        [summarize(kid, ['label'], c).assign(metric=c) for c in ('recovered', 'recovered_abs')]
+    )
+    latex(
+        sens,
+        'recovery_criteria',
+        f'Recovery rate under the Mahalanobis criterion ({crit_tex}) and the absolute-error '
+        f'criterion (error $<$ {RECOVER_POS_THRESH} m and $<$ {RECOVER_YAW_THRESH} rad for '
+        f'{HOLD_TIME:g} s), pooled over noise levels.',
+        digits=2,
+    )
 
     # Recovery over time (handles unrecovered runs without survivorship bias)
     plot_recovery_curves(raw[raw.condition == 'kidnapped'], noises)
@@ -505,9 +612,12 @@ def main():
     ax.legend()
     ax.set_title('Runtime per update (95% CI)')
     save(fig, 'runtime', s)
-    latex(summarize(base, ['label'], 'runtime_ms').assign(metric='runtime_ms'), 'runtime',
-          'Average runtime per update step across algorithms, baseline runs pooled over all '
-          'noise levels.')
+    latex(
+        summarize(base, ['label'], 'runtime_ms').assign(metric='runtime_ms'),
+        'runtime',
+        'Average runtime per update step across algorithms, baseline runs pooled over all '
+        'noise levels.',
+    )
 
 
 if __name__ == '__main__':

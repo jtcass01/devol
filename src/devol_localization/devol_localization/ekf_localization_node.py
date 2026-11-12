@@ -210,7 +210,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.localization_runtime += perf_counter() - start_time
         self.publish_pose_and_tf_runtime(
             stamp=msg.header.stamp,
-            cov_3x3=self.covariance[:3,:3],
+            cov_3x3=self.covariance[:3, :3],
             start_time=0.0,
             end_time=self.localization_runtime,
         )

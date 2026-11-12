@@ -85,8 +85,16 @@ class LocalizationLoggingNode(Node):
         self.dr_rt_sub = Subscriber(self, PointStamped, '/devol_drive/dr_pose/runtime')
 
         self.ts = ApproximateTimeSynchronizer(
-            [self.gt_sub, self.ekf_sub, self.ekf_rt_sub, self.pf_sub, self.pf_cloud_sub,
-             self.pf_rt_sub, self.dr_sub, self.dr_rt_sub],
+            [
+                self.gt_sub,
+                self.ekf_sub,
+                self.ekf_rt_sub,
+                self.pf_sub,
+                self.pf_cloud_sub,
+                self.pf_rt_sub,
+                self.dr_sub,
+                self.dr_rt_sub,
+            ],
             queue_size=20,
             slop=0.5,
         )
@@ -97,13 +105,16 @@ class LocalizationLoggingNode(Node):
             f'(max rate: {rate_hz if rate_hz > 0 else "every sync"} Hz)'
         )
 
-    def sync_callback(self, gt_msg, ekf_msg, ekf_rt_msg, pf_msg, pf_cloud_msg, pf_rt_msg,
-                      dr_msg, dr_rt_msg):
+    def sync_callback(
+        self, gt_msg, ekf_msg, ekf_rt_msg, pf_msg, pf_cloud_msg, pf_rt_msg, dr_msg, dr_rt_msg
+    ):
         """Writes one CSV row per matched set of messages (throttled to rate_hz)."""
         t = Time.from_msg(gt_msg.header.stamp).nanoseconds * 1e-9
         if self.t0 is None:
             self.t0 = t
-            self.get_logger().info('First synchronized sample received. Starting metrics collection.')
+            self.get_logger().info(
+                'First synchronized sample received. Starting metrics collection.'
+            )
         t -= self.t0
 
         if self.last_write is not None and t - self.last_write < self.min_period:

@@ -63,17 +63,18 @@ plt.rcParams['ytick.color'] = '#002D72'
 
 class ErrorTracker:
     """Tracks position and yaw errors, calculating RMSE and integral error over time."""
+
     def __init__(self, name: str, color: str):
         self.name = name
         self.color = color
-        
+
         self.count = 0
         self.times = []
         self.err_pos = []
         self.rmse_pos = []
         self.err_yaw = []
         self.rmse_yaw = []
-        
+
         self.sum_sq_pos = 0.0
         self.sum_sq_yaw = 0.0
         self.integral_pos = 0.0
@@ -90,7 +91,7 @@ class ErrorTracker:
         # Calculate Euclidean position error
         dx = x - gt_x
         dy = y - gt_y
-        e_pos = math.sqrt(dx*dx + dy*dy)
+        e_pos = math.sqrt(dx * dx + dy * dy)
 
         # Calculate shortest path yaw error normalized to [-pi, pi]
         dyaw = yaw - gt_yaw
