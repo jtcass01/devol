@@ -13,11 +13,11 @@ RESULTS_DIR = Path('test_results')
 TABLE_DIR = Path('tables')
 OUT_DIR = Path('figures')
 ALGOS = ['EKF', 'DR', 'PF']
-REF_NOISE = 0.0        # noise scale used for the headline accuracy figure
-KIDNAP_JUMP = 1.0      # [m] simultaneous error jump (all estimators) that marks the kidnap
-RECOVER_POS_THRESH = 0.3   # [m] error considered "recovered"
-RECOVER_YAW_THRESH = 0.2   # [rad] error considered "recovered"
-HOLD_TIME = 2.0        # [s] error must stay below RECOVER_THRESH this long to count
+REF_NOISE = 0.0  # noise scale used for the headline accuracy figure
+KIDNAP_JUMP = 1.0  # [m] simultaneous error jump (all estimators) that marks the kidnap
+RECOVER_POS_THRESH = 0.3  # [m] error considered "recovered"
+RECOVER_YAW_THRESH = 0.2  # [rad] error considered "recovered"
+HOLD_TIME = 2.0  # [s] error must stay below RECOVER_THRESH this long to count
 
 METRIC_NAMES = {
     'pos_rmse': 'Position RMSE (m)',
@@ -39,13 +39,19 @@ JHU = {
     'gold': '#F1C400',
 }
 COLORS = list(JHU.values())
-rcParams.update({
-    'axes.prop_cycle': cycler(color=COLORS),
-    'axes.grid': True, 'grid.linestyle': ':', 'grid.alpha': 0.6,
-    'axes.spines.top': False, 'axes.spines.right': False,
-    'errorbar.capsize': 4,
-    'savefig.dpi': 300, 'savefig.bbox': 'tight',
-})
+rcParams.update(
+    {
+        'axes.prop_cycle': cycler(color=COLORS),
+        'axes.grid': True,
+        'grid.linestyle': ':',
+        'grid.alpha': 0.6,
+        'axes.spines.top': False,
+        'axes.spines.right': False,
+        'errorbar.capsize': 4,
+        'savefig.dpi': 300,
+        'savefig.bbox': 'tight',
+    }
+)
 
 PATH_RE = re.compile(r'particles_(\d+)/noise_([\d.]+)/(baseline|kidnapped)/run_(\d+)/')
 
@@ -102,15 +108,23 @@ def load(root=RESULTS_DIR):
                 print(f'Warning: no kidnap detected in {csv}')
             last = df.iloc[-1]
             for a in ALGOS:
-                rec = recovery_time(times, df[f'{a}_Pos_Err'].to_numpy(), df[f'{a}_Yaw_Error'].to_numpy(), t0)
-                rows.append(dict(
-                    particles=particles, noise=noise, condition=cond, seed=seed, algo=a,
-                    pos_rmse=last[f'{a}_Pos_RMSE'],
-                    yaw_rmse=last[f'{a}_Yaw_RMSE'],
-                    runtime_ms=df[f'{a}_Runtime'].mean() * 1e3,
-                    recovery_s=rec,
-                    recovered=nan if isnan(t0) else float(not isnan(rec)),
-                ))
+                rec = recovery_time(
+                    times, df[f'{a}_Pos_Err'].to_numpy(), df[f'{a}_Yaw_Error'].to_numpy(), t0
+                )
+                rows.append(
+                    dict(
+                        particles=particles,
+                        noise=noise,
+                        condition=cond,
+                        seed=seed,
+                        algo=a,
+                        pos_rmse=last[f'{a}_Pos_RMSE'],
+                        yaw_rmse=last[f'{a}_Yaw_RMSE'],
+                        runtime_ms=df[f'{a}_Runtime'].mean() * 1e3,
+                        recovery_s=rec,
+                        recovered=nan if isnan(t0) else float(not isnan(rec)),
+                    )
+                )
         except Exception as e:
             print(f'Skipping {csv}: {e}')
     return DataFrame(rows)
@@ -124,10 +138,12 @@ def by_estimator(df):
     and make the CI falsely narrow.
     """
     pf = df[df.algo == 'PF'].assign(label=lambda d: 'PF-' + d.particles.astype(str))
-    other = (df[df.algo != 'PF']
-             .groupby(['algo', 'noise', 'condition', 'seed'], as_index=False)
-             .mean(numeric_only=True)
-             .assign(label=lambda d: d.algo))
+    other = (
+        df[df.algo != 'PF']
+        .groupby(['algo', 'noise', 'condition', 'seed'], as_index=False)
+        .mean(numeric_only=True)
+        .assign(label=lambda d: d.algo)
+    )
     order = ['EKF', 'DR'] + [f'PF-{p}' for p in sorted(df.particles.unique())]
     out = concat([other, pf], ignore_index=True)
     out['label'] = Categorical(out.label, categories=order, ordered=True)
@@ -183,9 +199,13 @@ def latex(s, name, caption, cols='metric', head=None, digits=3):
     p = s.pivot(index=['rank', 'label'], columns=cols, values=['mean', 'ci']).droplevel('rank')
     keys = p['mean'].columns
     heads = ['Algorithm'] + [METRIC_NAMES[k] if head is None else head.format(k) for k in keys]
-    rows = [' & '.join([full_name(lbl)] +
-                       [fmt(p['mean'].at[lbl, k], p['ci'].at[lbl, k], digits) for k in keys])
-            for lbl in p.index]
+    rows = [
+        ' & '.join(
+            [full_name(lbl)]
+            + [fmt(p['mean'].at[lbl, k], p['ci'].at[lbl, k], digits) for k in keys]
+        )
+        for lbl in p.index
+    ]
 
     out = [
         r'\begin{table}[!htbp]',
@@ -204,6 +224,7 @@ def latex(s, name, caption, cols='metric', head=None, digits=3):
     TABLE_DIR.mkdir(exist_ok=True)
     (TABLE_DIR / f'{name}.tex').write_text('\n'.join(out) + '\n')
 
+
 # ----------------------------------------------------------------------------- main
 def main():
     raw = load()
@@ -218,49 +239,88 @@ def main():
     # Accuracy at the reference noise level
     fig, axs = subplots(1, 2, figsize=(11, 4))
     ref = base[base.noise == REF_NOISE]
-    s = [bars(axs[0], ref, 'pos_rmse', 'Position RMSE (m)'),
-         bars(axs[1], ref, 'yaw_rmse', 'Yaw RMSE (rad)')]
+    s = [
+        bars(axs[0], ref, 'pos_rmse', 'Position RMSE (m)'),
+        bars(axs[1], ref, 'yaw_rmse', 'Yaw RMSE (rad)'),
+    ]
     fig.suptitle(f'Accuracy, baseline, noise scale {REF_NOISE} (95% CI)')
     save(fig, 'accuracy', s)
-    latex(concat(s), 'accuracy',
-          f'Baseline localization accuracy at odometry noise scale {REF_NOISE:g}.')
+    latex(
+        concat(s),
+        'accuracy',
+        f'Baseline localization accuracy at odometry noise scale {REF_NOISE:g}.',
+    )
 
     # Noise sensitivity
     fig, axs = subplots(1, 2, figsize=(11, 4), sharex=True)
-    s = [lines(axs[0], base, 'noise', 'pos_rmse', 'Position RMSE (m)'),
-         lines(axs[1], base, 'noise', 'yaw_rmse', 'Yaw RMSE (rad)')]
+    s = [
+        lines(axs[0], base, 'noise', 'pos_rmse', 'Position RMSE (m)'),
+        lines(axs[1], base, 'noise', 'yaw_rmse', 'Yaw RMSE (rad)'),
+    ]
     for ax in axs:
         ax.set_xlabel(noise_x)
     axs[0].legend()
     fig.suptitle('Accuracy vs. odometry noise, baseline (95% CI)')
     save(fig, 'noise', s)
-    latex(s[0], 'noise_pos', 'Baseline position RMSE (m) vs. odometry noise scale.',
-          cols='noise', head=noise_col)
-    latex(s[1], 'noise_yaw', 'Baseline yaw RMSE (rad) vs. odometry noise scale.',
-          cols='noise', head=noise_col)
+    latex(
+        s[0],
+        'noise_pos',
+        'Baseline position RMSE (m) vs. odometry noise scale.',
+        cols='noise',
+        head=noise_col,
+    )
+    latex(
+        s[1],
+        'noise_yaw',
+        'Baseline yaw RMSE (rad) vs. odometry noise scale.',
+        cols='noise',
+        head=noise_col,
+    )
 
     # Kidnap recovery
     fig, axs = subplots(1, 3, figsize=(16, 4), sharex=True)
-    s = [lines(axs[0], kid, 'noise', 'recovered', 'Recovery rate'),
-         lines(axs[1], kid, 'noise', 'recovery_s', 'Time to recover (s), recovered runs'),
-         lines(axs[2], kid, 'noise', 'pos_rmse', 'Position RMSE (m)')]
+    s = [
+        lines(axs[0], kid, 'noise', 'recovered', 'Recovery rate'),
+        lines(axs[1], kid, 'noise', 'recovery_s', 'Time to recover (s), recovered runs'),
+        lines(axs[2], kid, 'noise', 'pos_rmse', 'Position RMSE (m)'),
+    ]
     axs[0].set_ylim(0, 1.05)
     for ax in axs:
         ax.set_xlabel(noise_x)
     axs[0].legend()
-    fig.suptitle(f'Kidnapping recovery (< {RECOVER_POS_THRESH} m and < {RECOVER_YAW_THRESH} rad held for {HOLD_TIME} s, 95% CI)')
+    fig.suptitle(
+        f'Kidnapping recovery (< {RECOVER_POS_THRESH} m and < {RECOVER_YAW_THRESH} rad held for {HOLD_TIME} s, 95% CI)'
+    )
     save(fig, 'recovery', s)
     crit = f'pos error $<$ {RECOVER_POS_THRESH} m and yaw error $<$ {RECOVER_YAW_THRESH} rad held for {HOLD_TIME:g} s'
-    latex(s[0], 'recovery_rate', f'Kidnapping recovery rate ({crit}).',
-          cols='noise', head=noise_col, digits=2)
-    latex(s[1], 'recovery_time', f'Time to recover (s) from kidnapping, recovered runs only ({crit}).',
-          cols='noise', head=noise_col, digits=1)
-    latex(s[2], 'recovery_rmse', 'Position RMSE (m) over kidnapped runs.',
-          cols='noise', head=noise_col)
+    latex(
+        s[0],
+        'recovery_rate',
+        f'Kidnapping recovery rate ({crit}).',
+        cols='noise',
+        head=noise_col,
+        digits=2,
+    )
+    latex(
+        s[1],
+        'recovery_time',
+        f'Time to recover (s) from kidnapping, recovered runs only ({crit}).',
+        cols='noise',
+        head=noise_col,
+        digits=1,
+    )
+    latex(
+        s[2],
+        'recovery_rmse',
+        'Position RMSE (m) over kidnapped runs.',
+        cols='noise',
+        head=noise_col,
+    )
 
     # Runtime vs. particle count (baseline, pooled over noise levels)
     rt = raw[raw.condition == 'baseline'].assign(
-        label=lambda d: d.algo, rank=lambda d: d.algo.map(ALGOS.index))
+        label=lambda d: d.algo, rank=lambda d: d.algo.map(ALGOS.index)
+    )
     particles = sorted(raw.particles.unique())
     fig, ax = subplots(figsize=(6, 4))
     s = [lines(ax, rt, 'particles', 'runtime_ms', 'Mean update time (ms)')]
@@ -270,9 +330,12 @@ def main():
     ax.legend()
     ax.set_title('Runtime per update (95% CI)')
     save(fig, 'runtime', s)
-    latex(summarize(base, [], 'runtime_ms').assign(metric='runtime_ms'), 'runtime',
-          'Average runtime per update step across algorithms, baseline runs pooled over all '
-          'noise levels.')
+    latex(
+        summarize(base, [], 'runtime_ms').assign(metric='runtime_ms'),
+        'runtime',
+        'Average runtime per update step across algorithms, baseline runs pooled over all '
+        'noise levels.',
+    )
 
 
 if __name__ == '__main__':
