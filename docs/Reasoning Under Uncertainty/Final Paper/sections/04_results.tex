@@ -1,0 +1,74 @@
+\section{Results}\label{sec:Results}
+The performance of the EKF, PF, and DR algorithms was evaluated using an automated Robot Operating System (ROS 2) test harness. 
+To ensure statistical significance, each algorithmic configuration underwent 10 independent trials across varying random seeds. 
+All quantitative results are reported as the mean alongside their 95\% Confidence Interval (CI).
+The algorithms were tested under two primary conditions: a baseline navigation scenario and a ``kidnapped robot'' scenario designed to test global localization recovery. 
+To fully evaluate the PF, it was tested across four distinct configurations: PF\_100, PF\_500, PF\_2000, and PF\_5000. 
+
+\subsection{Algorithm Accuracy}
+Algorithm accuracy was evaluated under the baseline condition by analyzing the Root Mean Square Error (RMSE) for both position and orientation (yaw). 
+As anticipated, the Particle Filter configurations demonstrated varying degrees of accuracy that scaled with the particle count. 
+The PF\_5000 configuration achieved the highest overall accuracy with an average position RMSE of [XX.XX] $\pm$ [X.XX] m and a yaw RMSE of [XX.XX] $\pm$ [X.XX] rad. 
+The lower particle counts showed correspondingly higher errors, with the PF\_100 variant yielding a position RMSE of [XX.XX] $\pm$ [X.XX] m. 
+By comparison, the EKF achieved a position RMSE of [XX.XX] $\pm$ [X.XX] m. 
+This allowed the EKF to outperform the lowest-particle PF configurations, though it fell short of the accuracy provided by PF\_2000 and PF\_5000 due to its susceptibility to linearization errors over time. 
+The DR approach lacked exteroceptive sensor corrections and drifted significantly, resulting in the lowest overall accuracy with a position RMSE of [XX.XX] $\pm$ [X.XX] m. 
+Figure \ref{fig:accuracy_comparison} illustrates the comparative RMSE across all tested methods.
+
+\begin{figure}[!htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/accuracy_comparison_ci.png}
+    \caption{Comparison of position and yaw Root Mean Square Error (RMSE) across algorithms in the baseline scenario. 
+    Lower values indicate higher accuracy. 
+    Error bars represent the 95\% Confidence Interval.}
+    \label{fig:accuracy_comparison}
+\end{figure}
+
+\subsection{Runtime Analysis}
+Computational efficiency was assessed by recording the average execution time per update step for each algorithm. 
+Table \ref{tab:runtime_analysis} summarizes the computational performance of each tested configuration. 
+The EKF demonstrated the lowest computational overhead, requiring an average of only [XX.XX] $\pm$ [X.XX] seconds per update. 
+The DR algorithm performed similarly with an update time of [XX.XX] $\pm$ [X.XX] seconds. 
+In contrast, the PF runtimes scaled linearly with the number of particles. 
+The PF\_100 configuration required [XX.XX] $\pm$ [X.XX] seconds per update, while the PF\_5000 configuration required an average of [XX.XX] $\pm$ [X.XX] seconds, making it the most computationally expensive approach tested. 
+These results highlight the EKF as the optimal choice for systems with strict real-time processing constraints, whereas the PF requires careful selection of particle counts to balance accuracy against available compute resources.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Average runtime per update step across algorithms with 95\% Confidence Intervals.}
+    \label{tab:runtime_analysis}
+    \begin{tabular}{lcc}
+        \hline
+        \textbf{Algorithm} & \textbf{Average Runtime (s)} & \textbf{95\% CI ($\pm$ s)} \\
+        \hline
+        Dead Reckoning (DR) & [XX.XX] & [X.XX] \\
+        Extended Kalman Filter (EKF) & [XX.XX] & [X.XX] \\
+        Particle Filter (100) & [XX.XX] & [X.XX] \\
+        Particle Filter (500) & [XX.XX] & [X.XX] \\
+        Particle Filter (2000) & [XX.XX] & [X.XX] \\
+        Particle Filter (5000) & [XX.XX] & [X.XX] \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Kidnap Recovery}
+Robustness to catastrophic tracking failure was evaluated using the kidnapping methodology described previously. 
+For analytical purposes in post-processing, the exact start of the kidnapping event was registered when the position error instantaneously exceeded 1.0 meters. 
+Recovery time was calculated as the duration required for the algorithm to reduce the tracking error back below 0.3 meters. 
+
+The tests confirmed that the PF variants were the only evaluated algorithms capable of global recovery. 
+Following the simulated teleportation, the PF successfully reconverged on the true state, with recovery times improving at higher particle counts. 
+The PF\_100 configuration recovered in an average of [XX.XX] $\pm$ [X.XX] seconds, while the PF\_5000 configuration achieved a faster and more reliable recovery in [XX.XX] $\pm$ [X.XX] seconds. 
+Because the EKF and DR algorithms rely entirely on continuous local tracking, they were unable to resolve the sudden global displacement. 
+Both the EKF and DR completely failed to recover and maintained an error above the threshold for the remainder of the simulation duration. 
+Figure \ref{fig:recovery_time} visualizes the average recovery times across all configurations, showing the capped failure states for the EKF and DR.
+
+\begin{figure}[!htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/kidnapping_recovery_time_ci.png}
+    \caption{Average time required for each algorithm to recover from a 1.0 meter kidnapping displacement. 
+    Recovery is defined as reducing the position error below 0.3 meters. 
+    Algorithms that failed to recover (EKF and DR) are capped at the remaining simulation duration. 
+    Error bars represent the 95\% Confidence Interval.}
+    \label{fig:recovery_time}
+\end{figure}

@@ -1,0 +1,1148 @@
+\section{Appendix}\label{sec:Appendix}
+
+\subsection{Base Localization Node Implementation}\label{subsec:Base implementation}
+\begin{verbatim}
+#!/usr/bin/env python3
+
+from zlib import crc32
+from numpy import ndarray, array, linspace, isinf, isnan, diag, deg2rad, zeros
+from numpy.random import default_rng
+
+from rclpy.node import Node
+from tf2_ros import Buffer, TransformBroadcaster, TransformListener
+
+from nav_msgs.msg import Odometry, OccupancyGrid
+from geometry_msgs.msg import PoseWithCovarianceStamped, PointStamped
+from sensor_msgs.msg import LaserScan
+
+from devol_localization.utils import euler_to_quaternion
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
+class BaseLocalizationNode(Node):
+    def __init__(
+        self,
+        node_name,
+        pose_topic: str = '/devol_drive/pose',
+        runtime_topic: str = '/devol_drive/pose/runtime',
+    ):
+        super().__init__(node_name)
+
+        # Declare Parameters
+        self.declare_parameter('odom_topic', '/devol_drive/odom')
+        self.declare_parameter('map_topic', '/devol_drive/localization/projected_map')
+        self.declare_parameter('scan_topic', '/devol_drive/sensors/lidar2d_0/scan')
+        self.declare_parameter('pose_topic', pose_topic)
+        self.declare_parameter('runtime_topic', runtime_topic)
+        self.declare_parameter('map_frame', 'map')
+        self.declare_parameter('odom_frame', 'odom')
+        self.declare_parameter('base_frame', 'a200_base_link')
+        self.declare_parameter('seed', '31')
+
+        # Retrieve Parameters
+        self.odom_topic: str = self.get_parameter('odom_topic').value
+        self.map_topic: str = self.get_parameter('map_topic').value
+        self.scan_topic: str = self.get_parameter('scan_topic').value
+        self.pose_topic: str = self.get_parameter('pose_topic').value
+        self.runtime_topic: str = self.get_parameter('runtime_topic').value
+        self.map_frame: str = self.get_parameter('map_frame').value
+        self.odom_frame: str = self.get_parameter('odom_frame').value
+        self.base_frame: str = self.get_parameter('base_frame').value
+        self.seed: int = int(self.get_parameter('seed').value)
+
+        # Shared State and Models
+        self.v: float = 0.0
+        self.omega: float = 0.0
+        self.x_est: ndarray = array([0.0, 0.0, 0.0])
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
+
+        # Proportional Control Noise Parameters
+        self.alpha_tv_causedby_tv: float = 0.10
+        self.alpha_tv_causedby_rv: float = 0.01
+        self.alpha_rv_causedby_tv: float = 0.01
+        self.alpha_rv_causedby_rv: float = 0.20
+
+        # Initialize random number generator
+        self.rng = default_rng(self.seed)
+
+        self.latest_odom_pose = array([0.0, 0.0, 0.0])
+        self.last_map_crc = None
+        self.last_scan_time = None
+
+        # Shared Publishers
+        self.pub_pose = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
+        self.runtime_pub = self.create_publisher(PointStamped, self.runtime_topic, 10)
+
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
+
+    def is_map_new(self, msg: OccupancyGrid) -> bool:
+        """Computes a CRC32 hash of the map data.
+        Returns True if the map is new/changed, False if it is identical."""
+        # Convert the map data array to continuous bytes and hash it
+        current_crc = crc32(bytes(msg.data))
+
+        if self.last_map_crc == current_crc:
+            return False
+
+        self.last_map_crc = current_crc
+        return True
+
+    def get_dt_from_header(self, header):
+        """Calculates the time delta (dt) from a message header.
+        Updates self.last_scan_time.
+        Returns dt (float) if valid, or None if the loop should be skipped."""
+        msg_time = header.stamp.sec + (header.stamp.nanosec / 1e9)
+
+        if self.last_scan_time is None:
+            self.last_scan_time = msg_time
+            return None
+
+        dt = msg_time - self.last_scan_time
+
+        # Prevent massive dt jumps if processing fell way behind
+        if dt > 1.0:
+            self.get_logger().warn(f'Large dt detected ({dt:.2f}s). Resetting.')
+            self.last_scan_time = msg_time
+            return None
+
+        self.last_scan_time = msg_time
+        return dt
+
+    @staticmethod
+    def preprocess_scan(msg: LaserScan):
+        """Standardizes LiDAR extraction for all algorithms."""
+        angles: ndarray = linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
+        ranges: ndarray = array(msg.ranges)
+
+        # Filter out infinite/bad rays
+        eps = 0.02
+        valid = (
+            (ranges > msg.range_min)
+            & (ranges < (msg.range_max - eps))
+            & ~isinf(ranges)
+            & ~isnan(ranges)
+        )
+        return ranges[valid], angles[valid]
+
+    def get_laser_offset(self):
+        """Looks up the physical LiDAR mount offset."""
+        return array([0.32825, 0.0, 0.0])
+
+    @staticmethod
+    def control_noise_covariance(
+        u: ndarray,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> ndarray:
+        """M"""
+        v: float = u[0]
+        omega: float = u[1]
+
+        sigma_v: float = alpha_tv_causedby_tv * abs(v) + alpha_tv_causedby_rv * abs(omega) + 0.001
+        sigma_w: float = alpha_rv_causedby_tv * abs(v) + alpha_rv_causedby_rv * abs(omega) + 0.001
+
+        return diag([sigma_v**2, sigma_w**2])
+
+    @staticmethod
+    def update_covariance(A: ndarray, cov: ndarray, R: ndarray) -> ndarray:
+        """Sigma"""
+        return A @ cov @ A.T + R
+
+    def publish_pose_and_tf_runtime(self, stamp, cov_3x3, start_time: float, end_time: float):
+        """Standardized publishing of Pose + Covariance and REP-105 TF."""
+        # Publish Pose
+        pose_msg = PoseWithCovarianceStamped()
+        pose_msg.header.stamp = stamp
+        pose_msg.header.frame_id = self.map_frame
+
+        pose_msg.pose.pose.position.x = self.x_est[0]
+        pose_msg.pose.pose.position.y = self.x_est[1]
+        pose_msg.pose.pose.orientation = euler_to_quaternion(self.x_est[2])
+
+        # Pack 3x3 covariance into ROS 6x6 format
+        cov_6x6 = zeros((6, 6))
+        cov_6x6[0, 0], cov_6x6[0, 1] = cov_3x3[0, 0], cov_3x3[0, 1]
+        cov_6x6[1, 0], cov_6x6[1, 1] = cov_3x3[1, 0], cov_3x3[1, 1]
+        cov_6x6[0, 5], cov_6x6[5, 0] = cov_3x3[0, 2], cov_3x3[2, 0]
+        cov_6x6[1, 5], cov_6x6[5, 1] = cov_3x3[1, 2], cov_3x3[2, 1]
+        cov_6x6[5, 5] = cov_3x3[2, 2]
+
+        pose_msg.pose.covariance = tuple(cov_6x6.flatten())
+        self.pub_pose.publish(pose_msg)
+
+        # Publish the runtime as a PointStamped message
+        runtime_msg = PointStamped()
+        runtime_msg.header.stamp = stamp
+        runtime_msg.point.x = end_time - start_time
+        self.runtime_pub.publish(runtime_msg)
+\end{verbatim}
+
+\newpage
+\subsection{Dead Reckoning Node Implementation}\label{subsec:DR implementation}
+\begin{verbatim}
+#!/usr/bin/env python3
+
+from typing import Tuple, Optional
+from time import perf_counter
+from numpy import diag, array, ndarray, sin, cos, zeros, deg2rad
+
+import rclpy
+from nav_msgs.msg import Odometry
+
+from devol_localization.base_localization_node import BaseLocalizationNode
+from devol_localization.motion_models import UnicycleMotionModel
+from devol_localization.utils import wrap_angle
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
+class DeadReckoningNode(BaseLocalizationNode):
+    def __init__(self):
+        super().__init__(
+            'dead_reckoning_node',
+            pose_topic='/devol_drive/dr_pose',
+            runtime_topic='/devol_drive/dr_pose/runtime',
+        )
+
+        # State variables.
+        self.x_est: ndarray = array([0.0, 0.0, 0.0])  # [x, y, theta]
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2])
+        self.localization_runtime = 0.0
+
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+
+        self.get_logger().info('Dead Reckoning Node Started!')
+
+    def odom_callback(self, msg: Odometry):
+        """Overrides base class implementation"""
+        start_time: float = perf_counter()
+        dt: Optional[float] = self.get_dt_from_header(msg.header)
+        if dt is None:
+            self.localization_runtime += perf_counter() - start_time
+            return
+
+        self.x_est, self.covariance = DeadReckoningNode._predict(
+            prev_x=self.x_est,
+            prev_cov=self.covariance,
+            v=msg.twist.twist.linear.x,
+            omega=msg.twist.twist.angular.z,
+            dt=dt,
+            alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
+            alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
+            alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
+            alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
+        )
+        self.localization_runtime += perf_counter() - start_time
+
+        # Publish Pose, TF, and Runtime using the base class
+        self.publish_pose_and_tf_runtime(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime,
+        )
+
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
+
+    @staticmethod
+    def mapped_process_noise(x: ndarray, M: ndarray, dt: float) -> ndarray:
+        """R"""
+        G: ndarray = UnicycleMotionModel.control_jacobian(x=x, dt=dt)
+        return G @ M @ G.T * dt
+
+    @staticmethod
+    def _predict(
+        prev_x: ndarray,
+        prev_cov: ndarray,
+        v: float,
+        omega: float,
+        dt: float,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> Tuple[ndarray, ndarray]:
+        """Prediction step. Apply Kinematic model"""
+        u: ndarray = array([v, omega])
+
+        # Apply model forward kinematics
+        x: ndarray = UnicycleMotionModel.forward(x=prev_x, u=u, noise=zeros(3), dt=dt)
+        x: ndarray = wrap_angle(x)
+
+        # Proportional Control Noise Covariance (M)
+        M: ndarray = DeadReckoningNode.control_noise_covariance(
+            u=u,
+            alpha_tv_causedby_tv=alpha_tv_causedby_tv,
+            alpha_tv_causedby_rv=alpha_tv_causedby_rv,
+            alpha_rv_causedby_tv=alpha_rv_causedby_tv,
+            alpha_rv_causedby_rv=alpha_rv_causedby_rv,
+        )
+
+        # Mapped Process Noise (R)
+        R: ndarray = DeadReckoningNode.mapped_process_noise(x=x, M=M, dt=dt)
+
+        # Calculate the Jacobian using the previous step.
+        A: ndarray = UnicycleMotionModel.state_jacobian(x=prev_x, u=u, dt=dt)
+
+        # Update the covariance
+        cov: ndarray = DeadReckoningNode.update_covariance(A=A, cov=prev_cov, R=R)
+
+        return x, cov
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    rclpy.spin(DeadReckoningNode())
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+\end{verbatim}
+
+\newpage
+\subsection{Extended Kalman Filter Node Implementation}\label{subsec:EKF implementation}
+\begin{verbatim}
+#!/usr/bin/env python3
+
+from typing import Tuple
+from time import perf_counter
+from scipy.spatial import KDTree
+from scipy.stats import chi2
+from numpy import (
+    ndarray,
+    array,
+    zeros,
+    diag,
+    deg2rad,
+    mean,
+    sum,
+    sin,
+    cos,
+    vstack,
+    where,
+    int8 as np_int8,
+    eye,
+    arctan2,
+    trace,
+    sqrt,
+    clip,
+)
+from numpy.linalg import svd, det, inv
+
+import rclpy
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+
+# ROS 2 Messages
+from nav_msgs.msg import OccupancyGrid, Odometry
+from sensor_msgs.msg import LaserScan
+
+# Import devol localization classes
+from devol_localization.base_localization_node import BaseLocalizationNode
+from devol_localization.motion_models import UnicycleMotionModel
+from devol_localization.utils import wrap_angle
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
+# Chi-square threshold for 3 degrees of freedom at 95% confidence
+CHI2_TRESHOLD_3DOF_95CONF: float = 7.815
+
+
+class EKFLocalizationNode(BaseLocalizationNode):
+    def __init__(self):
+        super().__init__(
+            'ekf_localization_node',
+            '/devol_drive/ekf_pose',
+            runtime_topic='/devol_drive/ekf_pose/runtime',
+        )
+
+        self.map_data = None
+        self.W_pose: ndarray = diag([0.05**2, 0.05**2, deg2rad(0.2) ** 2])
+
+        # State variables.
+        self.x_est: ndarray = array(
+            [0.0, 0.0, 0.0, 1.0]
+        )  # [x, y, theta, s], where true yaw rate = s * raw odometry yaw
+        self.covariance: ndarray = diag([0.1**2, 0.1**2, deg2rad(5.0) ** 2, 0.3**2])
+        self.q_yaw_scale: float = 0.02
+
+        # Time synchronization variables
+        self.odom_buffer: list = []
+        self.last_time: float = None
+
+        # Total runtime accumulator
+        self.localization_runtime: float = 0.0
+
+        # Subscribers / Publishers
+        map_qos: QoSProfile = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
+        self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 10)
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+
+        self.get_logger().info('EKF Localization Node Started!')
+
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        start_time: float = perf_counter()
+        # Convert ROS timestamp to a float in seconds
+        stamp = msg.header.stamp
+        t_odom = stamp.sec + stamp.nanosec * 1e-9
+        v = msg.twist.twist.linear.x
+        omega = msg.twist.twist.angular.z
+
+        # Add to the buffer
+        self.odom_buffer.append((t_odom, v, omega))
+        self.localization_runtime += perf_counter() - start_time
+
+    def map_callback(self, msg: OccupancyGrid):
+        """Extracts obstacle coordinates and builds KDTree."""
+        start_time: float = perf_counter()
+
+        if not self.is_map_new(msg):
+            self.localization_runtime += perf_counter() - start_time
+            return
+
+        grid: ndarray = array(msg.data, dtype=np_int8).reshape((msg.info.height, msg.info.width))
+
+        # Find the row/col indices of all cells that are likely obstacles
+        obstacle_y, obstacle_x = where(grid > 50)
+
+        # Convert indices to real-world metric coordinates
+        map_pts_x: ndarray = msg.info.origin.position.x + (obstacle_x + 0.5) * msg.info.resolution
+        map_pts_y: ndarray = msg.info.origin.position.y + (obstacle_y + 0.5) * msg.info.resolution
+
+        # Stack into an Nx2 array of obstacle points
+        map_points: ndarray = vstack((map_pts_x, map_pts_y)).T
+
+        # Build the KDTree for the ICP algorithm
+        self.map_data: dict = {'points': map_points, 'kdtree': KDTree(map_points)}
+        self.get_logger().info(
+            f'Map received. Built KDTree with {len(map_points)} obstacle points.'
+        )
+
+        self.localization_runtime += perf_counter() - start_time
+
+    def scan_callback(self, msg: LaserScan):
+        """The main loop of the EKF."""
+        start_time: float = perf_counter()
+
+        if self.map_data is None:
+            self.localization_runtime += perf_counter() - start_time
+            return  # Wait for map to load
+
+        # Get exact timestamp of the laser scan
+        stamp = msg.header.stamp
+        t_scan = stamp.sec + stamp.nanosec * 1e-9
+
+        # Initialize time tracker on the very first scan
+        if self.last_time is None:
+            self.last_time = t_scan
+            self.localization_runtime += perf_counter() - start_time
+            return
+
+        # Process all buffered odom messages stamped AT or BEFORE the scan time
+        x_pred, cov_pred = self.x_est.copy(), self.covariance.copy()
+        current_v = 0.0
+        current_omega = 0.0
+        while self.odom_buffer and self.odom_buffer[0][0] <= t_scan:
+            t_odom, v, omega = self.odom_buffer.pop(0)
+
+            dt = t_odom - self.last_time
+            if dt > 0:
+                x_pred, cov_pred = EKFLocalizationNode._predict(
+                    prev_x=x_pred,
+                    prev_cov=cov_pred,
+                    v=v,
+                    omega=omega,
+                    dt=dt,
+                    q_yaw_scale=self.q_yaw_scale,
+                    alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
+                    alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
+                    alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
+                    alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
+                )
+                self.last_time = t_odom
+
+            # Keep track of the latest velocities for the partial step
+            current_v = v
+            current_omega = omega
+
+        # Add one final partial step exactly up to the scan timestamp
+        dt_partial = t_scan - self.last_time
+        if dt_partial > 0:
+            x_pred, cov_pred = EKFLocalizationNode._predict(
+                prev_x=x_pred,
+                prev_cov=cov_pred,
+                v=current_v,
+                omega=current_omega,
+                dt=dt_partial,
+                q_yaw_scale=self.q_yaw_scale,
+                alpha_tv_causedby_tv=self.alpha_tv_causedby_tv,
+                alpha_tv_causedby_rv=self.alpha_tv_causedby_rv,
+                alpha_rv_causedby_tv=self.alpha_rv_causedby_tv,
+                alpha_rv_causedby_rv=self.alpha_rv_causedby_rv,
+            )
+            self.last_time = t_scan
+
+        # update step (Using LaserScan ICP)
+        z, is_valid, match_error = EKFLocalizationNode.scan_match(
+            msg=msg,
+            x_pred=x_pred,
+            cov_pred=cov_pred,
+            map_data=self.map_data,
+            laser_offset=self.get_laser_offset(),
+        )
+
+        if is_valid:
+            self.x_est, self.covariance, accepted = EKFLocalizationNode._update(
+                x_pred=x_pred, cov_pred=cov_pred, W_pose=self.W_pose, z=z, match_error=match_error
+            )
+
+            if not accepted:
+                self.get_logger().debug('ICP match rejected by Mahalanobis check.')
+        else:
+            self.x_est = x_pred
+            self.covariance = cov_pred
+
+        # Publish state
+        self.localization_runtime += perf_counter() - start_time
+        self.publish_pose_and_tf_runtime(
+            stamp=msg.header.stamp,
+            cov_3x3=self.covariance,
+            start_time=0.0,
+            end_time=self.localization_runtime,
+        )
+
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
+
+    @staticmethod
+    def scan_match(
+        msg: LaserScan,
+        x_pred: ndarray,
+        cov_pred: ndarray,
+        map_data: dict,
+        laser_offset: ndarray,
+        max_iter: int = 200,
+        tolerance: float = 1e-4,
+    ):
+        """2D Iterative Closest Point using SVD."""
+        # Filter out invalid rays
+        ranges, angles = EKFLocalizationNode.preprocess_scan(msg=msg)
+
+        if len(ranges) < 10:
+            return array([0.0, 0.0, 0.0, 1.0]), False, 0.0  # Not enough valid points
+
+        # Nx2 array of local laser points
+        laser_pts: ndarray = vstack((ranges * cos(angles), ranges * sin(angles))).T
+
+        R_offset: ndarray = array(
+            [
+                [cos(laser_offset[2]), -sin(laser_offset[2])],
+                [sin(laser_offset[2]), cos(laser_offset[2])],
+            ]
+        )
+        local_pts: ndarray = (R_offset @ laser_pts.T).T + laser_offset[:2]
+
+        z: ndarray = x_pred[:3].copy()
+        prev_error: float = float('inf')
+
+        # Calculate adaptive correspondence gate based on positional covariance
+        pos_variance = trace(cov_pred[:2, :2])
+        #  3-sigma radius, clamped between 0.5m and 2.0m
+        search_radius: float = float(clip(3.0 * sqrt(pos_variance), 0.5, 2.0))
+
+        for _ in range(max_iter):
+            # Transform local scan points into the global map frame
+            theta: float = z[2]
+            R_curr: ndarray = array([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])
+            global_pts: ndarray = (R_curr @ local_pts.T).T + z[:2]
+
+            # Find the closest Map points (Q) for every Global Scan point (P)
+            distances, indices = map_data['kdtree'].query(global_pts)
+
+            # Reject outlier points using the adaptive search radius
+            good_matches: ndarray = distances < search_radius
+            if sum(good_matches) < 10:
+                break  # Lost tracking
+
+            # SVD-Based Alignment (Arun et al., 1987 / Umeyama, 1991)
+            P: ndarray = global_pts[good_matches]
+            Q: ndarray = map_data['points'][indices[good_matches]]
+
+            # Compute Centroids
+            centroid_P: ndarray = mean(P, axis=0)
+            centroid_Q: ndarray = mean(Q, axis=0)
+
+            # Center the points around the origin
+            P_centered: ndarray = P - centroid_P
+            Q_centered: ndarray = Q - centroid_Q
+
+            # Compute Cross-Covariance Matrix (H)
+            H: ndarray = P_centered.T @ Q_centered
+
+            # Singular Value Decomposition
+            U, _, Vt = svd(H)
+
+            # Optimal Rotation (R_delta)
+            R_delta: ndarray = Vt.T @ U.T
+            # Ensure it is a pure rotation, not a reflection
+            if det(R_delta) < 0:
+                Vt[-1, :] *= -1
+                R_delta = Vt.T @ U.T
+
+            # Optimal Translation (t_delta)
+            t_delta: ndarray = centroid_Q - R_delta @ centroid_P
+
+            # Apply the delta transformation to current pose guess
+            z[:2] = R_delta @ z[:2] + t_delta
+            z[2] += arctan2(R_delta[1, 0], R_delta[0, 0])
+
+            # Check for convergence based on Mean Squared Error
+            mean_error: float = mean(distances[good_matches])
+            if abs(prev_error - mean_error) < tolerance:
+                break
+            prev_error = mean_error
+
+        # Format final pose
+        z = wrap_angle(z)
+
+        is_valid: bool = EKFLocalizationNode.inlier_fraction_check(
+            current_pose=z, local_pts=local_pts, map_data=map_data
+        )
+
+        return z, is_valid, prev_error
+
+    @staticmethod
+    def inlier_fraction_check(
+        current_pose: ndarray,
+        local_pts: ndarray,
+        map_data: dict,
+        distance_threshold: float = 0.15,
+        valid_threshold: float = 0.8,
+    ) -> bool:
+        # Project scan points to the global map frame using the pose
+        final_theta: float = current_pose[2]
+        R_final: ndarray = array(
+            [[cos(final_theta), -sin(final_theta)], [sin(final_theta), cos(final_theta)]]
+        )
+        final_global_pts: ndarray = (R_final @ local_pts.T).T + current_pose[:2]
+
+        # Query distances to the nearest map points.
+        final_distances, _ = map_data['kdtree'].query(final_global_pts)
+
+        # Calculate the fraction of points within distance_threshold
+        inliers = sum(final_distances <= distance_threshold)
+        inlier_fraction = float(inliers) / len(final_global_pts)
+
+        # Consider the match "valid" if within valid_threshold
+        return inlier_fraction >= valid_threshold
+
+    @staticmethod
+    def mapped_process_noise(x: ndarray, M: ndarray, dt: float, q_yaw_scale: float) -> ndarray:
+        """R"""
+        theta: float = x[2]
+        G = array([[cos(theta), 0.0], [sin(theta), 0.0], [0.0, 1.0], [0.0, 0.0]])
+        R: ndarray = G @ M @ G.T * dt
+        R[3, 3] += q_yaw_scale**2 * dt
+        return R
+
+    @staticmethod
+    def _predict(
+        prev_x: ndarray,
+        prev_cov: ndarray,
+        v: float,
+        omega: float,
+        dt: float,
+        q_yaw_scale: float,
+        alpha_tv_causedby_tv: float,
+        alpha_tv_causedby_rv: float,
+        alpha_rv_causedby_tv: float,
+        alpha_rv_causedby_rv: float,
+    ) -> Tuple[ndarray, ndarray]:
+        """Prediction step. Apply Kinematic model"""
+        # Package the inputs for the motion model
+        s: float = prev_x[3]
+        u: ndarray = array([v, s * omega])
+
+        # Apply model forward kinematics
+        x: ndarray = prev_x.copy()
+        x[:3] = UnicycleMotionModel.forward(x=prev_x[:3], u=u, noise=zeros(3), dt=dt)
+        x: ndarray = wrap_angle(x)
+
+        # Proportional Control Noise Covariance (M)
+        M: ndarray = EKFLocalizationNode.control_noise_covariance(
+            u=u,
+            alpha_tv_causedby_tv=alpha_tv_causedby_tv,
+            alpha_tv_causedby_rv=alpha_tv_causedby_rv,
+            alpha_rv_causedby_tv=alpha_rv_causedby_tv,
+            alpha_rv_causedby_rv=alpha_rv_causedby_rv,
+        )
+
+        # Mapped Process Noise (R)
+        R: ndarray = EKFLocalizationNode.mapped_process_noise(
+            x=prev_x, M=M, dt=dt, q_yaw_scale=q_yaw_scale
+        )
+
+        # Calculate the Jacobian using the previous step.
+        A: ndarray = eye(4)
+        A[:3, :3] = UnicycleMotionModel.state_jacobian(x=prev_x[:3], u=u, dt=dt)
+        A[2, 3] = omega * dt
+
+        # Update the covariance
+        cov: ndarray = EKFLocalizationNode.update_covariance(A=A, cov=prev_cov, R=R)
+
+        return x, cov
+
+    @staticmethod
+    def _update(
+        x_pred: ndarray, cov_pred: ndarray, W_pose: ndarray, z: ndarray, match_error: float
+    ) -> Tuple[ndarray, ndarray, bool]:
+        error_scale: float = max(1.0, (match_error / 0.05) ** 2)
+        W_dynamic: ndarray = W_pose * error_scale
+
+        # Observation matrix (H is identity because we observe the direct [x, y, theta, s] pose from ICP scan matching)
+        H: ndarray = eye(3, 4)
+
+        # Innovation covariance (S)
+        S: ndarray = H @ cov_pred @ H.T + W_dynamic
+
+        # Innovation (y_tilde) is the difference between observation and prediction
+        y_tilde: ndarray = wrap_angle(z - x_pred[:3])
+
+        # Statistical Acceptance Test
+        mahalanobis_sq = y_tilde.T @ inv(S) @ y_tilde
+
+        if mahalanobis_sq > chi2.ppf(0.95, 3):
+            # The observation is statistically absurd given current belief.
+            # Reject the update and keep prior estimate.
+            return x_pred, cov_pred, False
+
+        # Kalman Gain (K)
+        K: ndarray = cov_pred @ H.T @ inv(S)
+
+        # Update the state estimate and shrink the covariance
+        x_update: ndarray = x_pred + K @ y_tilde
+        x_update[3] = clip(x_update[3], 0.5, 1.2)
+        cov_update: ndarray = (eye(4) - K @ H) @ cov_pred
+
+        # Wrap heading to [-pi, pi] to prevent runaway angle values over time
+        x_update = wrap_angle(x_update)
+
+        return x_update, cov_update, True
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = EKFLocalizationNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+\end{verbatim}
+
+\newpage
+\subsection{Particle Filter Node Implementation}\label{subsec:PF implementation}
+\begin{verbatim}
+#!/usr/bin/env python3
+
+from typing import Optional
+from time import perf_counter
+from scipy.ndimage import distance_transform_edt
+from numpy import (
+    ndarray,
+    array,
+    cov,
+    float32 as np_float32,
+    ones_like,
+    ones,
+    searchsorted,
+    cumsum,
+    average,
+    arctan2,
+    cos,
+    sin,
+    copy as np_copy,
+    arange,
+    exp as np_exp,
+    max as np_max,
+    zeros,
+    vstack,
+    where,
+    pi,
+    mean as np_mean,
+)
+
+import rclpy
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+
+# ROS 2 Messages
+from nav_msgs.msg import OccupancyGrid, Odometry
+from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import PoseArray, Pose
+
+# Import devol localization classes
+from devol_localization.base_localization_node import BaseLocalizationNode
+from devol_localization.laser_model import LaserModel
+from devol_localization.motion_models import UnicycleMotionModel
+from devol_localization.utils import euler_to_quaternion
+
+
+__author__ = 'Jacob Taylor Cassady'
+__email__ = 'jcassad1@jh.edu'
+
+
+class ParticleFilterNode(BaseLocalizationNode):
+    def __init__(self):
+        super().__init__(
+            'particle_filter_node',
+            '/devol_drive/pf_pose',
+            runtime_topic='/devol_drive/pf_pose/runtime',
+        )
+
+        self.declare_parameter('num_particles', '500')
+
+        self.map_dict = None
+        self.num_particles: int = int(self.get_parameter('num_particles').value)
+
+        # Initialize particles clustered around starting origin
+        self.particles: ndarray = self.rng.multivariate_normal(
+            self.x_est, self.covariance, self.num_particles
+        )
+        self.weights: ndarray = ones(self.num_particles) / self.num_particles
+
+        # Adaptive injection moving averages
+        self.slow_avg_lik = 0.0
+        self.fast_avg_lik = 0.0
+
+        # Total runtime accumulator
+        self.localization_runtime = 0.0
+
+        # Subscribers / Publishers
+        map_qos: QoSProfile = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(OccupancyGrid, self.map_topic, self.map_callback, map_qos)
+        self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 1)
+        self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+
+        self.pub_particles = self.create_publisher(PoseArray, self.pose_topic + '_cloud', 10)
+
+        self.get_logger().info('Particle Filter Node Started!')
+
+    def odom_callback(self, msg: Odometry):
+        """Base callback to track the latest odometry twist."""
+        start_time: float = perf_counter()
+        self.v: float = msg.twist.twist.linear.x
+        self.omega: float = msg.twist.twist.angular.z
+        self.u: ndarray = array([self.v, self.omega])
+
+        dt: Optional[float] = self.get_dt_from_header(msg.header)
+        if dt is None:
+            return
+
+        self.particles = self._predict(dt=dt)
+        self.localization_runtime += perf_counter() - start_time
+
+    def map_callback(self, msg: OccupancyGrid):
+        """Converts ROS OccupancyGrid into a distance transform map for the Likelihood field"""
+        start_time: float = perf_counter()
+
+        if not self.is_map_new(msg):
+            self.localization_runtime += perf_counter() - start_time
+            return
+
+        # Convert 1D array to 2D numpy array
+        grid: ndarray = array(msg.data, dtype=np_float32).reshape(
+            (msg.info.height, msg.info.width)
+        )
+
+        # Create binary map where obstacle = 0, free space = 1
+        binary_map: ndarray = ones_like(grid)
+        binary_map[grid > 50] = 0
+
+        # Calculate Euclidean distance to nearest obstacle (in pixels)
+        distance_grid: ndarray = distance_transform_edt(binary_map)
+        edt_map: ndarray = distance_grid * msg.info.resolution
+
+        # Pre-compute free space coordinates for the escape hatch
+        free_y, free_x = where(binary_map == 1)
+        res: float = msg.info.resolution
+        ox: float = msg.info.origin.position.x
+        oy: float = msg.info.origin.position.y
+
+        # Convert pixel indices to real-world coordinates
+        free_world_x: ndarray = free_x * res + ox + (res / 2.0)
+        free_world_y: ndarray = free_y * res + oy + (res / 2.0)
+
+        # Store in dict to pass to LaserModel easily
+        self.map_dict: dict = {
+            'grid': edt_map,
+            'info': msg.info,
+            'free_x': free_world_x,
+            'free_y': free_world_y,
+        }
+        self.get_logger().info('Map received and Euclidean Distance Transform computed.')
+        self.localization_runtime += perf_counter() - start_time
+
+    def scan_callback(self, msg: LaserScan):
+        """The main loop of the PF: computes dt, downsamples scan, runs PF, and publishes results."""
+        start_time: float = perf_counter()
+
+        # Wait for map and ensure odometry has ran at least once.
+        if self.map_dict is None:
+            self.localization_runtime += perf_counter() - start_time
+            return
+
+        z_dists, z_thetas = self.preprocess_scan(msg=msg)
+
+        if len(z_dists) == 0:
+            self.localization_runtime += perf_counter() - start_time
+            return  # No valid measurements
+
+        # Run the Particle Filter using Odometry values and the Unicycle model
+        self.particles, self.x_est = self._update(z_dists=z_dists, z_thetas=z_thetas)
+        self.localization_runtime += perf_counter() - start_time
+
+        # Publish state and particles
+        self.publish_state(msg.header.stamp)
+
+    def publish_state(self, stamp):
+        """Publishes the estimated pose and the particle cloud for RViz"""
+        cov_3x3: ndarray = cov(self.particles, rowvar=False)
+
+        # Publish state
+        self.publish_pose_and_tf_runtime(
+            stamp=stamp, cov_3x3=cov_3x3, start_time=0.0, end_time=self.localization_runtime
+        )
+
+        # Publish Particle Cloud
+        cloud_msg: PoseArray = PoseArray()
+        cloud_msg.header.stamp = stamp
+        cloud_msg.header.frame_id = self.map_frame
+        for p in self.particles:
+            pose = Pose()
+            pose.position.x = p[0]
+            pose.position.y = p[1]
+            pose.orientation = euler_to_quaternion(p[2])
+            cloud_msg.poses.append(pose)
+
+        self.pub_particles.publish(cloud_msg)
+
+        # Reset runtime for the next cycle
+        self.localization_runtime = 0.0
+
+    def _predict(self, dt: float) -> ndarray:
+        ## Apply the motion model to the samples (Prediction Step)
+        # Create noise proportional to the velocity commands for each particle
+        sigma_v: float = self.alpha_tv_causedby_tv * abs(self.v) + self.alpha_tv_causedby_rv * abs(
+            self.omega
+        )
+        sigma_w: float = self.alpha_rv_causedby_tv * abs(self.v) + self.alpha_rv_causedby_rv * abs(
+            self.omega
+        )
+
+        # Add a small floor (0.02) to heading noise to maintain diversity when stopped
+        sigma_w = max(0.02, sigma_w)
+
+        # Draw noise applied to the distance and heading moved using sqrt(dt)
+        sqrt_dt = dt**0.5
+
+        # Calculate nominal distances and headings moved in this timestep
+        dist_moved = self.v * dt
+        heading_moved = self.omega * dt
+
+        # Vectorized generation of noisy movements (std_dev = sigma * sqrt(dt))
+        noisy_dists = self.rng.normal(dist_moved, sigma_v * sqrt_dt, self.num_particles)
+        noisy_headings = self.rng.normal(heading_moved, sigma_w * sqrt_dt, self.num_particles)
+
+        # Convert back to effective velocities since UnicycleMotionModel expects velocity inputs
+        noisy_vs = noisy_dists / dt
+        noisy_ws = noisy_headings / dt
+
+        # Apply the forward model using the noisy velocities for each particle
+        new_particles: ndarray = array(
+            [
+                UnicycleMotionModel.forward(
+                    self.particles[i],
+                    array([noisy_vs[i], noisy_ws[i]]),
+                    zeros(3),
+                    dt,
+                )
+                for i in range(self.num_particles)
+            ]
+        )
+
+        # Inject independent X and Y lateral slip noise directly to the array
+        new_particles[:, 0] += self.rng.normal(0.0, 0.005, self.num_particles)
+        new_particles[:, 1] += self.rng.normal(0.0, 0.005, self.num_particles)
+
+        return new_particles
+
+    def _update(self, z_dists: list, z_thetas: list):
+        ## Update
+        # Calculate where the laser actually is for each newly predicted particle
+        laser_poses: ndarray = np_copy(self.particles)
+        laser_offset: ndarray = self.get_laser_offset()
+        # Shift X and Y based on the laser's physical mount and the robot's current yaw
+        laser_poses[:, 0] += laser_offset[0] * cos(laser_poses[:, 2]) - laser_offset[1] * sin(
+            laser_poses[:, 2]
+        )
+        laser_poses[:, 1] += laser_offset[0] * sin(laser_poses[:, 2]) + laser_offset[1] * cos(
+            laser_poses[:, 2]
+        )
+        # Shift Yaw
+        laser_poses[:, 2] += laser_offset[2]
+
+        # Computes log probabilities
+        log_weights = array(
+            [
+                LaserModel.likelihood_field_range_finder(
+                    z_dists=z_dists, z_thetas=z_thetas, x=particle, map_dict=self.map_dict, std=0.1
+                )
+                for particle in laser_poses
+            ],
+            dtype=float,
+        )
+
+        # shift all weights so their highest value is 0.
+        max_log_weights: ndarray = np_max(log_weights)
+        step_weights: ndarray = np_exp(log_weights - max_log_weights)
+
+        # Calculate raw likelihood average for the adaptive injection logic
+        avg_raw_likelihood = np_mean(np_exp(log_weights / len(z_dists)))
+
+        # Initialize running averages on the very first update
+        if self.slow_avg_lik == 0.0:
+            self.slow_avg_lik = avg_raw_likelihood
+            self.fast_avg_lik = avg_raw_likelihood
+
+        # Update exponential moving averages (standard AMCL alpha values)
+        self.slow_avg_lik += 0.001 * (avg_raw_likelihood - self.slow_avg_lik)
+        self.fast_avg_lik += 0.1 * (avg_raw_likelihood - self.fast_avg_lik)
+
+        # Multiply the new step weights into the running weight accumulator
+        self.weights *= step_weights
+
+        # Prevent division by zero
+        self.weights += 1e-40
+        # normalize (\eta)
+        self.weights /= sum(self.weights)
+
+        # Calculate Effective Sample Size (N_eff)
+        n_eff = 1.0 / sum(self.weights**2)
+
+        # Estimate the state based on the weighted average of particles
+        x_est: ndarray = average(self.particles, axis=0, weights=self.weights)
+
+        # Wrap angle
+        x_est[2] = arctan2(
+            average(sin(self.particles[:, 2]), weights=self.weights),
+            average(cos(self.particles[:, 2]), weights=self.weights),
+        )
+
+        # Conditional Resampling: Only resample if N_eff drops below 50%
+        if n_eff < (self.num_particles / 2.0):
+            # Calculate adaptive escape fraction
+            escape_fraction = 0.0
+            if self.slow_avg_lik > 0 and self.fast_avg_lik < self.slow_avg_lik:
+                # The fast average dropped below the slow average; spike injection rate.
+                escape_fraction = 1.0 - (self.fast_avg_lik / self.slow_avg_lik)
+
+            # Cap the maximum injection
+            escape_fraction = max(0.0, min(0.05, escape_fraction))
+
+            num_random = int(self.num_particles * escape_fraction)
+            num_normal = self.num_particles - num_random
+            normal_particles: ndarray = self.resample(
+                self.particles, self.weights, num_samples=num_normal
+            )
+
+            # Draw fresh random particles uniformly from map freespace
+            free_x = self.map_dict.get('free_x', array([]))
+            free_y = self.map_dict.get('free_y', array([]))
+
+            if num_random > 0:
+                if len(free_x) > 0:
+                    rand_indices = self.rng.choice(len(free_x), size=num_random, replace=True)
+                    random_particles = zeros((num_random, 3))
+                    random_particles[:, 0] = free_x[rand_indices]
+                    random_particles[:, 1] = free_y[rand_indices]
+                    random_particles[:, 2] = self.rng.uniform(-pi, pi, num_random)
+                else:
+                    # Safe fallback if map processing missed freespace coordinates
+                    random_particles = self.rng.multivariate_normal(
+                        x_est, cov(self.particles, rowvar=False), num_random
+                    )
+
+                # Combine both groups to form the new generation
+                new_particles: ndarray = vstack((normal_particles, random_particles))
+            else:
+                new_particles = normal_particles
+
+            # Reset weights to uniform after a resample event
+            self.weights = ones(self.num_particles) / self.num_particles
+        else:
+            new_particles = self.particles
+
+        return new_particles, x_est
+
+    def resample(
+        self, particles: ndarray, weights: ndarray, num_samples: Optional[int] = None
+    ) -> ndarray:
+        N = len(particles) if num_samples is None else num_samples
+
+        # Generate a single random start point between 0 and 1/N
+        step = 1.0 / N
+        pointers = self.rng.uniform(0, step) + arange(N) * step
+
+        # Find where those evenly spaced pointers land in the cumulative weight array
+        cumulative_sum = cumsum(weights)
+        indexes = searchsorted(cumulative_sum, pointers)
+
+        return particles[indexes]
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ParticleFilterNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+\end{verbatim}
