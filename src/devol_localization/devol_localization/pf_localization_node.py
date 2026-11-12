@@ -6,7 +6,6 @@ from scipy.ndimage import distance_transform_edt
 from numpy import (
     ndarray,
     array,
-    cov,
     float32 as np_float32,
     ones_like,
     ones,
@@ -188,11 +187,9 @@ class ParticleFilterNode(BaseLocalizationNode):
 
     def publish_state(self, stamp):
         """Publishes the estimated pose and the particle cloud for RViz"""
-        cov_3x3: ndarray = cov(self.particles, rowvar=False)
-
         # Publish state
         self.publish_pose_and_tf_runtime(
-            stamp=stamp, cov_3x3=cov_3x3, start_time=0.0, end_time=self.localization_runtime
+            stamp=stamp, cov_3x3=self.cov_est, start_time=0.0, end_time=self.localization_runtime
         )
 
         # Publish Particle Cloud

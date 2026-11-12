@@ -17,19 +17,23 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+LOC_PKG: str = 'devol_localization'
+
 
 def launch_setup(context):
     def arg(name):
         return context.perform_substitution(LaunchConfiguration(name))
 
+    def check(argument: str) -> bool:
+        return arg(argument).lower() == 'true'
+
     actions = []
 
     sim_share = get_package_share_directory('devol_sim')
-    loc_share = 'devol_localization'
-    noisy: bool = arg('noise').lower() == 'true'
-    odom_topic = '/devol_drive/noisy/odom' if noisy else '/devol_drive/odom'
+    seed: int = int(arg('seed'))
+    odom_topic = '/devol_drive/noisy/odom' if check('noise') else '/devol_drive/odom'
 
-    # Start the Simulation Pipeline
+    # Sim
     actions.append(
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -46,111 +50,119 @@ def launch_setup(context):
         )
     )
 
-    # Start Extended Kalman Filter
-    actions.append(
+    # Estimators
+    actions += [
         Node(
-            package=loc_share,
+            package=LOC_PKG,
             executable='ekf_node',
             name='ekf_localization_node',
             output='screen',
-            parameters=[{'use_sim_time': True, 'odom_topic': odom_topic, 'seed': arg('seed')}],
-        )
-    )
-
-    # Start Particle Filter
-    actions.append(
+            parameters=[{'use_sim_time': True, 'odom_topic': odom_topic, 
+                         'seed': int(arg('seed'))}],
+        ),
         Node(
-            package=loc_share,
+            package=LOC_PKG,
             executable='pf_node',
             name='particle_filter_node',
             output='screen',
             parameters=[
                 {
                     'use_sim_time': True,
-                    'seed': arg('seed'),
+                    'seed': int(arg('seed')),
                     'odom_topic': odom_topic,
                     'num_particles': int(arg('pf_num_particles')),
                 }
             ],
-        )
-    )
-
-    # Start Dead Reckoning
-    actions.append(
+        ),
         Node(
-            package=loc_share,
+            package=LOC_PKG,
             executable='dr_node',
             name='dead_reckoning_node',
             output='screen',
             parameters=[
                 {
                     'use_sim_time': True,
-                    'seed': arg('seed'),
+                    'seed': int(arg('seed')),
                     'odom_topic': odom_topic,
                 }
             ],
         )
-    )
+    ]
 
-    # Start Visualization Node
-    actions.append(
-        Node(
-            package=loc_share,
-            executable='viz_node',
-            name='localization_vis_node',
+    # visualization
+    if check('show_vis'):
+        # Start Visualization Node
+        actions.append(
+            Node(
+                package=LOC_PKG,
+                executable='viz_node',
+                name='localization_vis_node',
+                output='screen',
+                parameters=[{'use_sim_time': True}],
+            )
+        )
+
+    # log metrics
+    if check('log_metrics'):
+        actions.append(
+            Node(
+                package=LOC_PKG,
+                executable='localization_logging_node',
+                name='localization_logging_node',
+                output='screen',
+                parameters=[{'use_sim_time': True, 
+                             'rate_hz': float(arg('log_rate_hz')),
+                             'results_dir': arg('results_dir')}],
+            )
+        )
+
+    # Kidnapping
+    if check('kidnap'):
+        actions.append(
+            Node(
+                package=LOC_PKG,
+                executable='kidnapper_node',
+                name='kidnapper_node',
+                output='screen',
+                parameters=[{'use_sim_time': True}]
+            )
+        )
+
+    # Noise Injection
+    if check('noise'):
+        actions.append(
+            Node(
+                package=LOC_PKG,
+                executable='noise_injector_node',
+                name='noise_injector_node',
+                output='screen',
+                parameters=[
+                    {'use_sim_time': True, 'seed': arg('seed'), 'k': float(arg('noise_scale'))}
+                ]
+            )
+        )
+
+    # Shutdown on goal
+    if check('monitor_goal'):
+        goal_monitor = Node(
+            package=LOC_PKG,
+            executable='goal_monitor_node',
+            name='goal_monitor_node',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            condition=IfCondition(LaunchConfiguration('show_vis')),
         )
-    )
 
-    # Start Metrics Node
-    actions.append(
-        Node(
-            package=loc_share,
-            executable='metrics_node',
-            name='metrics_vis_node',
-            output='screen',
-            parameters=[{'use_sim_time': True, 'results_dir': arg('results_dir')}],
-            condition=IfCondition(LaunchConfiguration('log_metrics')),
-        )
-    )
+        actions += [
+            goal_monitor,
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=goal_monitor,
+                    on_exit=[EmitEvent(event=Shutdown(reason='Goal reached. Test complete.'))],
+                )
+            )
+        ]
 
-    actions.append(
-        Node(
-            package=loc_share,
-            executable='kidnapper_node',
-            name='kidnapper_node',
-            output='screen',
-            parameters=[{'use_sim_time': True}],
-            condition=IfCondition(LaunchConfiguration('kidnap')),
-        )
-    )
-
-    actions.append(
-        Node(
-            package=loc_share,
-            executable='noise_injector_node',
-            name='noise_injector_node',
-            output='screen',
-            parameters=[
-                {'use_sim_time': True, 'seed': arg('seed'), 'k': float(arg('noise_scale'))}
-            ],
-            condition=IfCondition(LaunchConfiguration('noise')),
-        )
-    )
-
-    goal_monitor = Node(
-        package=loc_share,
-        executable='goal_monitor_node',
-        name='goal_monitor_node',
-        output='screen',
-        parameters=[{'use_sim_time': True}],
-        condition=IfCondition(LaunchConfiguration('monitor_goal')),
-    )
-
-    actions.append(goal_monitor)
-
+    # Planner
     planner: Node = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -181,20 +193,10 @@ def launch_setup(context):
         output='log',
     )
 
-    actions.append(wait_for_ekf)
-
-    actions.append(
+    actions += [
+        wait_for_ekf,
         RegisterEventHandler(OnProcessExit(target_action=wait_for_ekf, on_exit=[planner]))
-    )
-
-    actions.append(
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=goal_monitor,
-                on_exit=[EmitEvent(event=Shutdown(reason='Goal reached. Test complete.'))],
-            )
-        )
-    )
+    ]
 
     return actions
 
@@ -209,6 +211,7 @@ def generate_launch_description():
         ('kidnap', 'true', 'kidnap?'),
         ('monitor_goal', 'true', 'Monitor goal for shutdown?'),
         ('log_metrics', 'true', 'log metrics?'),
+        ('log_rate_hz', '10.0', 'Max logging rate in Hz.'),
         ('show_vis', 'true', 'Visualize?'),
         ('seed', '31', 'Seed for RNG'),
         ('results_dir', 'results', 'relative directory for results'),

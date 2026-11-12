@@ -21,6 +21,7 @@ def yaw_from_quaternion(q):
 
 def wrap_angle(x: ndarray) -> ndarray:
     """Wrap heading to [-pi, pi] to prevent runaway angle values over time"""
+    x = x.astype(float, copy=True)
     x[2] = (x[2] + pi) % (2 * pi) - pi
     return x
 

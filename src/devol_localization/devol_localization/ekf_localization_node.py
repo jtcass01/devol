@@ -210,7 +210,7 @@ class EKFLocalizationNode(BaseLocalizationNode):
         self.localization_runtime += perf_counter() - start_time
         self.publish_pose_and_tf_runtime(
             stamp=msg.header.stamp,
-            cov_3x3=self.covariance,
+            cov_3x3=self.covariance[:3,:3],
             start_time=0.0,
             end_time=self.localization_runtime,
         )
@@ -423,10 +423,12 @@ class EKFLocalizationNode(BaseLocalizationNode):
         # Kalman Gain (K)
         K: ndarray = cov_pred @ H.T @ inv(S)
 
-        # Update the state estimate and shrink the covariance
+        # Update the state estimate and shrink the covariance using the Joseph Form
         x_update: ndarray = x_pred + K @ y_tilde
         x_update[3] = clip(x_update[3], 0.5, 1.2)
-        cov_update: ndarray = (eye(4) - K @ H) @ cov_pred
+        I_KH: ndarray = eye(4) - K @ H
+        cov_update: ndarray = I_KH @ cov_pred @ I_KH.T + K @ W_dynamic @ K.T
+        cov_update = 0.5 * (cov_update + cov_update.T)
 
         # Wrap heading to [-pi, pi] to prevent runaway angle values over time
         x_update = wrap_angle(x_update)
